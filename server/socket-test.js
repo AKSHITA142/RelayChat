@@ -1,3 +1,6 @@
+//This is a simple test client for the Socket.IO server.
+//Make sure to replace TOKEN and CHAT_ID with valid values before running.
+
 const { io } = require("socket.io-client");
 
 console.log("🚀 Starting socket client...");
