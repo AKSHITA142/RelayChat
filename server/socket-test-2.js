@@ -29,12 +29,13 @@ socket.on("user-offline", ({ userId }) => {
 });
 
 socket.on("new-message", (msg) => {
+  console.log("Message Came");
   console.log("💬 New message:", msg.content);
 });
 
 setTimeout(() => {
   socket.emit("send-message", {
     chatId: CHAT_ID,
-    content: "Hello from Yashvi Hello👋",
+    content: "Hello from Yashvi Hello 12345👋",
   });
 }, 3000);

@@ -53,33 +53,78 @@ function initSocket(server) {
     socket.join(socket.userId);
 
     // 🔔 JOIN CHAT ROOM
-    socket.on("join-chat", (chatId) => {
-      socket.join(chatId);
-      console.log(`➡️ ${socket.userId} joined chat ${chatId}`);
+    socket.on("join-chat", (chatId, cb) => {
+      const roomId = chatId.toString();   // 👈 FORCE STRING
+      socket.join(roomId);
+
+      console.log(
+        "✅ joined chat room:",
+        roomId,
+        "socket:",
+        socket.id
+      );
+
+      cb && cb();
     });
 
     // 💬 SEND MESSAGE TO CHAT
     socket.on("send-message", async ({ chatId, content }) => {
-      if (!mongoose.Types.ObjectId.isValid(chatId)) return;
+    try {
+      console.log("📩 send-message EVENT HIT");
+      console.log("📩 chatId:", chatId);
+      console.log("📩 content:", content);
 
+      // 1️⃣ Validate chatId
+      if (!mongoose.Types.ObjectId.isValid(chatId)) {
+        console.log("❌ Invalid chatId");
+        return;
+      }
+
+      // 2️⃣ Check chat exists
+      const chat = await Chat.findById(chatId);
+      if (!chat) {
+        console.log("❌ Chat not found in DB");
+        return;
+      }
+
+      // 3️⃣ Create message
       const message = await Message.create({
         sender: socket.userId,
         chat: chatId,
         content,
       });
 
+      console.log("✅ Message saved:", message._id);
+
+      // 4️⃣ Update last message
       await Chat.findByIdAndUpdate(chatId, {
         lastMessage: message._id,
       });
+
+      console.log("✅ Chat updated");
+
+      // 5️⃣ Emit to room
+      console.log("📤 Emitting to room",
+        chatId,
+        "Sockets in room:",
+        io.sockets.adapter.rooms.get(chatId)?.size
+      );
 
       io.to(chatId).emit("new-message", {
         _id: message._id,
         chat: chatId,
         sender: socket.userId,
-        content,
+        content: message.content,
         createdAt: message.createdAt,
       });
-    });
+
+      console.log("📤 Message emitted to room");
+
+    } catch (err) {
+      console.error("🔥 SEND MESSAGE ERROR:", err);
+    }
+  });
+
 
     // 🔴 DISCONNECT
     socket.on("disconnect", async () => {
