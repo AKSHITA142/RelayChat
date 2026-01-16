@@ -1,93 +1,99 @@
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
+const User = require("./models/User");
 const Message = require("./models/Message");
 const Chat = require("./models/Chat");
 
-let io;
-
 function initSocket(server) {
-  io = new Server(server, {
+  const io = new Server(server, {
     cors: { origin: "*" },
   });
 
-  // 🔐 JWT AUTH — THIS MUST EXIST
+  // 🔐 AUTH
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
       if (!token) return next(new Error("No token"));
 
       const decoded = jwt.verify(token, "SECRET_KEY");
-      socket.userId = decoded.id; // 🔥 REQUIRED
-
-      console.log("🔐 Socket user:", socket.userId);
+      socket.userId = decoded.id;
       next();
-    } catch (err) {
+    } catch {
       next(new Error("Invalid token"));
     }
   });
 
+  io.on("connection", async (socket) => {
+    console.log("✅ Connected:", socket.userId);
 
-  io.on("connection", (socket) => {
-    console.log("✅ Socket connected:", socket.id);
-    console.log("👤 User ID:", socket.userId);
+    // 🔵 SEND EXISTING ONLINE USERS
+    const onlineUsers = await User.find({
+      isOnline: true,
+      _id: { $ne: socket.userId },
+    }).select("_id");
 
-    // join personal room
+    socket.emit(
+      "online-users",
+      onlineUsers.map(u => ({ _id: u._id }))
+    );
+
+    // 🔵 MARK CURRENT USER ONLINE
+    await User.findByIdAndUpdate(socket.userId, {
+      isOnline: true,
+      lastSeen: null,
+    });
+
+    // 🔵 BROADCAST USER ONLINE
+    socket.broadcast.emit("user-online", {
+      userId: socket.userId,
+    });
+
+    // 🔔 JOIN PERSONAL ROOM
     socket.join(socket.userId);
 
-    // join chat room
+    // 🔔 JOIN CHAT ROOM
     socket.on("join-chat", (chatId) => {
       socket.join(chatId);
-      console.log(`📥 User ${socket.userId} joined chat ${chatId}`);
+      console.log(`➡️ ${socket.userId} joined chat ${chatId}`);
     });
 
-    // send message
+    // 💬 SEND MESSAGE TO CHAT
     socket.on("send-message", async ({ chatId, content }) => {
-  try {
-    console.log("📨 Incoming:", { chatId, content });
-    console.log("👤 Sender:", socket.userId);
+      if (!mongoose.Types.ObjectId.isValid(chatId)) return;
 
-    // 🔴 HARD VALIDATION (NO GUESSING)
-    if (!mongoose.Types.ObjectId.isValid(chatId)) {
-      throw new Error("Invalid chatId");
-    }
+      const message = await Message.create({
+        sender: socket.userId,
+        chat: chatId,
+        content,
+      });
 
-    if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
-      throw new Error("Invalid sender id");
-    }
+      await Chat.findByIdAndUpdate(chatId, {
+        lastMessage: message._id,
+      });
 
-    // 🔥 SAVE MESSAGE (MATCHES YOUR SCHEMA)
-    const message = await Message.create({
-      sender: socket.userId,
-      chat: chatId,
-      content,
+      io.to(chatId).emit("new-message", {
+        _id: message._id,
+        chat: chatId,
+        sender: socket.userId,
+        content,
+        createdAt: message.createdAt,
+      });
     });
 
-    // 🔥 UPDATE CHAT
-    await Chat.findByIdAndUpdate(chatId, {
-      lastMessage: message._id,
-    });
+    // 🔴 DISCONNECT
+    socket.on("disconnect", async () => {
+      await User.findByIdAndUpdate(socket.userId, {
+        isOnline: false,
+        lastSeen: new Date(),
+      });
 
-    // 🔥 EMIT
-    io.to(chatId).emit("new-message", {
-      _id: message._id,
-      chat: message.chat,
-      sender: message.sender,
-      content: message.content,
-      createdAt: message.createdAt,
-    });
+      socket.broadcast.emit("user-offline", {
+        userId: socket.userId,
+        lastSeen: new Date(),
+      });
 
-    console.log("✅ Message saved:", message._id);
-
-  } catch (error) {
-    console.error("❌ REAL ERROR:", error.message);
-    socket.emit("error-message", error.message);
-  }
-});
-
-
-    socket.on("disconnect", () => {
-      console.log("❌ Socket disconnected:", socket.id);
+      console.log("❌ Disconnected:", socket.userId);
     });
   });
 }

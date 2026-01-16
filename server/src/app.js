@@ -16,6 +16,9 @@ app.use("/api/user", userRoutes);
 const chatRoutes = require("./routes/chat.routes");
 app.use("/api/chat", chatRoutes);
 
+const messageRoutes = require("./routes/message.routes");
+app.use("/api/message", messageRoutes);
+
 
 const deleteUser = require("./routes/admin.route");
 app.use("/api/admin", deleteUser);

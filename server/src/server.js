@@ -3,17 +3,16 @@ const app = require("./app");
 const connectDB = require("./config/db");
 const initSocket = require("./socket");
 
-const PORT = process.env.PORT || 5000;
+const PORT = 5000;
 
-connectDB();
+(async () => {
+  await connectDB();               // 🔥 DB FIRST
+  console.log("✅ MongoDB connected");
 
-// 🔥 MUST CREATE HTTP SERVER
-const server = http.createServer(app);
+  const server = http.createServer(app);
+  initSocket(server);              // 🔥 Socket AFTER DB
 
-// 🔥 MUST PASS SERVER TO SOCKET
-initSocket(server);
-
-// 🔥 LISTEN ON SERVER (NOT app)
-server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
+  });
+})();

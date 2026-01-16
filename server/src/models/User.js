@@ -21,7 +21,15 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["user", "admin"],
       default: "user"
-    }
+    },
+    lastSeen: {
+      type: Date,
+      default: null,
+    },
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

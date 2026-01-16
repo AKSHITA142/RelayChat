@@ -7,3 +7,4 @@ const { createChat } = require("../controllers/chat.controller");
 router.post("/create", authMiddleware, createChat);
 
 module.exports = router;
+
