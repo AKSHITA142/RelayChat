@@ -15,7 +15,18 @@ const messageSchema = new mongoose.Schema(
     content: {
       type: String,
       required: true
-    }
+    },
+    status: {
+      type: String,
+      enum: ["sent", "delivered", "seen"],
+      default: "sent",
+    },
+    seenBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   { timestamps: true }
 );
