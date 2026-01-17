@@ -17,7 +17,6 @@ function initSocket(server) {
       if (!token) return next(new Error("No token"));
 
       const decoded = jwt.verify(token, "SECRET_KEY");
-      console.log(decoded);
       socket.userId = decoded.id;
       next();
     } catch {
@@ -26,8 +25,40 @@ function initSocket(server) {
   });
 
   io.on("connection", async (socket) => {
-    console.log("✅ Connected:", socket.userId);
+    console.log("🔵 SOCKET CONNECTED:", socket.id, socket.userId);
 
+    // JOIN CHAT ROOM
+    socket.on("join-chat", (chatId, cb) => {
+      const roomId = chatId.toString();
+      socket.join(roomId);
+
+      console.log("🟣 JOIN-CHAT:", socket.userId, roomId);
+      cb && cb();
+    });
+
+
+    // TYPING
+    socket.on("typing", (chatId) => {
+      const roomId = chatId.toString();
+
+      console.log("✍️ TYPING:", socket.userId, roomId);
+
+      //This line Means:“Target everyone in roomId EXCEPT this socket”
+      socket.to(roomId).emit("typing", {
+        userId: socket.userId,
+      });
+    });
+
+    // STOP TYPING
+    socket.on("stop-typing", (chatId) => {
+      const roomId = chatId.toString();
+
+      console.log("🛑 STOP-TYPING:", socket.userId, roomId);
+
+      socket.to(roomId).emit("stop-typing", {
+        userId: socket.userId,
+      });
+    });
     // 🔵 SEND EXISTING ONLINE USERS
     const onlineUsers = await User.find({
       isOnline: true,
@@ -50,33 +81,12 @@ function initSocket(server) {
       userId: socket.userId,
     });
 
-    // 🔔 JOIN PERSONAL ROOM
-    socket.join(socket.userId);
-
-    // 🔔 JOIN CHAT ROOM
-    socket.on("join-chat", (chatId, cb) => {
-      const roomId = chatId.toString();   // 👈 FORCE STRING
-      socket.join(roomId);
-
-      console.log(
-        "✅ joined chat room:",
-        roomId,
-        "socket:",
-        socket.id
-      );
-
-      cb && cb();
-    });
-
-    // 💬 SEND MESSAGE TO CHAT
+    // SEND MESSAGE
     socket.on("send-message", async ({ chatId, content }) => {
-    try {
+      try{
       const roomId = chatId.toString();
-      console.log("📩 send-message EVENT HIT");
-      console.log("📩 chatId:", roomId);
-      console.log("📩 content:", content);
 
-      // 1️⃣ Validate chatId
+
       if (!mongoose.Types.ObjectId.isValid(roomId)) {
         console.log("❌ Invalid chatId");
         return;
@@ -89,28 +99,18 @@ function initSocket(server) {
         return;
       }
 
-      // 3️⃣ Create message
       const message = await Message.create({
         sender: socket.userId,
         chat: roomId,
         content,
       });
-
       console.log("✅ Message saved:", message._id);
 
       // 4️⃣ Update last message
       await Chat.findByIdAndUpdate(roomId, {
         lastMessage: message._id,
       });
-
       console.log("✅ Chat updated");
-
-      // 5️⃣ Emit to room
-      console.log("📤 Emitting to room",
-        roomId,
-        "Sockets in room:",
-        io.sockets.adapter.rooms.get(roomId)?.size
-      );
 
       io.to(roomId).emit("new-message", {
         _id: message._id,
@@ -119,16 +119,13 @@ function initSocket(server) {
         content: message.content,
         createdAt: message.createdAt,
       });
-
-      console.log("📤 Message emitted to room");
-
+      console.log("📨 SEND-MESSAGE:", socket.userId, roomId);
     } catch (err) {
+
       console.error("🔥 SEND MESSAGE ERROR:", err);
     }
-  });
-
-
-    // 🔴 DISCONNECT
+    });
+    // DISCONNECT
     socket.on("disconnect", async () => {
       await User.findByIdAndUpdate(socket.userId, {
         isOnline: false,
@@ -146,3 +143,4 @@ function initSocket(server) {
 }
 
 module.exports = initSocket;
+

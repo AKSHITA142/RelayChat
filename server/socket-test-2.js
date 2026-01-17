@@ -1,9 +1,9 @@
-//This is a simple test client for the Socket.IO server.
-//Make sure to replace TOKEN and CHAT_ID with valid values before running.
+// //This is a simple test client for the Socket.IO server.
+// //Make sure to replace TOKEN and CHAT_ID with valid values before running.
+
 const { io } = require("socket.io-client");
 
-const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Njc3MjY0ZmU1MTI1Y2ZmNTY1YTI3YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4NjI1OTU4LCJleHAiOjE3Njg2Mjk1NTh9.B5pAgQXTPbAji0vQLE7hnHYMVkvet2mcoF-Q24pqAhg";
-
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Njc3MjY0ZmU1MTI1Y2ZmNTY1YTI3YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4NjU1MTg1LCJleHAiOjE3Njg2NTg3ODV9.MDfjuA7drchhOvDCC2hG3iAifTsVMFMOPfv7TjOnJJo";
 const CHAT_ID = "69677a5c9a67e5ca11a58b6e";
 
 const socket = io("http://localhost:5000", {
@@ -12,8 +12,24 @@ const socket = io("http://localhost:5000", {
 
 socket.on("connect", () => {
   console.log("🟢 Yashvi connected");
-  socket.emit("join",socket.id);
-  socket.emit("join-chat", CHAT_ID);
+
+  socket.emit("join-chat", CHAT_ID, () => {
+    console.log("✅ Yashvi joined chat");
+
+    // START TYPING
+    socket.emit("typing", CHAT_ID);
+
+    setTimeout(() => {
+      socket.emit("stop-typing", CHAT_ID);
+    }, 2000);
+
+    setTimeout(() => {
+      socket.emit("send-message", {
+        chatId: CHAT_ID,
+        content: "Hello Akshita Jariwala👋",
+      });
+    }, 3000);
+  });
 });
 
 socket.on("online-users", (users) => {
@@ -30,14 +46,19 @@ socket.on("user-offline", ({ userId }) => {
   console.log("🔴 User went offline:", userId);
 });
 
-socket.on("new-message", (msg) => {
-  console.log("Message Came");
-  console.log("💬 New message:", msg.content);
+socket.on("typing", ({ userId }) => {
+  console.log("✍️ Someone typing:", userId);
 });
 
-setTimeout(() => {
-  socket.emit("send-message", {
-    chatId: CHAT_ID,
-    content: "Hello from Yashvi Hello 12345👋.. how r you",
-  });
-}, 3000);
+socket.on("stop-typing", ({ userId }) => {
+  console.log("🛑 Someone stopped typing:", userId);
+});
+
+socket.on("new-message", (msg) => {
+  console.log("💬 New message:", msg.content);
+});
+// KEEP ALIVE
+setInterval(() => {}, 1000);
+//for to restart server again after changes
+//Here it is nessasary to write but in server it's not nessasary if want to change any server code b/c there nodemon is used and it is automatically restart the server after changes
+
