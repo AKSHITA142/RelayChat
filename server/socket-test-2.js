@@ -2,7 +2,8 @@
 //Make sure to replace TOKEN and CHAT_ID with valid values before running.
 const { io } = require("socket.io-client");
 
-const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Njc3MjY0ZmU1MTI1Y2ZmNTY1YTI3YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4NTM3MTMzLCJleHAiOjE3Njg1NDA3MzN9.AMWBdKDZNOLv3k8U_ixIaTr0FD48F6ysuVqhaqjYDlU";
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Njc3MjY0ZmU1MTI1Y2ZmNTY1YTI3YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4NjI1OTU4LCJleHAiOjE3Njg2Mjk1NTh9.B5pAgQXTPbAji0vQLE7hnHYMVkvet2mcoF-Q24pqAhg";
+
 const CHAT_ID = "69677a5c9a67e5ca11a58b6e";
 
 const socket = io("http://localhost:5000", {
@@ -11,6 +12,7 @@ const socket = io("http://localhost:5000", {
 
 socket.on("connect", () => {
   console.log("🟢 Yashvi connected");
+  socket.emit("join",socket.id);
   socket.emit("join-chat", CHAT_ID);
 });
 
@@ -36,6 +38,6 @@ socket.on("new-message", (msg) => {
 setTimeout(() => {
   socket.emit("send-message", {
     chatId: CHAT_ID,
-    content: "Hello from Yashvi Hello 12345👋",
+    content: "Hello from Yashvi Hello 12345👋.. how r you",
   });
 }, 3000);

@@ -17,6 +17,7 @@ function initSocket(server) {
       if (!token) return next(new Error("No token"));
 
       const decoded = jwt.verify(token, "SECRET_KEY");
+      console.log(decoded);
       socket.userId = decoded.id;
       next();
     } catch {
@@ -70,18 +71,19 @@ function initSocket(server) {
     // 💬 SEND MESSAGE TO CHAT
     socket.on("send-message", async ({ chatId, content }) => {
     try {
+      const roomId = chatId.toString();
       console.log("📩 send-message EVENT HIT");
-      console.log("📩 chatId:", chatId);
+      console.log("📩 chatId:", roomId);
       console.log("📩 content:", content);
 
       // 1️⃣ Validate chatId
-      if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      if (!mongoose.Types.ObjectId.isValid(roomId)) {
         console.log("❌ Invalid chatId");
         return;
       }
 
       // 2️⃣ Check chat exists
-      const chat = await Chat.findById(chatId);
+      const chat = await Chat.findById(roomId);
       if (!chat) {
         console.log("❌ Chat not found in DB");
         return;
@@ -90,14 +92,14 @@ function initSocket(server) {
       // 3️⃣ Create message
       const message = await Message.create({
         sender: socket.userId,
-        chat: chatId,
+        chat: roomId,
         content,
       });
 
       console.log("✅ Message saved:", message._id);
 
       // 4️⃣ Update last message
-      await Chat.findByIdAndUpdate(chatId, {
+      await Chat.findByIdAndUpdate(roomId, {
         lastMessage: message._id,
       });
 
@@ -105,14 +107,14 @@ function initSocket(server) {
 
       // 5️⃣ Emit to room
       console.log("📤 Emitting to room",
-        chatId,
+        roomId,
         "Sockets in room:",
-        io.sockets.adapter.rooms.get(chatId)?.size
+        io.sockets.adapter.rooms.get(roomId)?.size
       );
 
-      io.to(chatId).emit("new-message", {
+      io.to(roomId).emit("new-message", {
         _id: message._id,
-        chat: chatId,
+        chat: roomId,
         sender: socket.userId,
         content: message.content,
         createdAt: message.createdAt,
