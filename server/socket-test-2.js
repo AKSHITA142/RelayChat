@@ -3,7 +3,7 @@
 
 const { io } = require("socket.io-client");
 
-const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Njc3MjY0ZmU1MTI1Y2ZmNTY1YTI3YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4NjU1MTg1LCJleHAiOjE3Njg2NTg3ODV9.MDfjuA7drchhOvDCC2hG3iAifTsVMFMOPfv7TjOnJJo";
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Njc3MjY0ZmU1MTI1Y2ZmNTY1YTI3YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4Njc0ODQ5LCJleHAiOjE3Njg2Nzg0NDl9.zc6dj1fSKBWl2VHSoFdtqlrheoAJ-UhEskBd2OB0APY";
 const CHAT_ID = "69677a5c9a67e5ca11a58b6e";
 
 const socket = io("http://localhost:5000", {
@@ -57,6 +57,15 @@ socket.on("stop-typing", ({ userId }) => {
 socket.on("new-message", (msg) => {
   console.log("💬 New message:", msg.content);
 });
+
+socket.on("message-delivered", ({ messageId }) => {
+  console.log("✅ Message delivered:", messageId);
+});
+
+socket.on("message-seen", ({ chatId, userId }) => {
+  console.log("👀 Messages seen in chat:", chatId, "by", userId);
+});
+
 // KEEP ALIVE
 setInterval(() => {}, 1000);
 //for to restart server again after changes

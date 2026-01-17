@@ -3,7 +3,7 @@
 
 const { io } = require("socket.io-client");
 
-const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NjViM2MwYjJmODRjNjRjZTA1ZGY0YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4NjU1MjU4LCJleHAiOjE3Njg2NTg4NTh9.6lOMlJVzaypG-E-y_BNXJW-FvUexOUAnxUHEoi5_YDw";
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NjViM2MwYjJmODRjNjRjZTA1ZGY0YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4Njc0ODgxLCJleHAiOjE3Njg2Nzg0ODF9.n6609mQcUiUTEwKWQ4EQPUtG46CJcUcKLZ_ecFAV1mM";
 const CHAT_ID = "69677a5c9a67e5ca11a58b6e";
 
 const socket = io("http://localhost:5000", {
@@ -28,7 +28,11 @@ socket.on("connect", () => {
         content: "Hello Yashvi BhangavanWala👋",
       });
     }, 3000);
-    
+    setTimeout(() => {
+      console.log("👀 Opening chat");
+      socket.emit("mark-seen", { chatId: CHAT_ID });
+    }, 5000);
+
   });
 });
 
@@ -56,6 +60,14 @@ socket.on("stop-typing", ({ userId }) => {
 
 socket.on("new-message", (msg) => {
     console.log("💬 New message:", msg.content);
+});
+
+socket.on("message-delivered", ({ messageId }) => {
+  console.log("✅ Message delivered:", messageId);
+});
+
+socket.on("message-seen", ({ chatId, userId }) => {
+  console.log("👀 Messages seen in chat:", chatId, "by", userId);
 });
 
 // KEEP ALIVE

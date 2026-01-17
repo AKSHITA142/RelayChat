@@ -112,6 +112,14 @@ function initSocket(server) {
       });
       console.log("✅ Chat updated");
 
+      message.status = "delivered";
+      await message.save();
+
+      // notify sender
+      socket.emit("message-delivered", {
+        messageId: message._id,
+      });
+
       io.to(roomId).emit("new-message", {
         _id: message._id,
         chat: roomId,
@@ -120,6 +128,32 @@ function initSocket(server) {
         createdAt: message.createdAt,
       });
       console.log("📨 SEND-MESSAGE:", socket.userId, roomId);
+
+      // notify receiver(s)
+      socket.to(roomId).emit("message-delivered", {
+        messageId: message._id,
+      });
+
+      socket.on("mark-seen", async ({ chatId }) => {
+      const messages = await Message.updateMany(
+        {
+          //📌 $addToSet avoids duplicates
+          //📌 Only marks others’ messages
+          chat: chatId,
+          sender: { $ne: socket.userId },
+          seenBy: { $ne: socket.userId },
+        },
+        {
+          $addToSet: { seenBy: socket.userId },
+          $set: { status: "seen" },
+        }
+      );
+
+      socket.to(chatId).emit("message-seen", {
+        chatId,
+        userId: socket.userId,
+      });
+    });
     } catch (err) {
 
       console.error("🔥 SEND MESSAGE ERROR:", err);
