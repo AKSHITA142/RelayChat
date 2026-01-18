@@ -36,7 +36,6 @@ function initSocket(server) {
       cb && cb();
     });
 
-
     // TYPING
     socket.on("typing", (chatId) => {
       const roomId = chatId.toString();
@@ -98,6 +97,7 @@ function initSocket(server) {
         console.log("❌ Chat not found in DB");
         return;
       }
+      // 3️⃣ Save message
 
       const message = await Message.create({
         sender: socket.userId,
@@ -133,13 +133,19 @@ function initSocket(server) {
       socket.to(roomId).emit("message-delivered", {
         messageId: message._id,
       });
+    } catch (err) {
 
-      socket.on("mark-seen", async ({ chatId }) => {
+      console.error("🔥 SEND MESSAGE ERROR:", err);
+    }
+    });
+    // MARK SEEN
+    socket.on("mark-seen", async ({ chatId }) => {
+      const roomId = chatId.toString();
       const messages = await Message.updateMany(
         {
           //📌 $addToSet avoids duplicates
           //📌 Only marks others’ messages
-          chat: chatId,
+          chat: roomId,
           sender: { $ne: socket.userId },
           seenBy: { $ne: socket.userId },
         },
@@ -149,16 +155,36 @@ function initSocket(server) {
         }
       );
 
-      socket.to(chatId).emit("message-seen", {
-        chatId,
-        userId: socket.userId,
+      socket.to(roomId).emit("message-seen", {
+          chatId: roomId,
+          userId: socket.userId,
       });
     });
-    } catch (err) {
+    // DELETE MESSAGE
+    socket.on("delete-for-me", async ({ messageId }) => {
+      const msgId = messageId.toString();
+      await Message.findByIdAndUpdate(msgId, {
+        $addToSet: { deletedFor: socket.userId },
+      });
 
-      console.error("🔥 SEND MESSAGE ERROR:", err);
-    }
+      socket.emit("message-deleted-for-me", { messageId: msgId });
     });
+
+    socket.on("delete-for-everyone", async ({ messageId, chatId }) => {
+      const msgId = messageId.toString();
+      const roomId = chatId.toString();
+      const msg = await Message.findById(msgId);
+      if (!msg || msg.sender.toString() !== socket.userId) return;
+
+      msg.isDeleted = true;
+      msg.content = "This message was deleted";
+      await msg.save();
+
+      io.to(roomId).emit("message-deleted-for-everyone", {
+        messageId: msgId,
+      });
+    });
+
     // DISCONNECT
     socket.on("disconnect", async () => {
       await User.findByIdAndUpdate(socket.userId, {
@@ -172,7 +198,10 @@ function initSocket(server) {
       });
 
       console.log("❌ Disconnected:", socket.userId);
+
     });
+
+
   });
 }
 
