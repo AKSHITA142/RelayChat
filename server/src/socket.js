@@ -36,6 +36,7 @@ function initSocket(server) {
       cb && cb();
     });
 
+    
     // TYPING
     socket.on("typing", (chatId) => {
       const roomId = chatId.toString();
@@ -58,6 +59,15 @@ function initSocket(server) {
         userId: socket.userId,
       });
     });
+    // OPEN CHAT
+    socket.on("open-chat", async (chatId) => {
+      const roomId = chatId.toString();
+      const chat = await Chat.findById(roomId);
+      chat.unreadCounts.set(socket.userId, 0);
+      await chat.save();
+      socket.to(roomId).emit("chat-opened");//this is just for clerification
+    });
+
     // 🔵 SEND EXISTING ONLINE USERS
     const onlineUsers = await User.find({
       isOnline: true,
@@ -133,6 +143,16 @@ function initSocket(server) {
       socket.to(roomId).emit("message-delivered", {
         messageId: message._id,
       });
+
+      chat.participants.forEach((userId) => {
+        if (userId.toString() !== socket.userId) {
+          const count = chat.unreadCounts.get(userId.toString()) || 0;
+          chat.unreadCounts.set(userId.toString(), count + 1);
+        }
+      });
+
+      await chat.save();
+
     } catch (err) {
 
       console.error("🔥 SEND MESSAGE ERROR:", err);

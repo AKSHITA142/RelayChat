@@ -35,3 +35,21 @@ exports.createChat = async (req, res) => {
     });
   }
 };
+
+exports.getMyChats = async (req, res) => {
+   const userId = req.user.id;
+
+
+  const chats = await Chat.find({ participants: userId })
+    .populate("lastMessage")
+    .lean();
+
+  const result = chats.map(chat => ({
+    _id: chat._id,
+    participants: chat.participants,
+    lastMessage: chat.lastMessage,
+    unreadCount: chat.unreadCounts?.[userId] || 0
+  }));
+
+  res.json(result);
+};

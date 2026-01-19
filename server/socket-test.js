@@ -3,9 +3,9 @@
 
 const { io } = require("socket.io-client");
 
-const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NjViM2MwYjJmODRjNjRjZTA1ZGY0YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4NzM0ODcwLCJleHAiOjE3Njg3Mzg0NzB9.TmblQ5vIR11Y2HNOVSfaHiedmnhnWbGiIT7-a3Z-UcQ";
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NjViM2MwYjJmODRjNjRjZTA1ZGY0YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4ODI1ODM1LCJleHAiOjE3Njg4Mjk0MzV9.atsZpmcOUoeVURIi542dOZs3D89azevaDFSsDRwgNkA";
 const CHAT_ID = "69677a5c9a67e5ca11a58b6e";
-const messageId2 = "696cc0b52b62834778dd4246";
+const messageId2 = "6969c6affe735c59f90b83b1";
 
 const socket = io("http://localhost:5000", {
   auth: { token: TOKEN },
@@ -16,7 +16,9 @@ socket.on("connect", () => {
 
   socket.emit("join-chat", CHAT_ID, () => {
     console.log("✅ Akshita joined chat");
-
+    
+    socket.emit("open-chat", CHAT_ID);
+    
     socket.emit("typing", CHAT_ID);
 
     setTimeout(() => {
@@ -43,10 +45,8 @@ socket.on("connect", () => {
   });
 });
 
-socket.on("online-users", (users) => {
-  users.forEach(u => {
-    console.log("🟢 ONLINE:", u._id);
-  });
+socket.on("chat-opened", () => {
+  console.log("📖 Chat opened by other user");
 });
 
 socket.on("typing", ({ userId }) => {
@@ -55,6 +55,12 @@ socket.on("typing", ({ userId }) => {
 
 socket.on("stop-typing", ({ userId }) => {
   console.log("🛑 Someone stopped typing:", userId);
+});
+
+socket.on("online-users", (users) => {
+  users.forEach(u => {
+    console.log("🟢 ONLINE:", u._id);
+  });
 });
 
 socket.on("user-online", ({ userId }) => {

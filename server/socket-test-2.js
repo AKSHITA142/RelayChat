@@ -3,9 +3,9 @@
 
 const { io } = require("socket.io-client");
 
-const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Njc3MjY0ZmU1MTI1Y2ZmNTY1YTI3YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4NzM0ODUzLCJleHAiOjE3Njg3Mzg0NTN9.-AF8FcMyZPVI0y_3jwSqnIQHmfufF09oYvKfaLJauuA";
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Njc3MjY0ZmU1MTI1Y2ZmNTY1YTI3YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4ODI2MTY4LCJleHAiOjE3Njg4Mjk3Njh9.IvSSGEsJ_QxnRCEjIv8FLpZ5_8U8TRq0e0WfOzOiICU";
 const CHAT_ID = "69677a5c9a67e5ca11a58b6e";
-const messageId1 = "696cc0b72b62834778dd424c";
+const messageId1 = "6969c6acfe735c59f90b83ad";
 // const messageId2 = "696ca814569c1d2449b530e2";
 
 const socket = io("http://localhost:5000", {
@@ -17,6 +17,8 @@ socket.on("connect", () => {
 
   socket.emit("join-chat", CHAT_ID, () => {
     console.log("✅ Yashvi joined chat");
+
+    // socket.emit("open-chat", CHAT_ID);
 
     // START TYPING
     socket.emit("typing", CHAT_ID);
@@ -55,6 +57,10 @@ socket.on("typing", ({ userId }) => {
 
 socket.on("stop-typing", ({ userId }) => {
   console.log("🛑 Someone stopped typing:", userId);
+});
+
+socket.on("chat-opened", () => {
+  console.log("📖 Chat opened by other user");
 });
 
 socket.on("online-users", (users) => {
