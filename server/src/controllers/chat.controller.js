@@ -53,3 +53,40 @@ exports.getMyChats = async (req, res) => {
 
   res.json(result);
 };
+
+exports.createGroup = async (req, res) => {
+  const { name, users } = req.body;
+
+  const chat = await Chat.create({
+    isGroup: true,
+    groupName: name,
+    participants: [...users, req.user.id],
+    groupAdmin: req.user.id,
+  });
+
+  res.json(chat);
+};
+
+exports.addToGroup = async (req, res) => {
+  const chat = await Chat.findById(req.params.chatId);
+
+  if (chat.groupAdmin.toString() !== req.user.id)
+    return res.status(403).json({ msg: "Only admin" });
+
+  chat.participants.addToSet(req.body.userId);
+  await chat.save();
+
+  res.json(chat);
+};
+
+exports.removeFromGroup = async (req, res) => {
+  const chat = await Chat.findById(req.params.chatId);
+
+  if (chat.groupAdmin.toString() !== req.user.id)
+    return res.status(403).json({ msg: "Only admin" });
+
+  chat.participants.pull(req.body.userId);
+  await chat.save();
+
+  res.json(chat);
+};
