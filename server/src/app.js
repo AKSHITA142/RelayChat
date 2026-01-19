@@ -3,10 +3,16 @@ const express = require("express");
 
 const app = express();
 
+const helmet = require("helmet");
+app.use(helmet());
+
 // middleware
 app.use(express.json());
 
 // routes
+const rateLimiter = require("./middleware/rateLimit");
+app.use("/api", rateLimiter);
+
 const authRoutes = require("./routes/auth.routes");
 app.use("/api/auth", authRoutes);
 
