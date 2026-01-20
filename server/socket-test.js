@@ -3,7 +3,7 @@
 
 const { io } = require("socket.io-client");
 
-const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NjViM2MwYjJmODRjNjRjZTA1ZGY0YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4ODI1ODM1LCJleHAiOjE3Njg4Mjk0MzV9.atsZpmcOUoeVURIi542dOZs3D89azevaDFSsDRwgNkA";
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NjViM2MwYjJmODRjNjRjZTA1ZGY0YiIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY4OTA3MTk3LCJleHAiOjE3Njg5MTA3OTd9.Li3BIyv6aI4yhMsYWcLpPG4WVGpJaJaDVzyj8r7Nbw8";
 const CHAT_ID = "69677a5c9a67e5ca11a58b6e";
 const messageId2 = "6969c6affe735c59f90b83b1";
 
