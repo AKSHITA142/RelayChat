@@ -2,6 +2,7 @@ import Message from "./Message";
 import { useEffect } from "react";
 import socket from "../services/socket";
 
+//only runs once when component is mounted
 export default function ChatWindow() {
   useEffect(() => {
     socket.on("new-message", msg => {
