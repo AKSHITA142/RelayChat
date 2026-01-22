@@ -37,9 +37,10 @@ exports.createChat = async (req, res) => {
 };
 
 exports.getMyChats = async (req, res) => {
-   const userId = req.user.id;
+  const userId = req.user.id;
 
-
+  //populate means:Replace the LastMessage ObjectId with the actual referenced document
+  //lean does:Returns plain JavaScript objects instead of Mongoose documents
   const chats = await Chat.find({ participants: userId })
     .populate("lastMessage")
     .lean();

@@ -1,7 +1,9 @@
-export default function Message({ text, isMe }) {
+export default function Message({ msg }) {
+  const myId = localStorage.getItem("userId");
+
   return (
-    <div className={`message ${isMe ? "sent" : "received"}`}>
-      {text}
+    <div className={msg.sender === myId ? "msg me" : "msg"}>
+      {msg.content}
     </div>
   );
 }

@@ -131,3 +131,11 @@ input {
   border-radius: 999px;
   float: right;
 }
+.input-box button {
+  margin-left: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #22c55e;
+  cursor: pointer;
+}
