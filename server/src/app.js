@@ -9,6 +9,7 @@ app.use(cors({
   credentials: true
 }));
 
+//header is used to add header for security purpose
 const helmet = require("helmet");
 app.use(helmet());
 
@@ -16,6 +17,7 @@ app.use(helmet());
 app.use(express.json());
 
 // routes
+//app.use() is used to mount (attach) a group of routes under a common base path.
 const rateLimiter = require("./middleware/rateLimit");
 app.use("/api", rateLimiter);
 

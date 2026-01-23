@@ -5,7 +5,7 @@ const { getProfile } = require("../controllers/user.controller");
 
 const router = express.Router();
 
-//Middleware sits b/w route and controller
+//Middleware sits b/w routes and controller
 router.get("/profile", authMiddleware, getProfile);
 
 module.exports = router;

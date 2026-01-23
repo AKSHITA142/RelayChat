@@ -14,6 +14,7 @@ exports.createChat = async (req, res) => {
     // check if chat already exists
     let chat = await Chat.findOne({
       isGroup: false,
+      //$all is a MongoDB query operator.
       participants: { $all: [req.user.id, userId] }
     });
 
