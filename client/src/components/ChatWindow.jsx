@@ -3,38 +3,34 @@ import Message from "./Message";
 import socket from "../services/socket";
 import api from "../services/api";
 
-export default function ChatWindow({ selectedChat, chats, setChats }) {
+import { getLoggedInUser } from "../utils/auth";  
+const myUserId = getLoggedInUser()?._id;
+
+export default function ChatWindow({ selectedChat, setChats }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
 
   useEffect(() => {
-    if (!selectedChat) return;    
-    api.get(`/chat/${selectedChat._id}/messages`)
-      .then(res => setMessages(res.data))
-      .catch(console.error);
+  if (!selectedChat) return;
 
-    socket.emit("join-chat", selectedChat._id);
-  }, [selectedChat]);
+  api.get(`/message/${selectedChat._id}`)
+    .then(res => setMessages(res.data));
 
-  useEffect(() => {
-  socket.on("new-message", msg => {
-  // ❌ Ignore if this message is already added optimistically
-  if (msg.sender === "me") return;
+  socket.emit("join-chat", selectedChat._id);
+}, [selectedChat]);
 
-  setChats(prev =>
-    prev.map(c =>
-      c._id === msg.chat ? { ...c, lastMessage: msg } : c
-    )
-  );
+useEffect(() => {
+  const handler = (msg) => {
+    if( msg.sender?._id === myUserId)return; // Ignore own messages 
+    if (msg.chat === selectedChat?._id) {
+      setMessages(prev => [...prev, msg]);
+    }
+  };
 
-  if (msg.chat === selectedChat?._id) {
-    setMessages(prev => [...prev, msg]);
-  }
+  socket.on("new-message", handler);
 
-  });
-
-  return () => socket.off("new-message");
-}, []);
+  return () => socket.off("new-message", handler);
+}, [selectedChat]);
 
 
   const sendMessage = () => {
