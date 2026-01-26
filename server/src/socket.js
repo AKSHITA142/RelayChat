@@ -44,7 +44,7 @@ function initSocket(server) {
 
       console.log("✍️ TYPING:", socket.userId, roomId);
 
-      //This line Means:“Target everyone in roomId EXCEPT this socket”
+      //This line Means:"Target everyone in roomId EXCEPT this socket"
       socket.to(roomId).emit("typing", {
         userId: socket.userId,
       });
@@ -102,13 +102,13 @@ function initSocket(server) {
         return;
       }
 
-      // 2️⃣ Check chat exists
+      // 2 Check chat exists
       const chat = await Chat.findById(roomId);
       if (!chat) {
         console.log("❌ Chat not found in DB");
         return;
       }
-      // 3️⃣ Save message
+      // 3 Save message
 
       const message = await Message.create({
         sender: socket.userId,
@@ -117,7 +117,7 @@ function initSocket(server) {
       });
       console.log("✅ Message saved:", message._id);
 
-      // 4️⃣ Update last message
+      // 4 Update last message
       await Chat.findByIdAndUpdate(roomId, {
         lastMessage: message._id,
       });
@@ -130,15 +130,8 @@ function initSocket(server) {
       socket.emit("message-delivered", {
         messageId: message._id,
       });
-
-      io.to(roomId).emit("new-message", {
-        _id: message._id,
-        chat: roomId,
-        sender: socket.userId,
-        content: message.content,
-        createdAt: message.createdAt,
-      });
-      console.log("📨 SEND-MESSAGE:", socket.userId, roomId);
+      const populatedMessage = await Message.findById(message._id).populate("sender", "_id name");
+        io.to(roomId).emit("new-message", populatedMessage);
 
       // notify receiver(s)
       socket.to(roomId).emit("message-delivered", {

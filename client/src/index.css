@@ -139,3 +139,20 @@ input {
   background: #22c55e;
   cursor: pointer;
 }
+.chat-window {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.input-box {
+  display: flex;
+  padding: 10px;
+  border-top: 1px solid #ddd;
+}

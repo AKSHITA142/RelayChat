@@ -3,64 +3,48 @@ import Message from "./Message";
 import socket from "../services/socket";
 import api from "../services/api";
 
-import { getLoggedInUser } from "../utils/auth";  
-const myUserId = getLoggedInUser()?._id;
-
-export default function ChatWindow({ selectedChat, setChats }) {
+export default function ChatWindow({ selectedChat }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
 
+  // Load messages when chat changes
   useEffect(() => {
-  if (!selectedChat) return;
+    if (!selectedChat) return;
 
-  api.get(`/message/${selectedChat._id}`)
-    .then(res => setMessages(res.data));
+    api.get(`/message/${selectedChat._id}`)
+      .then(res => {
+        const sorted = res.data.sort(
+          (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+        );
+        setMessages(sorted);
+      });
 
-  socket.emit("join-chat", selectedChat._id);
-}, [selectedChat]);
+    socket.emit("join-chat", selectedChat._id);
+  }, [selectedChat]);
 
-useEffect(() => {
-  const handler = (msg) => {
-    if( msg.sender?._id === myUserId)return; // Ignore own messages 
-    if (msg.chat === selectedChat?._id) {
+  // Receive messages only from socket
+  useEffect(() => {
+    const handler = (msg) => {
+      if (msg.chat !== selectedChat?._id) return;
       setMessages(prev => [...prev, msg]);
-    }
-  };
+    };
 
-  socket.on("new-message", handler);
+    socket.on("new-message", handler);
+    return () => socket.off("new-message", handler);
+  }, [selectedChat]);
 
-  return () => socket.off("new-message", handler);
-}, [selectedChat]);
-
-
+  // FINAL SEND
   const sendMessage = () => {
-  if (!text.trim()) return;
+    if (!text.trim() || !selectedChat) return;
 
-  const tempMessage = {
-    _id: Date.now(), // temporary id
-    content: text,
-    chat: selectedChat._id,
-    sender: "me", // optional
+    socket.emit("join-chat", selectedChat._id); // safety
+    socket.emit("send-message", {
+      chatId: selectedChat._id,
+      content: text,
+    });
+
+    setText("");
   };
-
-  // ✅ UPDATE UI IMMEDIATELY
-  setMessages(prev => [...prev, tempMessage]);
-
-  setChats(prev =>
-    prev.map(c =>
-      c._id === selectedChat._id
-        ? { ...c, lastMessage: tempMessage }
-        : c
-    )
-  );
-
-  socket.emit("send-message", {
-    chatId: selectedChat._id,
-    content: text,
-  });
-
-  setText("");
-};
 
   if (!selectedChat) return <div>Select a chat</div>;
 
@@ -76,6 +60,7 @@ useEffect(() => {
         <input
           value={text}
           onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && sendMessage()}
           placeholder="Type a message..."
         />
         <button onClick={sendMessage}>Send</button>
