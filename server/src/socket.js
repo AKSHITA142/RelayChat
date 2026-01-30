@@ -68,8 +68,13 @@ function initSocket(server) {
       await chat.save();
       socket.to(roomId).emit("chat-opened");//this is just for clerification
     });
+    // MARK CURRENT USER ONLINE (first)
+    await User.findByIdAndUpdate(socket.userId, {
+      isOnline: true,
+      lastSeen: null,
+    });
 
-    // 🔵 SEND EXISTING ONLINE USERS
+    //  SEND EXISTING ONLINE USERS
     const onlineUsers = await User.find({
       isOnline: true,
       _id: { $ne: socket.userId },
@@ -80,13 +85,8 @@ function initSocket(server) {
       onlineUsers.map(u => ({ _id: u._id }))
     );
 
-    // 🔵 MARK CURRENT USER ONLINE
-    await User.findByIdAndUpdate(socket.userId, {
-      isOnline: true,
-      lastSeen: null,
-    });
 
-    // 🔵 BROADCAST USER ONLINE
+    // BROADCAST USER ONLINE
     socket.broadcast.emit("user-online", {
       userId: socket.userId,
     });
@@ -98,14 +98,14 @@ function initSocket(server) {
 
 
       if (!mongoose.Types.ObjectId.isValid(roomId)) {
-        console.log("❌ Invalid chatId");
+        console.log(" Invalid chatId");
         return;
       }
 
       // 2 Check chat exists
       const chat = await Chat.findById(roomId);
       if (!chat) {
-        console.log("❌ Chat not found in DB");
+        console.log(" Chat not found in DB");
         return;
       }
       // 3 Save message
@@ -115,7 +115,7 @@ function initSocket(server) {
         chat: roomId,
         content,
       });
-      console.log("✅ Message saved:", message._id);
+      console.log(" Message saved:", message._id);
 
       // 4 Update last message
       await Chat.findByIdAndUpdate(roomId, {
@@ -157,8 +157,8 @@ function initSocket(server) {
       const roomId = chatId.toString();
       const messages = await Message.updateMany(
         {
-          //📌 $addToSet avoids duplicates
-          //📌 Only marks others’ messages
+          // $addToSet avoids duplicates
+          // Only marks others’ messages
           chat: roomId,
           sender: { $ne: socket.userId },
           seenBy: { $ne: socket.userId },
@@ -211,7 +211,7 @@ function initSocket(server) {
         lastSeen: new Date(),
       });
 
-      console.log("❌ Disconnected:", socket.userId);
+      console.log(" Disconnected:", socket.userId);
 
     });
 

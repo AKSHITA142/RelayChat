@@ -2,13 +2,29 @@ import { useEffect, useState, useRef } from "react";
 import Message from "./Message";
 import socket from "../services/socket";
 import api from "../services/api";
+import { getLoggedInUser } from "../utils/auth";
 
-export default function ChatWindow({ selectedChat }) {
-  const [onlineUsers, setOnlineUsers] = useState([]);
+const myUserId = getLoggedInUser()?._id;
+
+export default function ChatWindow({ selectedChat , onlineUsers = [],lastSeenMap = {} }) {
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeout = useRef(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+
+  const otherUser = selectedChat?.participants?.find(
+  u => u._id !== myUserId
+);
+
+// const isOnline = onlineUsers.includes(otherUser?._id);
+const isOnline = onlineUsers.some(
+  id => id.toString() === otherUser?._id?.toString()
+);
+const lastSeen = lastSeenMap[otherUser?._id];
+
+const lastSeenText = lastSeen
+  ? `last seen at ${new Date(lastSeen).toLocaleTimeString()}`
+  : "offline";
 
   // Load messages when chat changes
   useEffect(() => {
@@ -45,25 +61,6 @@ export default function ChatWindow({ selectedChat }) {
   };
 }, []);
 
-useEffect(() => {
-  socket.on("online-users", users => {
-    setOnlineUsers(users.map(u => u._id));
-  });
-
-  socket.on("user-online", ({ userId }) => {
-    setOnlineUsers(prev => [...new Set([...prev, userId])]);
-  });
-
-  socket.on("user-offline", ({ userId }) => {
-    setOnlineUsers(prev => prev.filter(id => id !== userId));
-  });
-
-  return () => {
-    socket.off("online-users");
-    socket.off("user-online");
-    socket.off("user-offline");
-  };
-}, []);
 
   // Receive messages only from socket
   useEffect(() => {
@@ -118,6 +115,20 @@ useEffect(() => {
 
   return (
     <div className="chat-window">
+      <div className="chat-header">
+        <div className="chat-title">
+          {selectedChat?.chatName || "Chat"}
+        </div>
+
+        <div className="chat-status">
+          {isTyping
+            ? "typing..."
+            : isOnline
+            ? "online"
+            : lastSeenText  }
+        </div>
+      </div>
+
       <div className="messages">
         {messages.map(m => (
           <Message key={m._id} msg={m} />
