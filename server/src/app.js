@@ -9,7 +9,7 @@ app.use(cors({
   credentials: true
 }));
 
-//header is used to add header for security purpose
+//helmet is used to add header for security purpose
 const helmet = require("helmet");
 app.use(helmet());
 

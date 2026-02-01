@@ -24,11 +24,11 @@ function initSocket(server) {
       next(new Error("Invalid token"));
     }
   });
-
+ 
   io.on("connection", async (socket) => {
     console.log("🔵 SOCKET CONNECTED:", socket.id, socket.userId);
 
-    // JOIN CHAT ROOM
+    //  JOIN CHAT ROOM
     socket.on("join-chat", (chatId, cb) => {
       const roomId = chatId.toString();
       socket.join(roomId);
