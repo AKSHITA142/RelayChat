@@ -1,9 +1,10 @@
 const mongoose = require("mongoose");
-require("dotenv").config();
+require("dotenv").config({ override: true });
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(`mongodb+srv://${process.env.USER_NAME}:${process.env.PASSWORD}@cluster0.vwicdex.mongodb.net/?appName=Cluster0`);
+    console.log("Connecting to URI:", process.env.MONGODB_URI ? process.env.MONGODB_URI.substring(0, 30) + "..." : "undefined");
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log("MongoDB connected");
   } catch (error) {
     console.error("MongoDB connection failed", error);

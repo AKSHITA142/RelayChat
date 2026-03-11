@@ -1,11 +1,12 @@
 const express = require("express");
 const authMiddleware = require("../middleware/auth.middleware");
-const { getProfile } = require("../controllers/user.controller");
+const { getProfile, searchUsers } = require("../controllers/user.controller");
 
 
 const router = express.Router();
 
 //Middleware sits b/w routes and controller
 router.get("/profile", authMiddleware, getProfile);
+router.get("/", authMiddleware, searchUsers);
 
 module.exports = router;

@@ -7,8 +7,12 @@ const Chat = require("./models/Chat");
 
 function initSocket(server) {
   const io = new Server(server, {
-    cors: { origin: "http://localhost:5173" },
-    credentials: true,
+    cors: { 
+      origin: ["http://localhost:5173", "http://localhost:5174"],
+      methods: ["GET", "POST"],
+      credentials: true
+    },
+    transports: ["polling", "websocket"]
   });
 
   // AUTH
@@ -93,6 +97,7 @@ function initSocket(server) {
 
     // SEND MESSAGE
     socket.on("send-message", async ({ chatId, content }) => {
+      console.log("📥 RECEIVED SEND-MESSAGE:", { chatId, content, userId: socket.userId });
       try{
       const roomId = chatId.toString();
 
