@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
-import socket from "../services/socket";
+import socket, { connectSocket } from "../services/socket";
 
 export default function Chat() {
+  useEffect(() => {
+    connectSocket();
+  }, []);
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
