@@ -1,8 +1,11 @@
+import { getLoggedInUser } from "../utils/auth";
+
 export default function Message({ msg }) {
-  const myId = localStorage.getItem("userId");
+  const myId = getLoggedInUser()?._id;
+  const isMe = (msg.sender?._id || msg.sender)?.toString() === myId?.toString();
 
   return (
-    <div className={msg.sender === myId ? "msg me" : "msg"}>
+    <div className={`message ${isMe ? "sent" : "received"}`}>
       {msg.content}
     </div>
   );

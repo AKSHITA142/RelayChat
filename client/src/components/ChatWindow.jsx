@@ -4,17 +4,18 @@ import socket from "../services/socket";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
 
-const myUserId = getLoggedInUser()?._id;
 
 export default function ChatWindow({ selectedChat , onlineUsers = [],lastSeenMap = {} }) {
+  const myUserId = getLoggedInUser()?._id;
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeout = useRef(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const messagesEndRef = useRef(null);
 
   const otherUser = selectedChat?.participants?.find(
-  u => u._id !== myUserId
-);
+    u => (u._id?.toString() || u.toString()) !== myUserId?.toString()
+  );
 
 // const isOnline = onlineUsers.includes(otherUser?._id);
 const isOnline = onlineUsers.some(
@@ -65,7 +66,11 @@ const lastSeenText = lastSeen
   // Receive messages only from socket
   useEffect(() => {
     const handler = (msg) => {
-      if (msg.chat !== selectedChat?._id) return;
+      console.log("📨 NEW MESSAGE RECEIVED AT CLIENT:", msg);
+      if (msg.chat?.toString() !== selectedChat?._id?.toString()) {
+        console.log("DEBUG: Chat ID mismatch. msg.chat:", msg.chat, "selectedChat._id:", selectedChat?._id);
+        return;
+      }
       setMessages(prev => [...prev, msg]);
     };
 
@@ -73,16 +78,32 @@ const lastSeenText = lastSeen
     return () => socket.off("new-message", handler);
   }, [selectedChat]);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   // FINAL SEND
   const sendMessage = () => {
-    if (!text.trim() || !selectedChat) return;
+    console.log("DEBUG: Attempting to send message. text:", text, "selectedChat:", selectedChat?._id);
+    if (!text.trim() || !selectedChat) {
+      console.log("DEBUG: Send aborted. text empty or no selectedChat.");
+      return;
+    }
 
-    socket.emit("join-chat", selectedChat._id); // safety
+    if (!socket.connected) {
+      console.log("DEBUG: Socket not connected! Attempting to reconnect...");
+      socket.connect();
+    }
+
+    socket.emit("join-chat", selectedChat._id);
     socket.emit("send-message", {
       chatId: selectedChat._id,
       content: text,
+    }, (ack) => {
+      console.log("DEBUG: Server acknowledged message receipt:", ack);
     });
 
+    console.log("DEBUG: socket.emit('send-message') called.");
     setText("");
   };
 
@@ -117,7 +138,7 @@ const lastSeenText = lastSeen
     <div className="chat-window">
       <div className="chat-header">
         <div className="chat-title">
-          {selectedChat?.chatName || "Chat"}
+          {selectedChat?.isGroup ? selectedChat?.groupName : (otherUser?.name || "Chat")}
         </div>
 
         <div className="chat-status">
@@ -133,6 +154,7 @@ const lastSeenText = lastSeen
         {messages.map(m => (
           <Message key={m._id} msg={m} />
         ))}
+        <div ref={messagesEndRef} />
       </div>
 
       <div className="input-box">

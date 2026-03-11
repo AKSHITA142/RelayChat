@@ -70,3 +70,16 @@
   text-decoration: underline;
 }
 
+.register-card button:hover {
+  background: #20b858;
+}
+
+.error-message {
+  background: #fecaca;
+  color: #b91c1c;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+  border: 1px solid #f87171;
+}
