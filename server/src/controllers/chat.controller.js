@@ -45,6 +45,7 @@ exports.getMyChats = async (req, res) => {
   const chats = await Chat.find({ participants: userId })
     .populate("participants", "name email")
     .populate("lastMessage")
+    .sort({ updatedAt: -1 })
     .lean();
 
   const result = chats.map(chat => ({

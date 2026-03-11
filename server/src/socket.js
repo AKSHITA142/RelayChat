@@ -44,25 +44,30 @@ function initSocket(server) {
     
     // TYPING
     socket.on("typing", (chatId) => {
-      const roomId = chatId.toString();
+      try {
+        const roomId = chatId.toString();
+        console.log("✍️ TYPING:", socket.userId, roomId);
 
-      console.log("✍️ TYPING:", socket.userId, roomId);
-
-      //This line Means:"Target everyone in roomId EXCEPT this socket"
-      socket.to(roomId).emit("typing", {
-        userId: socket.userId,
-      });
+        socket.to(roomId).emit("typing", {
+          userId: socket.userId,
+        });
+      } catch (err) {
+        console.error("Typing emit error:", err);
+      }
     });
 
     // STOP TYPING
     socket.on("stop-typing", (chatId) => {
-      const roomId = chatId.toString();
+      try {
+        const roomId = chatId.toString();
+        console.log("🛑 STOP-TYPING:", socket.userId, roomId);
 
-      console.log("🛑 STOP-TYPING:", socket.userId, roomId);
-
-      socket.to(roomId).emit("stop-typing", {
-        userId: socket.userId,
-      });
+        socket.to(roomId).emit("stop-typing", {
+          userId: socket.userId,
+        });
+      } catch (err) {
+        console.error("Stop-typing emit error:", err);
+      }
     });
     // OPEN CHAT
     socket.on("open-chat", async (chatId) => {
@@ -123,10 +128,9 @@ function initSocket(server) {
       console.log(" Message saved:", message._id);
 
       // 4 Update last message
-      await Chat.findByIdAndUpdate(roomId, {
-        lastMessage: message._id,
-      });
-      console.log("✅ Chat updated");
+      chat.lastMessage = message._id;
+      await chat.save();
+      console.log("✅ Chat updated with lastMessage and bumped updatedAt");
 
       message.status = "delivered";
       await message.save();
