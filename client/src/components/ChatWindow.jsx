@@ -5,27 +5,28 @@ import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
 
 
-export default function ChatWindow({ selectedChat , onlineUsers = [],lastSeenMap = {} }) {
+export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap = {} }) {
   const myUserId = getLoggedInUser()?._id;
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeout = useRef(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef(null);
 
   const otherUser = selectedChat?.participants?.find(
     u => (u._id?.toString() || u.toString()) !== myUserId?.toString()
   );
 
-// const isOnline = onlineUsers.includes(otherUser?._id);
-const isOnline = onlineUsers.some(
-  id => id.toString() === otherUser?._id?.toString()
-);
-const lastSeen = lastSeenMap[otherUser?._id];
+  // const isOnline = onlineUsers.includes(otherUser?._id);
+  const isOnline = onlineUsers.some(
+    id => id.toString() === otherUser?._id?.toString()
+  );
+  const lastSeen = lastSeenMap[otherUser?._id];
 
-const lastSeenText = lastSeen
-  ? `last seen at ${new Date(lastSeen).toLocaleTimeString()}`
-  : "offline";
+  const lastSeenText = lastSeen
+    ? `last seen at ${new Date(lastSeen).toLocaleTimeString()}`
+    : "offline";
 
   // Load messages when chat changes
   useEffect(() => {
@@ -40,27 +41,28 @@ const lastSeenText = lastSeen
       });
 
     socket.emit("join-chat", selectedChat._id);
+    socket.emit("mark-seen", { chatId: selectedChat._id });
   }, [selectedChat]);
 
 
   // TYPING INDICATOR
   useEffect(() => {
-  const handleTyping = () => {
-    setIsTyping(true);
-  };
+    const handleTyping = () => {
+      setIsTyping(true);
+    };
 
-  const handleStopTyping = () => {
-    setIsTyping(false);
-  };
+    const handleStopTyping = () => {
+      setIsTyping(false);
+    };
 
-  socket.on("typing", handleTyping);
-  socket.on("stop-typing", handleStopTyping);
+    socket.on("typing", handleTyping);
+    socket.on("stop-typing", handleStopTyping);
 
-  return () => {
-    socket.off("typing", handleTyping);
-    socket.off("stop-typing", handleStopTyping);
-  };
-}, []);
+    return () => {
+      socket.off("typing", handleTyping);
+      socket.off("stop-typing", handleStopTyping);
+    };
+  }, []);
 
 
   // Receive messages only from socket
@@ -72,42 +74,68 @@ const lastSeenText = lastSeen
         return;
       }
       setMessages(prev => [...prev, msg]);
+
+      // Mark as seen immediately if it's from the other user
+      if ((msg.sender?._id || msg.sender)?.toString() !== myUserId?.toString()) {
+        socket.emit("mark-seen", { chatId: selectedChat._id });
+      }
+    };
+
+    const statusHandler = ({ messageId }) => {
+      setMessages(prev => prev.map(m =>
+        m._id === messageId ? { ...m, status: "delivered" } : m
+      ));
+    };
+
+    const seenHandler = ({ chatId, userId }) => {
+      if (chatId === selectedChat?._id && userId !== myUserId) {
+        setMessages(prev => prev.map(m =>
+          m.status !== "seen" ? { ...m, status: "seen" } : m
+        ));
+      }
     };
 
     socket.on("new-message", handler);
-    return () => socket.off("new-message", handler);
-  }, [selectedChat]);
+    socket.on("message-delivered", statusHandler);
+    socket.on("message-seen", seenHandler);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    return () => {
+      socket.off("new-message", handler);
+      socket.off("message-delivered", statusHandler);
+      socket.off("message-seen", seenHandler);
+    };
+  }, [selectedChat, myUserId]);
 
-  // FINAL SEND
-  const sendMessage = () => {
-    console.log("DEBUG: Attempting to send message. text:", text, "selectedChat:", selectedChat?._id);
-    if (!text.trim() || !selectedChat) {
-      console.log("DEBUG: Send aborted. text empty or no selectedChat.");
-      return;
-    }
+useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [messages]);
 
-    if (!socket.connected) {
-      console.log("DEBUG: Socket not connected! Attempting to reconnect...");
-      socket.connect();
-    }
+// FINAL SEND
+const sendMessage = () => {
+  console.log("DEBUG: Attempting to send message. text:", text, "selectedChat:", selectedChat?._id);
+  if (!text.trim() || !selectedChat) {
+    console.log("DEBUG: Send aborted. text empty or no selectedChat.");
+    return;
+  }
 
-    socket.emit("join-chat", selectedChat._id);
-    socket.emit("send-message", {
-      chatId: selectedChat._id,
-      content: text,
-    }, (ack) => {
-      console.log("DEBUG: Server acknowledged message receipt:", ack);
-    });
+  if (!socket.connected) {
+    console.log("DEBUG: Socket not connected! Attempting to reconnect...");
+    socket.connect();
+  }
 
-    console.log("DEBUG: socket.emit('send-message') called.");
-    setText("");
-  };
+  socket.emit("join-chat", selectedChat._id);
+  socket.emit("send-message", {
+    chatId: selectedChat._id,
+    content: text,
+  }, (ack) => {
+    console.log("DEBUG: Server acknowledged message receipt:", ack);
+  });
 
-  if (!selectedChat) {
+  console.log("DEBUG: socket.emit('send-message') called.");
+  setText("");
+};
+
+if (!selectedChat) {
   return (
     <div className="chat-empty">
       <div className="empty-actions">
@@ -134,30 +162,51 @@ const lastSeenText = lastSeen
 }
 
 
-  return (
-    <div className="chat-window">
-      <div className="chat-header">
-        <div className="chat-title">
-          {selectedChat?.isGroup ? selectedChat?.groupName : (otherUser?.name || "Chat")}
-        </div>
+return (
+  <div className="chat-window">
+    <div className="chat-header">
+      <div className="chat-title">
+        {selectedChat?.isGroup ? selectedChat?.groupName : (otherUser?.name || "Chat")}
+      </div>
 
-        <div className="chat-status">
-          {isTyping
-            ? "typing..."
-            : isOnline
+      <div className="chat-status">
+        {isTyping
+          ? "typing..."
+          : isOnline
             ? "online"
-            : lastSeenText  }
-        </div>
+            : lastSeenText}
       </div>
+    </div>
 
-      <div className="messages">
-        {messages.map(m => (
-          <Message key={m._id} msg={m} />
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
+    <div className="messages">
+      {messages.map(m => (
+        <Message key={m._id} msg={m} />
+      ))}
+      <div ref={messagesEndRef} />
+    </div>
 
       <div className="input-box">
+        {showEmojiPicker && (
+          <div className="emoji-picker">
+            {["😊", "😂", "❤️", "👍", "🙏", "🔥", "😭", "😮", "🎉", "✨", "💯", "✅", "🙌", "💀", "🤣", "🤔", "😘", "😎", "👀", "👋"].map(emoji => (
+              <span 
+                key={emoji} 
+                onClick={() => {
+                  setText(prev => prev + emoji);
+                  setShowEmojiPicker(false);
+                }}
+              >
+                {emoji}
+              </span>
+            ))}
+          </div>
+        )}
+        <button 
+          className="emoji-btn"
+          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+        >
+          😊
+        </button>
         {isTyping && (
           <div className="typing-indicator">
             typing...
@@ -166,19 +215,19 @@ const lastSeenText = lastSeen
         <input
           value={text}
           onChange={e => {
-            setText(e.target.value); 
+            setText(e.target.value);
             socket.emit("typing", selectedChat._id);
             clearTimeout(typingTimeout.current);
 
             typingTimeout.current = setTimeout(() => {
               socket.emit("stop-typing", selectedChat._id);
             }, 1000);
-            
+
           }}
           onKeyDown={e => e.key === "Enter" && sendMessage()}
-          placeholder="Type a message..."/>
+          placeholder="Type a message..." />
         <button onClick={sendMessage}>Send</button>
       </div>
-    </div>
-  );
+  </div>
+);
 }

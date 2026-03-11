@@ -59,11 +59,20 @@ useEffect(() => {
   // Update sidebar lastMessage for BOTH users
   useEffect(() => {
     const handler = (msg) => {
-      setChats(prev =>
-        prev.map(c =>
-          c._id === msg.chat ? { ...c, lastMessage: msg } : c
-        )
-      );
+      setChats(prev => {
+        const msgChatId = (msg.chat?._id || msg.chat)?.toString();
+        // Find if this chat exists in our list
+        const chatIdx = prev.findIndex(c => c._id?.toString() === msgChatId);
+        
+        if (chatIdx === -1) return prev; 
+
+        // Update the chat object
+        const updatedChat = { ...prev[chatIdx], lastMessage: msg };
+        
+        // Remove it from current position and put at top
+        const rest = prev.filter((_, i) => i !== chatIdx);
+        return [updatedChat, ...rest];
+      });
     };
 
     socket.on("new-message", handler);

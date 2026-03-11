@@ -54,6 +54,56 @@ input {
   line-height: 1.4;
   border-radius: 18px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  width: fit-content;
+  min-width: 80px;
+}
+
+.message-content {
+  margin-bottom: 2px;
+  word-break: break-word;
+}
+
+.message-info {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-size: 10px;
+  opacity: 0.8;
+  align-self: flex-end;
+}
+
+.message-time {
+  font-weight: 300;
+  margin-top: 2px;
+}
+
+.status-ticks {
+  font-size: 12px;
+  line-height: 1;
+  font-weight: bold;
+}
+
+.status-ticks.seen {
+  color: #34b7f1; /* WhatsApp blue */
+}
+
+.status-ticks.delivered {
+  color: #64748b; /* Slate 500 */
+}
+
+.status-ticks.sent {
+  color: #64748b; /* Slate 500 */
+}
+
+.sent .message-info {
+  color: #1e293b;
+}
+
+.received .message-info {
+  color: #94a3b8;
 }
 
 /* ================= SENT ================= */
@@ -229,4 +279,43 @@ input {
 
 .chat-status:contains("offline") {
   color: #8696a0;
+}
+
+/* EMOJI PICKER */
+.input-box {
+  position: relative;
+}
+
+.emoji-btn {
+  background: transparent !important;
+  font-size: 20px !important;
+  padding: 0 10px !important;
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: 80px;
+  left: 10px;
+  background: #202c33;
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  border: 1px solid #2a3942;
+}
+
+.emoji-picker span {
+  font-size: 24px;
+  cursor: pointer;
+  transition: transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emoji-picker span:hover {
+  transform: scale(1.2);
 }
