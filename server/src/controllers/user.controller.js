@@ -17,9 +17,12 @@ const getProfile = async (req, res) => {
 
 const searchUsers = async (req, res) => {
   try {
+    //Basically Keyword is users collections..
     const keyword = req.query.search
       ? {
           $or: [
+            //$regex used for partial matching
+            //i used for case insensitive
             { name: { $regex: req.query.search, $options: "i" } },
             { email: { $regex: req.query.search, $options: "i" } },
           ],

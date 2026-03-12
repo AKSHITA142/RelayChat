@@ -5,7 +5,6 @@ const { getProfile, searchUsers } = require("../controllers/user.controller");
 
 const router = express.Router();
 
-//Middleware sits b/w routes and controller
 router.get("/profile", authMiddleware, getProfile);
 router.get("/", authMiddleware, searchUsers);
 

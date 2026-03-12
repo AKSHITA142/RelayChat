@@ -1,6 +1,6 @@
 const Chat = require("../models/Chat");
 
-// create or get one-to-one chat
+
 exports.createChat = async (req, res) => {
   try {
     const { userId } = req.body; // other user
