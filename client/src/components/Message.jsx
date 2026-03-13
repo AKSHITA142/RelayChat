@@ -60,7 +60,31 @@ export default function Message({ msg }) {
       }}
     >
       <div className="message-content">
-        {msg.content}
+        {msg.fileUrl ? (
+          <div className="message-attachment">
+            {msg.fileType.startsWith("image/") ? (
+              <img 
+                src={`http://localhost:5002${msg.fileUrl}`} 
+                alt={msg.fileName} 
+                className="attachment-image" 
+                onClick={() => window.open(`http://localhost:5002${msg.fileUrl}`, "_blank")}
+              />
+            ) : (
+              <a 
+                href={`http://localhost:5002${msg.fileUrl}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="attachment-file"
+              >
+                <span className="file-icon">📄</span>
+                <span className="file-name">{msg.fileName}</span>
+              </a>
+            )}
+            {msg.content && msg.content !== msg.fileName && <p className="attachment-caption">{msg.content}</p>}
+          </div>
+        ) : (
+          msg.content
+        )}
         <button 
           className="message-options-btn" 
           onClick={(e) => {

@@ -12,6 +12,7 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
   const messagesEndRef = useRef(null);
 
   const otherUser = selectedChat?.participants?.find(
@@ -149,6 +150,43 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
 
     console.log("DEBUG: socket.emit('send-message') called.");
     setText("");
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const fileInputRef = useRef(null);
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setSelectedFile(file);
+  };
+
+  const sendFileAndText = async () => {
+    if (!selectedChat) return;
+
+    if (selectedFile) {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("chatId", selectedChat._id);
+      if (text.trim()) {
+        formData.append("content", text);
+      }
+
+      try {
+        await api.post("/message/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+        setSelectedFile(null);
+        setText("");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      } catch (err) {
+        console.error("Upload failed", err);
+        alert("Upload failed. Is the server running?");
+      }
+    } else {
+      sendMessage();
+    }
   };
 
   if (!selectedChat) {
@@ -201,6 +239,16 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
         <div ref={messagesEndRef} />
       </div>
 
+      {selectedFile && (
+        <div className="file-preview-bar">
+          <div className="preview-info">
+            <span className="preview-icon">📄</span>
+            <span className="preview-name">{selectedFile.name}</span>
+          </div>
+          <button className="remove-file-btn" onClick={() => setSelectedFile(null)}>✕</button>
+        </div>
+      )}
+
       <div className="input-box">
         {showEmojiPicker && (
           <div className="emoji-picker">
@@ -223,6 +271,18 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
         >
           😊
         </button>
+        <button 
+          className="attachment-btn"
+          onClick={() => fileInputRef.current.click()}
+        >
+          📎
+        </button>
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          style={{ display: "none" }} 
+          onChange={handleFileChange}
+        />
         {isTyping && (
           <div className="typing-indicator">
             typing...
@@ -240,9 +300,9 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
             }, 1000);
 
           }}
-          onKeyDown={e => e.key === "Enter" && sendMessage()}
+          onKeyDown={e => e.key === "Enter" && sendFileAndText()}
           placeholder="Type a message..." />
-        <button onClick={sendMessage}>Send</button>
+        <button onClick={sendFileAndText}>Send</button>
       </div>
     </div>
   );
