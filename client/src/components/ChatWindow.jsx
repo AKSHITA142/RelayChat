@@ -95,95 +95,111 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
       }
     };
 
+    const deleteForMeHandler = ({ messageId }) => {
+      setMessages(prev => prev.filter(m => m._id !== messageId));
+    };
+
+    const deleteForEveryoneHandler = ({ messageId }) => {
+      setMessages(prev => prev.map(m => 
+        m._id === messageId 
+          ? { ...m, content: "This message was deleted", isDeleted: true } 
+          : m
+      ));
+    };
+
     socket.on("new-message", handler);
     socket.on("message-delivered", statusHandler);
     socket.on("message-seen", seenHandler);
+    socket.on("message-deleted-for-me", deleteForMeHandler);
+    socket.on("message-deleted-for-everyone", deleteForEveryoneHandler);
 
     return () => {
       socket.off("new-message", handler);
       socket.off("message-delivered", statusHandler);
       socket.off("message-seen", seenHandler);
+      socket.off("message-deleted-for-me", deleteForMeHandler);
+      socket.off("message-deleted-for-everyone", deleteForEveryoneHandler);
     };
   }, [selectedChat, myUserId]);
 
-useEffect(() => {
-  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-}, [messages]);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-// FINAL SEND
-const sendMessage = () => {
-  console.log("DEBUG: Attempting to send message. text:", text, "selectedChat:", selectedChat?._id);
-  if (!text.trim() || !selectedChat) {
-    console.log("DEBUG: Send aborted. text empty or no selectedChat.");
-    return;
+  // FINAL SEND
+  const sendMessage = () => {
+    console.log("DEBUG: Attempting to send message. text:", text, "selectedChat:", selectedChat?._id);
+    if (!text.trim() || !selectedChat) {
+      console.log("DEBUG: Send aborted. text empty or no selectedChat.");
+      return;
+    }
+
+    if (!socket.connected) {
+      console.log("DEBUG: Socket not connected! Attempting to reconnect...");
+      socket.connect();
+    }
+
+    socket.emit("join-chat", selectedChat._id);
+    socket.emit("send-message", {
+      chatId: selectedChat._id,
+      content: text,
+    }, (ack) => {
+      console.log("DEBUG: Server acknowledged message receipt:", ack);
+    });
+
+    console.log("DEBUG: socket.emit('send-message') called.");
+    setText("");
+  };
+
+  if (!selectedChat) {
+    return (
+      <div className="chat-empty">
+        <div className="empty-actions">
+          <div className="empty-card">
+            <span>📄</span>
+            <p>Send document</p>
+          </div>
+
+          <div
+            className="empty-card"
+            onClick={() => alert("Open Add User / New Chat Modal")}
+          >
+            <span>👤➕</span>
+            <p>Add contact</p>
+          </div>
+
+          <div className="empty-card">
+            <span>🤖</span>
+            <p>Ask AI</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  if (!socket.connected) {
-    console.log("DEBUG: Socket not connected! Attempting to reconnect...");
-    socket.connect();
-  }
 
-  socket.emit("join-chat", selectedChat._id);
-  socket.emit("send-message", {
-    chatId: selectedChat._id,
-    content: text,
-  }, (ack) => {
-    console.log("DEBUG: Server acknowledged message receipt:", ack);
-  });
-
-  console.log("DEBUG: socket.emit('send-message') called.");
-  setText("");
-};
-
-if (!selectedChat) {
   return (
-    <div className="chat-empty">
-      <div className="empty-actions">
-        <div className="empty-card">
-          <span>📄</span>
-          <p>Send document</p>
+    <div className="chat-window">
+      <div className="chat-header">
+        <div className="chat-title">
+          {selectedChat?.isGroup ? selectedChat?.groupName : (otherUser?.name || "Chat")}
         </div>
 
-        <div
-          className="empty-card"
-          onClick={() => alert("Open Add User / New Chat Modal")}
-        >
-          <span>👤➕</span>
-          <p>Add contact</p>
-        </div>
-
-        <div className="empty-card">
-          <span>🤖</span>
-          <p>Ask AI</p>
+        <div className="chat-status">
+          {isTyping
+            ? "typing..."
+            : isOnline
+              ? "online"
+              : lastSeenText}
         </div>
       </div>
-    </div>
-  );
-}
 
-
-return (
-  <div className="chat-window">
-    <div className="chat-header">
-      <div className="chat-title">
-        {selectedChat?.isGroup ? selectedChat?.groupName : (otherUser?.name || "Chat")}
+      <div className="messages">
+        {messages.map(m => (
+          <Message key={m._id} msg={m} />
+        ))}
+        <div ref={messagesEndRef} />
       </div>
-
-      <div className="chat-status">
-        {isTyping
-          ? "typing..."
-          : isOnline
-            ? "online"
-            : lastSeenText}
-      </div>
-    </div>
-
-    <div className="messages">
-      {messages.map(m => (
-        <Message key={m._id} msg={m} />
-      ))}
-      <div ref={messagesEndRef} />
-    </div>
 
       <div className="input-box">
         {showEmojiPicker && (
@@ -228,6 +244,6 @@ return (
           placeholder="Type a message..." />
         <button onClick={sendMessage}>Send</button>
       </div>
-  </div>
-);
+    </div>
+  );
 }
