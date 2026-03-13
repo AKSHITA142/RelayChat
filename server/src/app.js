@@ -15,6 +15,8 @@ app.use(helmet());
 
 // middleware
 app.use(express.json());
+const path = require("path");
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // routes
 //app.use() is used to mount (attach) a group of routes under a common base path.

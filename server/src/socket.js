@@ -5,8 +5,10 @@ const User = require("./models/User");
 const Message = require("./models/Message");
 const Chat = require("./models/Chat");
 
+let io;
+
 function initSocket(server) {
-  const io = new Server(server, {
+  io = new Server(server, {
     cors: { 
       origin: "*",
       methods: ["GET", "POST"],
@@ -233,5 +235,8 @@ function initSocket(server) {
   });
 }
 
-module.exports = initSocket;
+module.exports = {
+  initSocket,
+  getIO: () => io
+};
 

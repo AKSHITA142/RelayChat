@@ -61,3 +61,39 @@ exports.deleteMessageForEveryone = async (req, res) => {
   }
 };
 
+exports.uploadFile = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const { chatId, content } = req.body;
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileType = req.file.mimetype;
+    const fileName = req.file.originalname;
+
+    const message = await Message.create({
+      sender: req.user.id,
+      chat: chatId,
+      content: content || fileName, // Use content if provided, else fileName
+      fileUrl,
+      fileType,
+      fileName
+    });
+
+    const populatedMessage = await Message.findById(message._id).populate("sender", "_id name");
+    
+    const { getIO } = require("../socket");
+    const io = getIO();
+    if (io) {
+      io.to(chatId.toString()).emit("new-message", populatedMessage);
+    }
+
+    res.status(201).json(populatedMessage);
+  } catch (error) {
+    res.status(500).json({ message: "Error uploading file", error: error.message });
+  }
+};
+
+
+

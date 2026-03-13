@@ -2,7 +2,7 @@ require("dotenv").config({ override: true });
 const http = require("http");
 const app = require("./app");
 const connectDB = require("./config/db");
-const initSocket = require("./socket");
+const { initSocket } = require("./socket");
 
 const PORT = process.env.PORT || 5000;
 
