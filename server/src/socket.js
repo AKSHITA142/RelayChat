@@ -15,7 +15,7 @@ function initSocket(server) {
     transports: ["polling", "websocket"]
   });
 
-  // AUTH
+  // Middleware
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -142,7 +142,7 @@ function initSocket(server) {
       const populatedMessage = await Message.findById(message._id).populate("sender", "_id name");
         io.to(roomId).emit("new-message", populatedMessage);
 
-      // notify receiver(s)
+      // notify receivers
       socket.to(roomId).emit("message-delivered", {
         messageId: message._id,
       });
@@ -167,7 +167,7 @@ function initSocket(server) {
       const messages = await Message.updateMany(
         {
           // $addToSet avoids duplicates
-          // Only marks others’ messages
+          // Only marks others messages
           chat: roomId,
           sender: { $ne: socket.userId },
           seenBy: { $ne: socket.userId },
@@ -183,8 +183,8 @@ function initSocket(server) {
           userId: socket.userId,
       });
     });
-    // DELETE MESSAGE
     socket.on("delete-for-me", async ({ messageId }) => {
+      console.log("🗑️ DELETE-FOR-ME:", messageId, "by", socket.userId);
       const msgId = messageId.toString();
       await Message.findByIdAndUpdate(msgId, {
         $addToSet: { deletedFor: socket.userId },
@@ -194,10 +194,14 @@ function initSocket(server) {
     });
 
     socket.on("delete-for-everyone", async ({ messageId, chatId }) => {
+      console.log("🧨 DELETE-FOR-EVERYONE:", messageId, "in chat", chatId);
       const msgId = messageId.toString();
       const roomId = chatId.toString();
       const msg = await Message.findById(msgId);
-      if (!msg || msg.sender.toString() !== socket.userId) return;
+      if (!msg || msg.sender.toString() !== socket.userId) {
+        console.log("❌ Unauthorized or not found");
+        return;
+      }
 
       msg.isDeleted = true;
       msg.content = "This message was deleted";
@@ -207,6 +211,7 @@ function initSocket(server) {
         messageId: msgId,
       });
     });
+
 
     // DISCONNECT
     socket.on("disconnect", async () => {
