@@ -33,6 +33,18 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    contacts: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User"
+        },
+        savedName: {
+          type: String,
+          required: true
+        }
+      }
+    ]
   },
   { timestamps: true }
 );

@@ -77,7 +77,8 @@ exports.login = async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        contacts: user.contacts
       }
     });
 
@@ -201,7 +202,8 @@ exports.verifyOtp = async (req, res) => {
         _id: user._id,
         name: user.name,
         phoneNumber: user.phoneNumber,
-        role: user.role
+        role: user.role,
+        contacts: user.contacts
       }
     });
 
@@ -262,7 +264,8 @@ exports.completeRegistration = async (req, res) => {
         _id: user._id,
         name: user.name,
         phoneNumber: user.phoneNumber,
-        role: user.role
+        role: user.role,
+        contacts: user.contacts
       }
     });
 

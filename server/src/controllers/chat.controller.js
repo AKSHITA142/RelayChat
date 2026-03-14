@@ -1,4 +1,5 @@
 const Chat = require("../models/Chat");
+const User = require("../models/User");
 
 
 exports.createChat = async (req, res) => {
@@ -43,7 +44,7 @@ exports.getMyChats = async (req, res) => {
   //populate means:Replace the LastMessage ObjectId with the actual referenced document
   //lean does:Returns plain JavaScript objects instead of Mongoose documents
   const chats = await Chat.find({ participants: userId })
-    .populate("participants", "name email")
+    .populate("participants", "name email phoneNumber")
     .populate("lastMessage")
     .sort({ updatedAt: -1 })
     .lean();
@@ -93,4 +94,55 @@ exports.removeFromGroup = async (req, res) => {
   await chat.save();
 
   res.json(chat);
+};
+
+exports.startChatByPhone = async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+
+    // Normalizing could be added here if needed, assuming exact match
+    const targetUser = await User.findOne({ phoneNumber: phone });
+
+    if (!targetUser) {
+      return res.status(404).json({ message: "User not registered" });
+    }
+
+    if (targetUser._id.toString() === req.user.id) {
+      return res.status(400).json({ message: "You cannot start a chat with yourself" });
+    }
+
+    // Check if chat already exists
+    let chat = await Chat.findOne({
+      isGroup: false,
+      participants: { $all: [req.user.id, targetUser._id] }
+    });
+
+    if (chat) {
+      return res.status(200).json({
+        chat_id: chat._id,
+        receiver_id: targetUser._id,
+        chat: chat // Returning full chat object for consistency with other frontend logic
+      });
+    }
+
+    // Create new chat
+    chat = await Chat.create({
+      participants: [req.user.id, targetUser._id],
+      isGroup: false
+    });
+
+    res.status(201).json({
+      chat_id: chat._id,
+      receiver_id: targetUser._id,
+      chat: chat
+    });
+
+  } catch (error) {
+    console.error("startChatByPhone error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
