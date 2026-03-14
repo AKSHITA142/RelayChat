@@ -9,7 +9,7 @@ let io;
 
 function initSocket(server) {
   io = new Server(server, {
-    cors: { 
+    cors: {
       origin: "*",
       methods: ["GET", "POST"],
       credentials: true
@@ -30,7 +30,7 @@ function initSocket(server) {
       next(new Error("Invalid token"));
     }
   });
- 
+
   io.on("connection", async (socket) => {
     console.log("🔵 SOCKET CONNECTED:", socket.id, socket.userId);
 
@@ -43,7 +43,7 @@ function initSocket(server) {
       cb && cb();
     });
 
-    
+
     // TYPING
     socket.on("typing", (chatId) => {
       try {
@@ -105,63 +105,63 @@ function initSocket(server) {
     // SEND MESSAGE
     socket.on("send-message", async ({ chatId, content }) => {
       console.log("📥 RECEIVED SEND-MESSAGE:", { chatId, content, userId: socket.userId });
-      try{
-      const roomId = chatId.toString();
+      try {
+        const roomId = chatId.toString();
 
 
-      if (!mongoose.Types.ObjectId.isValid(roomId)) {
-        console.log(" Invalid chatId");
-        return;
-      }
+        if (!mongoose.Types.ObjectId.isValid(roomId)) {
+          console.log(" Invalid chatId");
+          return;
+        }
 
-      // 2 Check chat exists
-      const chat = await Chat.findById(roomId);
-      if (!chat) {
-        console.log(" Chat not found in DB");
-        return;
-      }
-      // 3 Save message
+        // 2 Check chat exists
+        const chat = await Chat.findById(roomId);
+        if (!chat) {
+          console.log(" Chat not found in DB");
+          return;
+        }
+        // 3 Save message
 
-      const message = await Message.create({
-        sender: socket.userId,
-        chat: roomId,
-        content,
-      });
-      console.log(" Message saved:", message._id);
+        const message = await Message.create({
+          sender: socket.userId,
+          chat: roomId,
+          content,
+        });
+        console.log(" Message saved:", message._id);
 
-      // 4 Update last message
-      chat.lastMessage = message._id;
-      await chat.save();
-      console.log("✅ Chat updated with lastMessage and bumped updatedAt");
+        // 4 Update last message
+        chat.lastMessage = message._id;
+        await chat.save();
+        console.log("✅ Chat updated with lastMessage and bumped updatedAt");
 
-      message.status = "delivered";
-      await message.save();
+        message.status = "delivered";
+        await message.save();
 
-      // notify sender
-      socket.emit("message-delivered", {
-        messageId: message._id,
-      });
-      const populatedMessage = await Message.findById(message._id).populate("sender", "_id name");
+        // notify sender
+        socket.emit("message-delivered", {
+          messageId: message._id,
+        });
+        const populatedMessage = await Message.findById(message._id).populate("sender", "_id name");
         io.to(roomId).emit("new-message", populatedMessage);
 
-      // notify receivers
-      socket.to(roomId).emit("message-delivered", {
-        messageId: message._id,
-      });
+        // notify receivers
+        socket.to(roomId).emit("message-delivered", {
+          messageId: message._id,
+        });
 
-      chat.participants.forEach((userId) => {
-        if (userId.toString() !== socket.userId) {
-          const count = chat.unreadCounts.get(userId.toString()) || 0;
-          chat.unreadCounts.set(userId.toString(), count + 1);
-        }
-      });
+        chat.participants.forEach((userId) => {
+          if (userId.toString() !== socket.userId) {
+            const count = chat.unreadCounts.get(userId.toString()) || 0;
+            chat.unreadCounts.set(userId.toString(), count + 1);
+          }
+        });
 
-      await chat.save();
+        await chat.save();
 
-    } catch (err) {
+      } catch (err) {
 
-      console.error("🔥 SEND MESSAGE ERROR:", err);
-    }
+        console.error("🔥 SEND MESSAGE ERROR:", err);
+      }
     });
     // MARK SEEN
     socket.on("mark-seen", async ({ chatId }) => {
@@ -181,8 +181,8 @@ function initSocket(server) {
       );
 
       socket.to(roomId).emit("message-seen", {
-          chatId: roomId,
-          userId: socket.userId,
+        chatId: roomId,
+        userId: socket.userId,
       });
     });
     socket.on("delete-for-me", async ({ messageId }) => {

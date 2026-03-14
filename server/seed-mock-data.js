@@ -23,20 +23,22 @@ async function seedData() {
       yashvi = await User.create({
         name: "Yashvi",
         email: yashviEmail,
+        phoneNumber: "+919999999999",
         password: yashviPassword
       });
     } else {
-      // Update password just in case it was plain text
+      // Update password and phone just in case it was missing
       yashvi.password = yashviPassword;
+      yashvi.phoneNumber = "+919999999999";
       await yashvi.save();
     }
     console.log(`Yashvi user found: ID=${yashvi._id}, Email=${yashvi.email}`);
 
     const mockUsersData = [
-      { name: "John Doe", email: "john@example.com", password: johnPassword },
-      { name: "Alice Smith", email: "alice@example.com", password: defaultPassword },
-      { name: "Bob Johnson", email: "bob@example.com", password: defaultPassword },
-      { name: "Sarah Wilson", email: "sarah@example.com", password: defaultPassword }
+      { name: "John Doe", email: "john@example.com", phoneNumber: "+918888888888", password: johnPassword },
+      { name: "Alice Smith", email: "alice@example.com", phoneNumber: "+917777777777", password: defaultPassword },
+      { name: "Bob Johnson", email: "bob@example.com", phoneNumber: "+916666666666", password: defaultPassword },
+      { name: "Sarah Wilson", email: "sarah@example.com", phoneNumber: "+915555555555", password: defaultPassword }
     ];
 
     for (const userData of mockUsersData) {
@@ -45,12 +47,14 @@ async function seedData() {
         user = await User.create({
           name: userData.name,
           email: userData.email,
+          phoneNumber: userData.phoneNumber,
           password: userData.password
         });
         console.log(`Created user: ${user.name}`);
       } else {
-        // Update password to hashed version
+        // Update password and phone
         user.password = userData.password;
+        user.phoneNumber = userData.phoneNumber;
         await user.save();
         console.log(`Updated password for: ${user.name}`);
       }
