@@ -95,5 +95,56 @@ exports.uploadFile = async (req, res) => {
   }
 };
 
+exports.reactToMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user.id;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Find if this user already reacted with THIS SAME emoji
+    const existingIndex = message.reactions.findIndex(
+      (r) => r.user.toString() === userId.toString() && r.emoji === emoji
+    );
+
+    if (existingIndex > -1) {
+      // If same emoji, remove it (toggle off)
+      message.reactions.splice(existingIndex, 1);
+    } else {
+      // If different emoji or no reaction, update user's reaction
+      const userReactionIndex = message.reactions.findIndex(
+        (r) => r.user.toString() === userId.toString()
+      );
+      
+      if (userReactionIndex > -1) {
+        // Replace existing emoji
+        message.reactions[userReactionIndex].emoji = emoji;
+      } else {
+        // Add new reaction
+        message.reactions.push({ emoji, user: userId });
+      }
+    }
+
+    await message.save();
+    
+    // Populate for frontend consistency
+    const updatedMessage = await Message.findById(messageId).populate("sender", "_id name");
+
+    const { getIO } = require("../socket");
+    const io = getIO();
+    if (io) {
+      io.to(message.chat.toString()).emit("message-reacted", updatedMessage);
+    }
+
+    res.status(200).json(updatedMessage);
+  } catch (error) {
+    res.status(500).json({ message: "Error reacting to message", error: error.message });
+  }
+};
+
 
 

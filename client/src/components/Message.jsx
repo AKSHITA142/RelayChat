@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Check, 
@@ -12,20 +12,31 @@ import {
   Clock,
   Mic
 } from "lucide-react";
+import ReactionPicker from "./ReactionPicker";
 import WaveformPlayer from "./WaveformPlayer";
 import { getLoggedInUser } from "../utils/auth";
 import socket from "../services/socket";
+import api from "../services/api"; // Added api import
 
 export default function Message({ message, isOwn, onDeleteMe, onDeleteEveryone, chatType }) {
   const [showMenu, setShowMenu] = useState(false);
+  const [showReactions, setShowReactions] = useState(false);
+  const [isPressing, setIsPressing] = useState(false);
+  const pressTimerRef = useRef(null);
+  
   const myId = getLoggedInUser()?._id;
   const msg = message; // for easier access
   const isMe = isOwn;
 
   const formatTime = (dateStr) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    try {
+      if (!dateStr) return "";
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "";
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch (e) {
+      return "";
+    }
   };
 
   const handleDeleteForMe = () => {
@@ -39,11 +50,33 @@ export default function Message({ message, isOwn, onDeleteMe, onDeleteEveryone, 
     }
     setShowMenu(false);
   };
+  
+  const handleReact = async (emoji) => {
+    try {
+      await api.patch(`/message/${msg._id}/react`, { emoji });
+      setShowReactions(false);
+    } catch (err) {
+      console.error("Failed to react:", err);
+    }
+  };
+
+  const startPress = () => {
+    pressTimerRef.current = setTimeout(() => {
+      setShowReactions(true);
+      setIsPressing(false);
+    }, 500);
+    setIsPressing(true);
+  };
+
+  const endPress = () => {
+    clearTimeout(pressTimerRef.current);
+    setIsPressing(false);
+  };
 
   const renderStatus = () => {
-    if (!isMe || msg.isDeleted) return null;
+    if (!isMe || msg?.isDeleted) return null;
     
-    switch (msg.status) {
+    switch (msg?.status) {
       case "seen":
         return <CheckCheck className="text-sky-400" size={14} />;
       case "delivered":
@@ -92,9 +125,26 @@ export default function Message({ message, isOwn, onDeleteMe, onDeleteEveryone, 
           e.preventDefault();
           setShowMenu(true);
         }}
+        onMouseEnter={() => {
+          // Optional: Show reactions on hover with delay if desired
+          // pressTimerRef.current = setTimeout(() => setShowReactions(true), 1000);
+        }}
+        onMouseLeave={() => {
+          // clearTimeout(pressTimerRef.current);
+          // Only hide if not mobile? Usually better to keep it manually dismissal
+        }}
+        onTouchStart={startPress}
+        onTouchEnd={endPress}
+        onMouseDown={startPress}
+        onMouseUp={endPress}
       >
+        <ReactionPicker 
+          isVisible={showReactions} 
+          onSelect={handleReact}
+          position={isMe ? "top" : "top"}
+        />
         {/* Attachment Logic */}
-        {msg.fileUrl ? (
+        {msg?.fileUrl ? (
           <div className="space-y-2 mb-1">
             {msg.fileType?.startsWith("image/") ? (
               <div className="relative overflow-hidden rounded-xl border border-black/10">
@@ -145,6 +195,35 @@ export default function Message({ message, isOwn, onDeleteMe, onDeleteEveryone, 
           </span>
           {renderStatus()}
         </div>
+
+        {/* Reactions Display */}
+        {msg.reactions && msg.reactions.length > 0 && (
+          <div className={`absolute -bottom-3 ${isMe ? "right-2" : "left-2"} flex flex-wrap gap-0.5 z-10`}>
+            {Object.entries(
+              (Array.isArray(msg.reactions) ? msg.reactions : []).reduce((acc, r) => {
+                if (r && r.emoji) {
+                  acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                }
+                return acc;
+              }, {})
+            ).map(([emoji, count]) => (
+              <motion.div
+                key={emoji}
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                whileHover={{ scale: 1.1 }}
+                className="flex items-center gap-1 bg-whatsapp-sidebar-dark/90 backdrop-blur-md border border-white/20 rounded-full px-1.5 py-0.5 shadow-lg group/reaction cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReact(emoji);
+                }}
+              >
+                <span className="text-sm">{emoji}</span>
+                {count > 1 && <span className="text-[10px] text-white/70 font-bold">{count}</span>}
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {/* Options Button */}
         <button 

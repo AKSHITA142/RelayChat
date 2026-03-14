@@ -46,7 +46,11 @@
 
 @layer utilities {
   .proximity-glow {
-    @apply pointer-events-none absolute inset-0 z-50 transition-opacity duration-500;
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    pointer-events: none;
+    transition: opacity 0.5s duration;
     background: radial-gradient(
       800px circle at var(--x) var(--y),
       rgba(59, 130, 246, 0.15),

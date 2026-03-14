@@ -240,15 +240,16 @@ export default function Sidebar({ chats, setChats, setSelectedChat, selectedChat
       {/* Chat List */}
       <div className="flex-1 overflow-y-auto px-2 space-y-1 custom-scrollbar">
         {filteredChats.map((chat, index) => {
-          const otherUser = chat.participants.find(u => (u._id?.toString() || u.toString()) !== myUserId?.toString());
+          const otherUser = (chat.participants || []).find(u => u && (u._id?.toString() || u.toString()) !== myUserId?.toString());
           const isSelected = selectedChat?._id === chat._id;
-          const isOnline = !chat.isGroup && onlineUsers.includes(otherUser?._id || otherUser);
+          const isOnline = !chat.isGroup && otherUser && onlineUsers.includes(otherUser._id || otherUser);
 
-          let displayName = chat.isGroup ? chat.groupName : "Unknown";
-          if (!chat.isGroup) {
-            const savedContact = contacts.find(c => c.userId?.toString() === otherUser?._id?.toString());
-            displayName = savedContact ? savedContact.savedName : (otherUser?.phoneNumber || otherUser?.name || "Unknown");
+          let displayName = chat.isGroup ? (chat.groupName || "Unnamed Group") : "Unknown";
+          if (!chat.isGroup && otherUser) {
+            const savedContact = contacts.find(c => c && c.userId?.toString() === (otherUser._id || otherUser).toString());
+            displayName = savedContact ? savedContact.savedName : (otherUser.phoneNumber || otherUser.name || "Unknown User");
           }
+          displayName = displayName || "Unknown";
 
           return (
             <motion.div
@@ -262,7 +263,7 @@ export default function Sidebar({ chats, setChats, setSelectedChat, selectedChat
               <div className="flex items-center gap-3">
                 <div className="relative flex-shrink-0">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${isSelected ? 'bg-whatsapp-bg-dark text-whatsapp-green' : 'bg-whatsapp-green/10 text-whatsapp-green'}`}>
-                    {chat.isGroup ? <Users size={20} /> : displayName[0]?.toUpperCase()}
+                    {chat.isGroup ? <Users size={20} /> : (displayName?.[0]?.toUpperCase() || "?")}
                   </div>
                   {!chat.isGroup && isOnline && (
                     <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-whatsapp-sidebar-dark rounded-full ${isSelected ? 'bg-whatsapp-bg-dark' : 'bg-whatsapp-green animate-pulse'}`} />

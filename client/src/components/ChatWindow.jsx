@@ -41,17 +41,24 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
     u => (u._id?.toString() || u.toString()) !== myUserId?.toString()
   );
 
-  const isOnline = onlineUsers.some(
-    id => id.toString() === otherUser?._id?.toString()
+  const isOnline = Array.isArray(onlineUsers) && otherUser?._id && onlineUsers.some(
+    id => id?.toString() === otherUser._id.toString()
   );
   
   const lastSeen = lastSeenMap[otherUser?._id];
-  const lastSeenText = lastSeen
-    ? `Available ${new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : "Offline";
+  const lastSeenText = (() => {
+    try {
+      if (!lastSeen) return "Offline";
+      const date = new Date(lastSeen);
+      if (isNaN(date.getTime())) return "Offline";
+      return `Available ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } catch (e) {
+      return "Offline";
+    }
+  })();
 
   const savedContact = otherUser ? contacts.find(c => c.userId?.toString() === otherUser?._id?.toString()) : null;
-  const displayName = selectedChat?.isGroup ? selectedChat.groupName : (savedContact ? savedContact.savedName : (otherUser?.phoneNumber || otherUser?.name || "Unknown"));
+  const displayName = (selectedChat?.isGroup ? selectedChat.groupName : (savedContact ? savedContact.savedName : (otherUser?.phoneNumber || otherUser?.name || "Unknown"))) || "Unknown";
 
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContactName, setNewContactName] = useState("");
@@ -140,9 +147,10 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
 
   useEffect(() => {
     const handler = (msg) => {
-      if (msg.chat?.toString() !== selectedChat?._id?.toString()) return;
+      if (!msg || !selectedChat?._id) return;
+      if (msg.chat?.toString() !== selectedChat._id.toString()) return;
       setMessages(prev => [...prev, msg]);
-      if ((msg.sender?._id || msg.sender)?.toString() !== myUserId?.toString()) {
+      if (msg.sender && (msg.sender?._id || msg.sender)?.toString() !== myUserId?.toString()) {
         socket.emit("mark-seen", { chatId: selectedChat._id });
       }
     };
@@ -162,7 +170,12 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
     };
 
     const deleteForEveryoneHandler = ({ messageId }) => {
-      setMessages(prev => prev.map(m => m._id === messageId ? { ...m, content: "This message was deleted", isDeleted: true } : m));
+      setMessages(prev => prev.map(m => m?._id === messageId ? { ...m, content: "This message was deleted", isDeleted: true } : m));
+    };
+
+    const reactionHandler = (updatedMessage) => {
+      if (!updatedMessage?._id) return;
+      setMessages(prev => prev.map(m => m?._id === updatedMessage._id ? updatedMessage : m));
     };
 
     socket.on("new-message", handler);
@@ -170,6 +183,7 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
     socket.on("message-seen", seenHandler);
     socket.on("message-deleted-for-me", deleteForMeHandler);
     socket.on("message-deleted-for-everyone", deleteForEveryoneHandler);
+    socket.on("message-reacted", reactionHandler);
 
     return () => {
       socket.off("new-message", handler);
@@ -177,6 +191,7 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
       socket.off("message-seen", seenHandler);
       socket.off("message-deleted-for-me", deleteForMeHandler);
       socket.off("message-deleted-for-everyone", deleteForEveryoneHandler);
+      socket.off("message-reacted", reactionHandler);
     };
   }, [selectedChat, myUserId]);
 
@@ -252,7 +267,7 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
         <div className="flex items-center gap-4">
           <div className="relative">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold bg-whatsapp-green/10 text-whatsapp-green`}>
-              {selectedChat.isGroup ? <Users size={20} /> : displayName[0]?.toUpperCase()}
+              {selectedChat.isGroup ? <Users size={20} /> : (displayName?.[0]?.toUpperCase() || "?")}
             </div>
             {!selectedChat.isGroup && isOnline && (
               <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-whatsapp-green border-2 border-whatsapp-sidebar-dark rounded-full shadow-lg" />
@@ -309,7 +324,7 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
                     Refining thoughts...
                   </span>
                 ) : selectedChat?.isGroup ? (
-                   `Joined • ${new Date(selectedChat.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`
+                   `Joined • ${selectedChat.createdAt ? new Date(selectedChat.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : "Recently"}`
                 ) : isOnline ? "Active Now" : lastSeenText}
               </span>
             </div>
@@ -355,15 +370,18 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
       {/* Messages */}
       <div className="flex-1 overflow-y-auto pt-4 pb-20 custom-scrollbar relative">
         <AnimatePresence mode="popLayout">
-          {messages.map((m, i) => (
-            <Message 
-              key={m._id} 
-              message={m} 
-              isOwn={(m.sender?._id || m.sender)?.toString() === myUserId?.toString()}
-              onDeleteMe={(msgId) => socket.emit("delete-for-me", { messageId: msgId })}
-              onDeleteEveryone={(msgId) => socket.emit("delete-for-everyone", { messageId: msgId, chatId: selectedChat._id })}
-            />
-          ))}
+          {messages && Array.isArray(messages) && messages.map((m, i) => {
+            if (!m || !m._id) return null;
+            return (
+              <Message 
+                key={m._id} 
+                message={m} 
+                isOwn={(m.sender?._id || m.sender)?.toString() === myUserId?.toString()}
+                onDeleteMe={(msgId) => socket.emit("delete-for-me", { messageId: msgId })}
+                onDeleteEveryone={(msgId) => socket.emit("delete-for-everyone", { messageId: msgId, chatId: selectedChat?._id })}
+              />
+            );
+          })}
         </AnimatePresence>
         <div ref={messagesEndRef} />
       </div>
