@@ -1,13 +1,26 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, CheckCheck, Trash2, ShieldAlert, FileText, ExternalLink, MoreVertical } from "lucide-react";
+import { 
+  Check, 
+  CheckCheck, 
+  Trash2, 
+  ShieldAlert, 
+  FileText, 
+  ExternalLink, 
+  MoreVertical,
+  Download,
+  Clock,
+  Mic
+} from "lucide-react";
+import WaveformPlayer from "./WaveformPlayer";
 import { getLoggedInUser } from "../utils/auth";
 import socket from "../services/socket";
 
-export default function Message({ msg }) {
+export default function Message({ message, isOwn, onDeleteMe, onDeleteEveryone, chatType }) {
   const [showMenu, setShowMenu] = useState(false);
   const myId = getLoggedInUser()?._id;
-  const isMe = (msg.sender?._id || msg.sender)?.toString() === myId?.toString();
+  const msg = message; // for easier access
+  const isMe = isOwn;
 
   const formatTime = (dateStr) => {
     if (!dateStr) return "";
@@ -16,13 +29,13 @@ export default function Message({ msg }) {
   };
 
   const handleDeleteForMe = () => {
-    socket.emit("delete-for-me", { messageId: msg._id });
+    onDeleteMe(msg._id);
     setShowMenu(false);
   };
 
   const handleDeleteForEveryone = () => {
     if (window.confirm("Permanently delete this message for all participants?")) {
-      socket.emit("delete-for-everyone", { messageId: msg._id, chatId: msg.chat });
+      onDeleteEveryone(msg._id);
     }
     setShowMenu(false);
   };
@@ -92,6 +105,13 @@ export default function Message({ msg }) {
                   onClick={() => window.open(`http://localhost:5002${msg.fileUrl}`, "_blank")}
                 />
               </div>
+            ) : msg.fileType?.startsWith("audio/") ? (
+              <div className="py-1">
+                <WaveformPlayer url={`http://localhost:5002${msg.fileUrl}`} />
+                {msg.content && msg.content !== "🎤 Voice Message" && (
+                   <p className="text-sm px-1 mt-2 leading-relaxed italic opacity-80">{msg.content}</p>
+                )}
+              </div>
             ) : (
               <a 
                 href={`http://localhost:5002${msg.fileUrl}`} 
@@ -111,7 +131,9 @@ export default function Message({ msg }) {
                 <ExternalLink size={14} className="opacity-40" />
               </a>
             )}
-            {msg.content && msg.content !== msg.fileName && <p className="text-sm px-1 leading-relaxed">{msg.content}</p>}
+            {msg.content && !msg.fileType?.startsWith("audio/") && msg.content !== msg.fileName && (
+              <p className="text-sm px-1 leading-relaxed">{msg.content}</p>
+            )}
           </div>
         ) : (
           <p className="text-[15px] leading-relaxed break-words">{msg.content}</p>
@@ -173,5 +195,3 @@ export default function Message({ msg }) {
     </motion.div>
   );
 }
-
-

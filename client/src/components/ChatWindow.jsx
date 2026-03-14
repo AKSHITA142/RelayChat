@@ -14,9 +14,11 @@ import {
   UserCheck, 
   Loader2,
   Circle,
-  Edit2
+  Edit2,
+  Mic
 } from "lucide-react";
 import Message from "./Message";
+import VoiceRecorder from "./VoiceRecorder";
 import socket from "../services/socket";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
@@ -53,6 +55,23 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
 
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContactName, setNewContactName] = useState("");
+  const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+
+  const handleVoiceSend = async (blob) => {
+    try {
+      const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("chatId", selectedChat._id);
+      formData.append("content", "🎤 Voice Message");
+
+      const res = await api.post("/message/upload", formData);
+      setIsVoiceRecording(false);
+    } catch (err) {
+      console.error("Error sending voice message:", err);
+      setIsVoiceRecording(false);
+    }
+  };
 
   const handleRenameChat = async () => {
     if (!tempGroupName.trim() || tempGroupName === displayName) {
@@ -188,8 +207,6 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
         headers: { "Content-Type": "multipart/form-data" }
       });
       setSelectedFile(null);
-      setText("");
-      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
       console.error("Upload failed", err);
     }
@@ -339,112 +356,155 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
       <div className="flex-1 overflow-y-auto pt-4 pb-20 custom-scrollbar relative">
         <AnimatePresence mode="popLayout">
           {messages.map((m, i) => (
-            <Message key={m._id} msg={m} />
+            <Message 
+              key={m._id} 
+              message={m} 
+              isOwn={(m.sender?._id || m.sender)?.toString() === myUserId?.toString()}
+              onDeleteMe={(msgId) => socket.emit("delete-for-me", { messageId: msgId })}
+              onDeleteEveryone={(msgId) => socket.emit("delete-for-everyone", { messageId: msgId, chatId: selectedChat._id })}
+            />
           ))}
         </AnimatePresence>
         <div ref={messagesEndRef} />
       </div>
 
       {/* Footer Interface */}
-      <div className="p-4 bg-whatsapp-bg-dark/80 backdrop-blur-xl border-t border-white/5 z-10">
-        <AnimatePresence>
-          {selectedFile && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
+      <footer className="p-4 bg-whatsapp-bg-dark/80 backdrop-blur-xl border-t border-white/5 z-10 relative">
+        <AnimatePresence mode="wait">
+          {isVoiceRecording ? (
+            <motion.div
+              key="voice-recorder"
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl mb-4 flex items-center justify-between"
+              exit={{ opacity: 0, y: 20 }}
+              className="w-full"
             >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-500/20 rounded-lg"><FilePlus className="text-emerald-400" size={16} /></div>
-                <span className="text-xs font-bold text-slate-300 truncate max-w-xs">{selectedFile.name}</span>
+              <VoiceRecorder 
+                onSend={handleVoiceSend} 
+                onCancel={() => setIsVoiceRecording(false)} 
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="chat-input"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full"
+            >
+              <AnimatePresence>
+                {selectedFile && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl mb-4 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-emerald-500/20 rounded-lg"><FilePlus className="text-emerald-400" size={16} /></div>
+                      <span className="text-xs font-bold text-slate-300 truncate max-w-xs">{selectedFile.name}</span>
+                    </div>
+                    <button onClick={() => setSelectedFile(null)} className="p-1.5 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-all"><X size={16} /></button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex items-center gap-3 relative">
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    className={`p-2 rounded-xl transition-all ${showEmojiPicker ? 'bg-whatsapp-green text-whatsapp-bg-dark' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                  >
+                    <Smile size={22} />
+                  </button>
+                  <button 
+                    onClick={() => fileInputRef.current.click()}
+                    className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/5 transition-all"
+                  >
+                    <Paperclip size={22} />
+                  </button>
+                </div>
+                
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) setSelectedFile(file);
+                  }}
+                />
+
+                <div className="flex-1 relative">
+                  <input
+                    value={text}
+                    onChange={e => {
+                      setText(e.target.value);
+                      socket.emit("typing", selectedChat._id);
+                      clearTimeout(typingTimeout.current);
+                      typingTimeout.current = setTimeout(() => {
+                        socket.emit("stop-typing", selectedChat._id);
+                      }, 1500);
+                    }}
+                    onKeyDown={e => e.key === "Enter" && handleSend()}
+                    placeholder="Express yourself..." 
+                    className="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-3 text-sm text-slate-200 outline-none focus:border-whatsapp-green transition-all placeholder:text-slate-600"
+                  />
+                </div>
+
+                {text.trim() || selectedFile ? (
+                  <motion.button 
+                    key="send-btn"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleSend}
+                    className="p-3 bg-whatsapp-green text-whatsapp-bg-dark rounded-2xl shadow-lg shadow-whatsapp-green/20 hover:brightness-110 active:brightness-90 transition-all"
+                  >
+                    <Send size={22} />
+                  </motion.button>
+                ) : (
+                  <motion.button 
+                    key="mic-btn"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setIsVoiceRecording(true)}
+                    className="p-3 bg-white/5 text-whatsapp-green border border-white/10 rounded-2xl hover:bg-whatsapp-green hover:text-whatsapp-bg-dark transition-all"
+                  >
+                    <Mic size={22} />
+                  </motion.button>
+                )}
+
+                {/* Emoji Picker Overlay */}
+                <AnimatePresence>
+                  {showEmojiPicker && (
+                    <motion.div 
+                      key="emoji-picker"
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                      className="absolute bottom-20 left-0 glass-card p-4 border-white/20 shadow-2xl z-50 grid grid-cols-5 gap-3"
+                    >
+                      {["😊", "😂", "❤️", "👍", "🙏", "🔥", "😭", "😮", "🎉", "✨", "💯", "✅", "🙌", "💀", "🤣", "🤔", "😘", "😎", "👀", "👋"].map(emoji => (
+                        <motion.span 
+                          key={emoji} 
+                          whileHover={{ scale: 1.3 }}
+                          whileTap={{ scale: 0.8 }}
+                          onClick={() => {
+                            setText(prev => prev + emoji);
+                            setShowEmojiPicker(false);
+                          }}
+                          className="text-2xl cursor-pointer p-1"
+                        >
+                          {emoji}
+                        </motion.span>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-              <button onClick={() => setSelectedFile(null)} className="p-1.5 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-all"><X size={16} /></button>
             </motion.div>
           )}
         </AnimatePresence>
-
-        <div className="flex items-center gap-3 relative">
-          <div className="flex items-center gap-1">
-             <button 
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className={`p-2 rounded-xl transition-all ${showEmojiPicker ? 'bg-whatsapp-green text-whatsapp-bg-dark' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-            >
-              <Smile size={22} />
-            </button>
-            <button 
-              onClick={() => fileInputRef.current.click()}
-              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/5 transition-all"
-            >
-              <Paperclip size={22} />
-            </button>
-          </div>
-          
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files[0];
-              if (file) setSelectedFile(file);
-            }}
-          />
-
-          <div className="flex-1 relative">
-            <input
-              value={text}
-              onChange={e => {
-                setText(e.target.value);
-                socket.emit("typing", selectedChat._id);
-                clearTimeout(typingTimeout.current);
-                typingTimeout.current = setTimeout(() => {
-                  socket.emit("stop-typing", selectedChat._id);
-                }, 1500);
-              }}
-              onKeyDown={e => e.key === "Enter" && handleSend()}
-              placeholder="Express yourself..." 
-              className="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-3 text-sm text-slate-200 outline-none focus:border-whatsapp-green transition-all placeholder:text-slate-600"
-            />
-          </div>
-
-          <motion.button 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleSend}
-            disabled={!text.trim() && !selectedFile}
-            className={`p-3 rounded-2xl flex items-center justify-center transition-all ${text.trim() || selectedFile ? 'bg-whatsapp-green text-whatsapp-bg-dark shadow-lg shadow-whatsapp-green/20' : 'bg-white/5 text-slate-600 cursor-not-allowed'}`}
-          >
-            <Send size={22} />
-          </motion.button>
-
-          {/* Emoji Picker Overlay */}
-          <AnimatePresence>
-            {showEmojiPicker && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20, scale: 0.9 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                className="absolute bottom-20 left-0 glass-card p-4 border-white/20 shadow-2xl z-50 grid grid-cols-5 gap-3"
-              >
-                {["😊", "😂", "❤️", "👍", "🙏", "🔥", "😭", "😮", "🎉", "✨", "💯", "✅", "🙌", "💀", "🤣", "🤔", "😘", "😎", "👀", "👋"].map(emoji => (
-                  <motion.span 
-                    key={emoji} 
-                    whileHover={{ scale: 1.3 }}
-                    whileTap={{ scale: 0.8 }}
-                    onClick={() => {
-                      setText(prev => prev + emoji);
-                      setShowEmojiPicker(false);
-                    }}
-                    className="text-2xl cursor-pointer p-1"
-                  >
-                    {emoji}
-                  </motion.span>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
+      </footer>
     </div>
   );
 }

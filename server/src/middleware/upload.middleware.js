@@ -19,8 +19,8 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  // Accept images and common document types
-  const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|text|txt/;
+  // Accept images, common document types, and audio files
+  const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|text|txt|mpeg|mp3|wav|webm|ogg|m4a|mp4/;
   const mimetype = allowedTypes.test(file.mimetype);
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
 

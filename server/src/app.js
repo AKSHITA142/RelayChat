@@ -9,9 +9,21 @@ app.use(cors({
   credentials: true
 }));
 
-//helmet is used to add header for security purpose
+// helmet is used to add header for security purpose
 const helmet = require("helmet");
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "media-src": ["'self'", "http://localhost:5002"],
+        "connect-src": ["'self'", "http://localhost:5002", "ws://localhost:5002"],
+        "img-src": ["'self'", "data:", "http://localhost:5002"],
+      },
+    },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 
 // middleware
 app.use(express.json());
