@@ -98,6 +98,16 @@ useEffect(() => {
     return () => socket.off("new-chat", newChatHandler);
   }, []);
 
+  // Listen for chat renames
+  useEffect(() => {
+    const renameHandler = ({ chatId, name }) => {
+      setChats(prev => prev.map(c => c._id === chatId ? { ...c, groupName: name } : c));
+      setSelectedChat(prev => (prev?._id === chatId ? { ...prev, groupName: name } : prev));
+    };
+    socket.on("chat-renamed", renameHandler);
+    return () => socket.off("chat-renamed", renameHandler);
+  }, []);
+
   //  CRITICAL: join ALL chat rooms once chats load
   useEffect(() => {
     if (!chats.length) return;
@@ -108,11 +118,12 @@ useEffect(() => {
   }, [chats]);
 
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
+    <div className="flex h-screen bg-whatsapp-bg-dark overflow-hidden">
       <Sidebar
         chats={chats}
         setChats={setChats}
         setSelectedChat={setSelectedChat}
+        selectedChat={selectedChat}
         onlineUsers={onlineUsers}
         contacts={contacts}
       />
@@ -123,7 +134,9 @@ useEffect(() => {
         lastSeenMap={lastSeenMap}
         contacts={contacts}
         setContacts={setContacts}
+        setChats={setChats}
       />
     </div>
   );
 }
+

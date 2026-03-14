@@ -56,7 +56,8 @@ exports.getMyChats = async (req, res) => {
     lastMessage: chat.lastMessage,
     unreadCount: chat.unreadCounts?.[userId] || 0,
     isGroup: chat.isGroup,
-    groupName: chat.groupName
+    groupName: chat.groupName,
+    createdAt: chat.createdAt
   }));
 
   res.json(result);
@@ -157,6 +158,40 @@ exports.startChatByPhone = async (req, res) => {
 
   } catch (error) {
     console.error("startChatByPhone error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.renameGroup = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "New name is required" });
+    }
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) return res.status(404).json({ message: "Chat not found" });
+
+    if (!chat.participants.includes(req.user.id)) {
+      return res.status(403).json({ message: "You are not a participant of this group" });
+    }
+
+    chat.groupName = name.trim();
+    await chat.save();
+
+    // Notify all participants
+    const io = getIO();
+    if (io) {
+      chat.participants.forEach(p => {
+        io.to(p.toString()).emit("chat-renamed", { chatId, name: chat.groupName });
+      });
+    }
+
+    res.json(chat);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
