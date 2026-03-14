@@ -4,7 +4,7 @@ import { connectSocket } from "../services/socket";
 import "./login.css";
 
 export default function Login({ onLogin, onSignup }) {
-  const [loginMethod, setLoginMethod] = useState("email"); // 'email' or 'phone'
+  const [loginMethod, setLoginMethod] = useState("phone"); // Default to Phone OTP
   
   // Email state
   const [email, setEmail] = useState("");
@@ -14,6 +14,10 @@ export default function Login({ onLogin, onSignup }) {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  
+  // Registration Flow state (for new phone users)
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [name, setName] = useState("");
   
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,7 +38,7 @@ export default function Login({ onLogin, onSignup }) {
       handleLoginSuccess(res);
     } catch (err) {
       console.error("Login error:", err);
-      setError(err.response?.data?.message || "Something went wrong.");
+      setError(err.response?.data?.message || "Invalid credentials.");
     } finally {
       setLoading(false);
     }
@@ -45,9 +49,9 @@ export default function Login({ onLogin, onSignup }) {
     setLoading(true);
     setError("");
     try {
-      const res = await api.post("/auth/send-otp", { phone });
+      await api.post("/auth/send-otp", { phone });
       setOtpSent(true);
-      setError("OTP Sent Successfully! (Check terminal)");
+      setError("OTP Sent Successfully! (Check your phone)");
     } catch (err) {
       console.error("OTP send error:", err);
       setError(err.response?.data?.message || "Failed to send OTP.");
@@ -62,7 +66,14 @@ export default function Login({ onLogin, onSignup }) {
     setError("");
     try {
       const res = await api.post("/auth/verify-otp", { phone, otp });
-      handleLoginSuccess(res);
+      
+      // If backend returns 202, it means it's a new user who needs to register
+      if (res.status === 202) {
+        setIsRegistering(true);
+        setError("Phone verified! Please complete your profile.");
+      } else {
+        handleLoginSuccess(res);
+      }
     } catch (err) {
       console.error("OTP verify error:", err);
       setError(err.response?.data?.message || "Invalid OTP.");
@@ -71,51 +82,72 @@ export default function Login({ onLogin, onSignup }) {
     }
   };
 
+  const handleCompleteRegistration = async () => {
+    if (!name) return setError("Name is required");
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.post("/auth/complete-registration", {
+        name,
+        email,
+        password,
+        phoneNumber: phone
+      });
+      handleLoginSuccess(res);
+    } catch (err) {
+      console.error("Registration failed:", err);
+      setError(err.response?.data?.message || "Registration failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="login-bg">
       <div className="login-card">
-        <h2>RelayChat</h2>
-
-        <div className="login-method-toggle" style={{display: 'flex', gap: '10px', marginBottom: '20px', justifyContent: 'center'}}>
-          <button 
-            style={{background: loginMethod === 'email' ? '#075e54' : '#ccc', padding: '5px 10px', color: 'white'}}
-            onClick={() => { setLoginMethod("email"); setError(""); }}
-          >
-            Email
-          </button>
-          <button 
-            style={{background: loginMethod === 'phone' ? '#075e54' : '#ccc', padding: '5px 10px', color: 'white'}}
-            onClick={() => { setLoginMethod("phone"); setError(""); }}
-          >
-            Phone OTP
-          </button>
-        </div>
+        <h2 style={{ marginBottom: '10px' }}>RelayChat</h2>
+        <p style={{ fontSize: '0.9rem', marginBottom: '25px', textAlign: 'center' }}>
+          {isRegistering ? "Almost there!" : loginMethod === "phone" ? "Verify your phone number" : "Login with your account"}
+        </p>
 
         {error && (
-          <div className="error-message" style={{color: error.includes("Success") ? "green" : "red"}}>
+          <div className="error-message" style={{ color: error.includes("Success") || error.includes("verified") ? "green" : "red", fontSize: '0.85rem', marginBottom: '15px', textAlign: 'center' }}>
             {error}
           </div>
         )}
 
-        {loginMethod === "email" ? (
+        {isRegistering ? (
           <>
             <input
+              type="text"
+              placeholder="Full Name (Required for WhatsApp style)"
+              value={name}
+              onChange={e => setName(e.target.value)}
+            />
+            <input
               type="email"
-              placeholder="Email"
+              placeholder="Email (Optional)"
               value={email}
               onChange={e => setEmail(e.target.value)}
             />
             <input
               type="password"
-              placeholder="Password"
+              placeholder="Set Password (Optional)"
               value={password}
               onChange={e => setPassword(e.target.value)}
             />
-            <button onClick={handleEmailLogin} disabled={loading}>
-              {loading ? "Logging in..." : "Login"}
+            <button onClick={handleCompleteRegistration} disabled={loading} style={{ background: '#075e54', marginTop: '10px' }}>
+              {loading ? "Registering..." : "Finish & Get Started"}
+            </button>
+            <button 
+              className="back-btn" 
+              style={{ background: 'none', color: '#ffffff', marginTop: '10px', fontSize: '0.9rem' }}
+              onClick={() => { setIsRegistering(false); setOtpSent(false); setOtp(""); setError(""); }}
+            >
+              Cancel
             </button>
           </>
-        ) : (
+        ) : loginMethod === "phone" ? (
           <>
             <input
               type="text"
@@ -136,22 +168,60 @@ export default function Login({ onLogin, onSignup }) {
             )}
 
             {!otpSent ? (
-               <button onClick={handleSendOtp} disabled={loading}>
+               <button onClick={handleSendOtp} disabled={loading} style={{ background: '#075e54' }}>
                  {loading ? "Sending..." : "Send OTP"}
                </button>
             ) : (
-               <button onClick={handleVerifyOtp} disabled={loading}>
-                 {loading ? "Verifying..." : "Verify & Login"}
+               <button onClick={handleVerifyOtp} disabled={loading} style={{ background: '#075e54' }}>
+                 {loading ? "Verifying..." : "Verify OTP"}
                </button>
             )}
+
+            <div style={{ textAlign: 'center', marginTop: '20px' }}>
+              <span 
+                style={{ color: '#ffffff', cursor: 'pointer', fontSize: '0.9rem' }}
+                onClick={() => { setLoginMethod("email"); setError(""); }}
+              >
+                Log in with Password instead
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
+            <button onClick={handleEmailLogin} disabled={loading} style={{ background: '#075e54', marginTop: '10px' }}>
+              {loading ? "Logging in..." : "Login"}
+            </button>
+            <div style={{ textAlign: 'center', marginTop: '15px' }}>
+              <span 
+                style={{ color: '#ffffff', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '500' }}
+                onClick={() => { setLoginMethod("phone"); setError(""); }}
+              >
+                ← Back to Phone Login
+              </span>
+            </div>
           </>
         )}
 
-        <p className="signup-text">
-          Not logged in yet?
-          <span onClick={onSignup}> Sign up</span>
-        </p>
+        {!isRegistering && (
+          <p className="signup-text">
+            Not logged in yet?
+            <span onClick={onSignup}>Sign up</span>
+          </p>
+        )}
       </div>
     </div>
   );
 }
+
