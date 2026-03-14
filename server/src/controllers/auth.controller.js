@@ -2,6 +2,7 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const redisClient = require("../config/redis");
+const { sendSms } = require("../utils/sms");
 
 
 exports.register = async (req, res) => {
@@ -114,11 +115,17 @@ exports.sendOtp = async (req, res) => {
       EX: 300
     });
 
-    // Mock sending SMS
-    console.log(`\n===========================================`);
-    console.log(`📱 SMS TO: ${phone}`);
-    console.log(`🔑 OTP: ${otp}`);
-    console.log(`===========================================\n`);
+    // Real SMS sending via Twilio
+    try {
+      await sendSms(phone, `Your RelayChat verification code is: ${otp}. It expires in 5 minutes.`);
+    } catch (smsErr) {
+      console.error("SMS Sending failed, fallback to console log:", smsErr.message);
+      // Fallback for development if Twilio keys are missing
+      console.log(`\n===========================================`);
+      console.log(`📱 SMS TO: ${phone}`);
+      console.log(`🔑 OTP: ${otp}`);
+      console.log(`===========================================\n`);
+    }
 
     res.status(200).json({ message: "OTP sent successfully" });
 
@@ -169,11 +176,14 @@ exports.verifyOtp = async (req, res) => {
 
     // Find or create user
     let user = await User.findOne({ phoneNumber: phone });
+    
+    // HYBRID FLOW: If user doesn't exist, don't create yet.
+    // Return 202 Accepted to signal frontend to show Registration Form.
     if (!user) {
-      user = await User.create({
-        phoneNumber: phone,
-        // Provide a default generic name for new phone users
-        name: `User-${phone.slice(-4)}`
+      return res.status(202).json({
+        message: "New user detected. Please complete registration.",
+        isNewUser: true,
+        phoneNumber: phone
       });
     }
 
@@ -198,5 +208,66 @@ exports.verifyOtp = async (req, res) => {
   } catch (error) {
     console.error("verifyOtp error:", error);
     res.status(500).json({ message: "Failed to verify OTP" });
+  }
+};
+
+exports.completeRegistration = async (req, res) => {
+  try {
+    const { name, email, password, phoneNumber } = req.body;
+
+    if (!name || !phoneNumber) {
+      return res.status(400).json({ message: "Name and Phone Number are required" });
+    }
+
+    // Check if user already exists
+    let user = await User.findOne({ phoneNumber });
+    if (user) {
+      return res.status(400).json({ message: "User already exists with this phone number" });
+    }
+
+    // Optional: Check if email exists if provided
+    if (email) {
+      const existingEmail = await User.findOne({ email });
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+    }
+
+    // Hash password if provided
+    let hashedPassword;
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      hashedPassword = await bcrypt.hash(password, salt);
+    }
+
+    // Create user
+    user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      phoneNumber
+    });
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "2h" }
+    );
+
+    res.status(201).json({
+      message: "Registration complete",
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        phoneNumber: user.phoneNumber,
+        role: user.role
+      }
+    });
+
+  } catch (error) {
+    console.error("completeRegistration error:", error);
+    res.status(500).json({ message: "Failed to complete registration" });
   }
 };
