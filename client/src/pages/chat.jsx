@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
 import socket, { connectSocket } from "../services/socket";
+import { getLoggedInUser } from "../utils/auth";
 
 export default function Chat() {
   useEffect(() => {
@@ -11,6 +12,7 @@ export default function Chat() {
   const [selectedChat, setSelectedChat] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [lastSeenMap, setLastSeenMap] = useState({});
+  const [contacts, setContacts] = useState(() => getLoggedInUser()?.contacts || []);
 
   useEffect(() => {
   socket.on("online-users", users => {
@@ -95,12 +97,15 @@ useEffect(() => {
         setChats={setChats}
         setSelectedChat={setSelectedChat}
         onlineUsers={onlineUsers}
+        contacts={contacts}
       />
 
       <ChatWindow
         selectedChat={selectedChat}
         onlineUsers={onlineUsers}
         lastSeenMap={lastSeenMap}
+        contacts={contacts}
+        setContacts={setContacts}
       />
     </div>
   );

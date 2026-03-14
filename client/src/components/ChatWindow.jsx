@@ -5,7 +5,7 @@ import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
 
 
-export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap = {} }) {
+export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap = {}, contacts = [], setContacts }) {
   const myUserId = getLoggedInUser()?._id;
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeout = useRef(null);
@@ -28,6 +28,32 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
   const lastSeenText = lastSeen
     ? `last seen at ${new Date(lastSeen).toLocaleTimeString()}`
     : "offline";
+
+  const savedContact = contacts.find(c => c.userId?.toString() === otherUser?._id?.toString());
+  const displayName = selectedChat?.isGroup ? selectedChat?.groupName : (savedContact ? savedContact.savedName : (otherUser?.phoneNumber || "Unknown"));
+
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [newContactName, setNewContactName] = useState("");
+  
+  const handleAddContact = async () => {
+    if (!newContactName.trim()) return;
+    try {
+      const res = await api.post("/user/save-contact", { 
+        targetUserId: otherUser._id, 
+        savedName: newContactName 
+      });
+      // Update local storage
+      const myUser = getLoggedInUser();
+      const updatedUser = { ...myUser, contacts: res.data.contacts };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setContacts(res.data.contacts);
+      setShowAddContact(false);
+      setNewContactName("");
+    } catch(err) {
+      console.error(err);
+      alert("Failed to save contact");
+    }
+  };
 
   // Load messages when chat changes
   useEffect(() => {
@@ -219,8 +245,42 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
   return (
     <div className="chat-window">
       <div className="chat-header">
-        <div className="chat-title">
-          {selectedChat?.isGroup ? selectedChat?.groupName : (otherUser?.name || "Chat")}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div className="chat-title">
+            {displayName}
+          </div>
+          {!selectedChat?.isGroup && !savedContact && otherUser && !showAddContact && (
+             <button 
+               onClick={() => setShowAddContact(true)} 
+               style={{ background: "#25d366", color: "#0b141a", border: "none", borderRadius: "4px", padding: "4px 8px", fontSize: "12px", cursor: "pointer", fontWeight: "bold" }}
+             >
+               Add Contact
+             </button>
+          )}
+          {showAddContact && (
+            <div style={{ display: "flex", gap: "5px" }}>
+              <input 
+                type="text" 
+                placeholder="Enter name..." 
+                value={newContactName}
+                onChange={(e) => setNewContactName(e.target.value)}
+                style={{ padding: "4px", fontSize: "12px", borderRadius: "4px", border: "1px solid #ccc" }}
+                autoFocus
+              />
+              <button 
+                onClick={handleAddContact}
+                style={{ background: "#25d366", color: "#0b141a", border: "none", borderRadius: "4px", padding: "4px 8px", fontSize: "12px", cursor: "pointer" }}
+              >
+                Save
+              </button>
+              <button 
+                onClick={() => { setShowAddContact(false); setNewContactName(""); }}
+                style={{ background: "#ef4444", color: "white", border: "none", borderRadius: "4px", padding: "4px 8px", fontSize: "12px", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="chat-status">
