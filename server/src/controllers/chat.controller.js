@@ -1,5 +1,6 @@
 const Chat = require("../models/Chat");
 const User = require("../models/User");
+const { getIO } = require("../socket");
 
 
 exports.createChat = async (req, res) => {
@@ -9,7 +10,7 @@ exports.createChat = async (req, res) => {
     if (!userId) {
       return res.status(400).json({
         message: "User ID is required"
-      });
+      });0
     }
 
     // check if chat already exists
@@ -53,7 +54,9 @@ exports.getMyChats = async (req, res) => {
     _id: chat._id,
     participants: chat.participants,
     lastMessage: chat.lastMessage,
-    unreadCount: chat.unreadCounts?.[userId] || 0
+    unreadCount: chat.unreadCounts?.[userId] || 0,
+    isGroup: chat.isGroup,
+    groupName: chat.groupName
   }));
 
   res.json(result);
@@ -69,7 +72,18 @@ exports.createGroup = async (req, res) => {
     groupAdmin: req.user.id,
   });
 
-  res.json(chat);
+  const fullGroupChat = await Chat.findOne({ _id: chat._id })
+    .populate("participants", "name email phoneNumber");
+
+  // Emit to all participants including creator so they get the chat real-time
+  const io = getIO();
+  if (io) {
+    fullGroupChat.participants.forEach(p => {
+      io.to(p._id.toString()).emit("new-chat", fullGroupChat);
+    });
+  }
+
+  res.status(201).json(fullGroupChat);
 };
 
 exports.addToGroup = async (req, res) => {

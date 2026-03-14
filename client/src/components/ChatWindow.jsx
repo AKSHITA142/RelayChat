@@ -29,8 +29,8 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
     ? `last seen at ${new Date(lastSeen).toLocaleTimeString()}`
     : "offline";
 
-  const savedContact = contacts.find(c => c.userId?.toString() === otherUser?._id?.toString());
-  const displayName = selectedChat?.isGroup ? selectedChat?.groupName : (savedContact ? savedContact.savedName : (otherUser?.phoneNumber || "Unknown"));
+  const savedContact = otherUser ? contacts.find(c => c.userId?.toString() === otherUser?._id?.toString()) : null;
+  const displayName = selectedChat?.isGroup ? selectedChat.groupName : (savedContact ? savedContact.savedName : (otherUser?.phoneNumber || otherUser?.name || "Unknown"));
 
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContactName, setNewContactName] = useState("");
@@ -286,9 +286,14 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
         <div className="chat-status">
           {isTyping
             ? "typing..."
-            : isOnline
-              ? "online"
-              : lastSeenText}
+            : selectedChat?.isGroup
+              ? `${selectedChat.participants.filter(p => 
+                  onlineUsers.some(id => id.toString() === (p._id?.toString() || p.toString())) &&
+                  (p._id?.toString() || p.toString()) !== myUserId?.toString()
+                ).length + 1} online`
+              : isOnline
+                ? "online"
+                : lastSeenText}
         </div>
       </div>
 

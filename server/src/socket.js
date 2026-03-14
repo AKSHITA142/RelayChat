@@ -33,6 +33,7 @@ function initSocket(server) {
 
   io.on("connection", async (socket) => {
     console.log("🔵 SOCKET CONNECTED:", socket.id, socket.userId);
+    socket.join(socket.userId.toString());
 
     //  JOIN CHAT ROOM
     socket.on("join-chat", (chatId, cb) => {

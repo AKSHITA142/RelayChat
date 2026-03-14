@@ -81,6 +81,23 @@ useEffect(() => {
     return () => socket.off("new-message", handler);
   }, []);
 
+  // Listen for newly created chats (like groups)
+  useEffect(() => {
+    const newChatHandler = (newChat) => {
+      setChats(prev => {
+        // Prevent duplicates if already added locally
+        if (prev.find(c => c._id?.toString() === newChat._id?.toString())) {
+          return prev;
+        }
+        socket.emit("join-chat", newChat._id); // Join the room immediately
+        return [newChat, ...prev];
+      });
+    };
+
+    socket.on("new-chat", newChatHandler);
+    return () => socket.off("new-chat", newChatHandler);
+  }, []);
+
   //  CRITICAL: join ALL chat rooms once chats load
   useEffect(() => {
     if (!chats.length) return;
