@@ -1,10 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
 import socket, { connectSocket } from "../services/socket";
 import { getLoggedInUser } from "../utils/auth";
 
 export default function Chat() {
+  const containerRef = useRef(null);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  // Smooth the mouse movement
+  const springConfig = { damping: 20, stiffness: 150 };
+  const smoothX = useSpring(mouseX, springConfig);
+  const smoothY = useSpring(mouseY, springConfig);
+
+  const x = useTransform(smoothX, (v) => `${v}px`);
+  const y = useTransform(smoothY, (v) => `${v}px`);
+
+  const handleMouseMove = (e) => {
+    if (!containerRef.current) return;
+    const { left, top } = containerRef.current.getBoundingClientRect();
+    mouseX.set(e.clientX - left);
+    mouseY.set(e.clientY - top);
+  };
+
   useEffect(() => {
     connectSocket();
   }, []);
@@ -15,63 +35,44 @@ export default function Chat() {
   const [contacts, setContacts] = useState(() => getLoggedInUser()?.contacts || []);
 
   useEffect(() => {
-  socket.on("online-users", users => {
-    setOnlineUsers(users.map(u => u._id));
-  });
+    socket.on("online-users", users => {
+      setOnlineUsers(users.map(u => u._id));
+    });
 
-  // socket.on("user-online", ({ userId }) => {
-  //   setOnlineUsers(prev => [...new Set([...prev, userId])]);
-  // });
-  socket.on("user-online", ({ userId }) => {
-  setOnlineUsers(prev => [...new Set([...prev, userId])]);
+    socket.on("user-online", ({ userId }) => {
+      setOnlineUsers(prev => [...new Set([...prev, userId])]);
 
-  setLastSeenMap(prev => {
-    const copy = { ...prev };
-    delete copy[userId];
-    return copy;
-  });
-});
+      setLastSeenMap(prev => {
+        const copy = { ...prev };
+        delete copy[userId];
+        return copy;
+      });
+    });
 
+    socket.on("user-offline", ({ userId, lastSeen }) => {
+      setOnlineUsers(prev => prev.filter(id => id !== userId));
 
-  // socket.on("user-offline", ({ userId }) => {
-  //   setOnlineUsers(prev => prev.filter(id => id !== userId));
-  // });
-  socket.on("user-offline", ({ userId, lastSeen }) => {
-  setOnlineUsers(prev => prev.filter(id => id !== userId));
+      setLastSeenMap(prev => ({
+        ...prev,
+        [userId]: lastSeen,
+      }));
+    });
 
-  setLastSeenMap(prev => ({
-    ...prev,
-    [userId]: lastSeen,
-  }));
-});
-
-
-  return () => {
-    socket.off("online-users");
-    socket.off("user-online");
-    socket.off("user-offline");
-  };
-}, []);
-
-useEffect(() => {
-  console.log("ONLINE USERS STATE:", onlineUsers);
-}, [onlineUsers]);
-
+    return () => {
+      socket.off("online-users");
+      socket.off("user-online");
+      socket.off("user-offline");
+    };
+  }, []);
 
   // Update sidebar lastMessage for BOTH users
   useEffect(() => {
     const handler = (msg) => {
       setChats(prev => {
         const msgChatId = (msg.chat?._id || msg.chat)?.toString();
-        // Find if this chat exists in our list
         const chatIdx = prev.findIndex(c => c._id?.toString() === msgChatId);
-        
         if (chatIdx === -1) return prev; 
-
-        // Update the chat object
         const updatedChat = { ...prev[chatIdx], lastMessage: msg };
-        
-        // Remove it from current position and put at top
         const rest = prev.filter((_, i) => i !== chatIdx);
         return [updatedChat, ...rest];
       });
@@ -85,11 +86,10 @@ useEffect(() => {
   useEffect(() => {
     const newChatHandler = (newChat) => {
       setChats(prev => {
-        // Prevent duplicates if already added locally
         if (prev.find(c => c._id?.toString() === newChat._id?.toString())) {
           return prev;
         }
-        socket.emit("join-chat", newChat._id); // Join the room immediately
+        socket.emit("join-chat", newChat._id); 
         return [newChat, ...prev];
       });
     };
@@ -118,7 +118,18 @@ useEffect(() => {
   }, [chats]);
 
   return (
-    <div className="flex h-screen bg-whatsapp-bg-dark overflow-hidden">
+    <motion.div 
+      ref={containerRef}
+      onMouseMove={handleMouseMove}
+      style={{
+        "--x": x,
+        "--y": y
+      }}
+      className="relative flex h-screen bg-whatsapp-bg-dark overflow-hidden group"
+    >
+      {/* Interactive Border Glow Layer */}
+      <div className="proximity-glow opacity-0 group-hover:opacity-100" />
+
       <Sidebar
         chats={chats}
         setChats={setChats}
@@ -136,7 +147,6 @@ useEffect(() => {
         setContacts={setContacts}
         setChats={setChats}
       />
-    </div>
+    </motion.div>
   );
 }
-

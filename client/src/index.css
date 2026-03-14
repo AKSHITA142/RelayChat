@@ -43,3 +43,14 @@
 .animate-slide-up {
   animation: slideUp 0.3s ease-out forwards;
 }
+
+@layer utilities {
+  .proximity-glow {
+    @apply pointer-events-none absolute inset-0 z-50 transition-opacity duration-500;
+    background: radial-gradient(
+      800px circle at var(--x) var(--y),
+      rgba(59, 130, 246, 0.15),
+      transparent 80%
+    );
+  }
+}
