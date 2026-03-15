@@ -1,7 +1,7 @@
 const redis = require('redis');
 require('dotenv').config({ override: true });
 
-// Read Redis URI from env, defaults to localhost
+
 const redisUrl = process.env.REDIS_URI || 'redis://127.0.0.1:6379';
 
 const realClient = redis.createClient({
@@ -11,7 +11,7 @@ const realClient = redis.createClient({
 let isConnected = false;
 const fallbackStore = new Map();
 
-// Simplified fallback for specific operations used in our app (set, get, del)
+
 const redisClient = {
     on: (event, callback) => realClient.on(event, callback),
     connect: async () => {
@@ -40,7 +40,6 @@ const redisClient = {
         if (isConnected) return realClient.del(key);
         return fallbackStore.delete(key);
     },
-    // Mock other methods as needed to avoid crashes
     quit: async () => isConnected ? realClient.quit() : null
 };
 

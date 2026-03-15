@@ -1,11 +1,9 @@
 const express = require("express");
 
-const { register , login, sendOtp, verifyOtp, completeRegistration } = require("../controllers/auth.controller");
+const { login, sendOtp, verifyOtp, completeRegistration } = require("../controllers/auth.controller");
 
 const router = express.Router();
 
-// REGISTER API
-router.post("/register", register);
 router.post("/login",login)
 
 // OTP API
