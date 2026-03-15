@@ -15,7 +15,10 @@ import {
   Loader2,
   Circle,
   Edit2,
-  Mic
+  Mic,
+  Search as SearchIcon,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import Message from "./Message";
 import VoiceRecorder from "./VoiceRecorder";
@@ -23,7 +26,16 @@ import socket from "../services/socket";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
 
-export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap = {}, contacts = [], setContacts, setChats }) {
+export default function ChatWindow({ 
+  selectedChat, 
+  onlineUsers = [], 
+  lastSeenMap = {}, 
+  contacts = [], 
+  setContacts, 
+  setChats,
+  setIsAddingContact,
+  setIsCreatingGroup
+}) {
   const myUserId = getLoggedInUser()?._id;
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeout = useRef(null);
@@ -37,9 +49,9 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
   const [isRenaming, setIsRenaming] = useState(false);
   const [tempGroupName, setTempGroupName] = useState("");
 
-  const otherUser = selectedChat?.participants?.find(
-    u => (u._id?.toString() || u.toString()) !== myUserId?.toString()
-  );
+  const otherUser = Array.isArray(selectedChat?.participants) 
+    ? selectedChat.participants.find(u => u && (u._id?.toString() || u.toString()) !== myUserId?.toString())
+    : null;
 
   const isOnline = Array.isArray(onlineUsers) && otherUser?._id && onlineUsers.some(
     id => id?.toString() === otherUser._id.toString()
@@ -63,6 +75,55 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContactName, setNewContactName] = useState("");
   const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+  
+  // New Menu & Search State
+  const [showMenu, setShowMenu] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(-1);
+  const [searchResults, setSearchResults] = useState([]);
+
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSearch = (q) => {
+    setSearchQuery(q);
+    if (!q.trim()) {
+      setSearchResults([]);
+      setCurrentSearchIndex(-1);
+      return;
+    }
+    const results = messages
+      .map((m, idx) => m.content?.toLowerCase().includes(q.toLowerCase()) ? idx : null)
+      .filter(idx => idx !== null);
+    setSearchResults(results);
+    if (results.length > 0) {
+      setCurrentSearchIndex(results.length - 1); // Point to latest match first
+      const firstMatchId = messages[results[results.length - 1]]._id;
+      document.getElementById(`msg-${firstMatchId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      setCurrentSearchIndex(-1);
+    }
+  };
+
+  const navigateSearch = (dir) => {
+    if (searchResults.length === 0) return;
+    let nextIdx = currentSearchIndex + dir;
+    if (nextIdx < 0) nextIdx = searchResults.length - 1;
+    if (nextIdx >= searchResults.length) nextIdx = 0;
+    setCurrentSearchIndex(nextIdx);
+    const matchId = messages[searchResults[nextIdx]]._id;
+    document.getElementById(`msg-${matchId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
 
   const handleVoiceSend = async (blob) => {
     try {
@@ -127,8 +188,16 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
     if (!selectedChat) return;
     api.get(`/message/${selectedChat._id}`)
       .then(res => {
-        const sorted = res.data.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        setMessages(sorted);
+        if (Array.isArray(res.data)) {
+          const sorted = res.data.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          setMessages(sorted);
+        } else {
+          setMessages([]);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to fetch messages:", err);
+        setMessages([]);
       });
     socket.emit("join-chat", selectedChat._id);
     socket.emit("mark-seen", { chatId: selectedChat._id });
@@ -147,8 +216,8 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
 
   useEffect(() => {
     const handler = (msg) => {
-      if (!msg || !selectedChat?._id) return;
-      if (msg.chat?.toString() !== selectedChat._id.toString()) return;
+      if (!msg || !selectedChat?._id || !msg.chat) return;
+      if (msg.chat.toString() !== selectedChat._id.toString()) return;
       setMessages(prev => [...prev, msg]);
       if (msg.sender && (msg.sender?._id || msg.sender)?.toString() !== myUserId?.toString()) {
         socket.emit("mark-seen", { chatId: selectedChat._id });
@@ -160,7 +229,7 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
     };
 
     const seenHandler = ({ chatId, userId }) => {
-      if (chatId === selectedChat?._id && userId !== myUserId) {
+      if (chatId?.toString() === selectedChat?._id?.toString() && userId?.toString() !== myUserId?.toString()) {
         setMessages(prev => prev.map(m => m.status !== "seen" ? { ...m, status: "seen" } : m));
       }
     };
@@ -332,11 +401,118 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
         </div>
 
         {/* Header Actions */}
-        <div className="flex items-center gap-3">
-          <button className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-all">
+        <div className="flex items-center gap-3 relative" ref={menuRef}>
+          <button 
+            onClick={() => setShowMenu(!showMenu)}
+            className={`p-2 rounded-lg transition-all ${showMenu ? 'bg-whatsapp-green text-whatsapp-bg-dark' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+          >
             <MoreHorizontal size={20} />
           </button>
+
+          <AnimatePresence>
+            {showMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className="absolute top-12 right-0 w-48 bg-whatsapp-sidebar-dark border border-white/10 rounded-xl shadow-2xl py-2 z-50 backdrop-blur-xl"
+              >
+                <button 
+                  onClick={() => { setShowSearch(true); setShowMenu(false); }}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-whatsapp-green transition-all"
+                >
+                  <SearchIcon size={16} /> Search Messages
+                </button>
+                <button 
+                  onClick={() => { setIsRenaming(true); setTempGroupName(displayName); setShowMenu(false); }}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-whatsapp-green transition-all"
+                >
+                  <Edit2 size={16} /> Rename {selectedChat.isGroup ? "Group" : "Chat"}
+                </button>
+                {!selectedChat?.isGroup && !savedContact && (
+                  <button 
+                    onClick={() => { setShowAddContact(true); setShowMenu(false); }}
+                    className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-whatsapp-green transition-all"
+                  >
+                    <UserPlus size={16} /> Add to Contacts
+                  </button>
+                )}
+                <div className="h-px bg-white/5 my-1" />
+                <button 
+                  onClick={() => { 
+                    setIsCreatingGroup(true); 
+                    setIsAddingContact(false);
+                    setShowMenu(false); 
+                  }}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-whatsapp-green transition-all"
+                >
+                  <Users size={16} /> New Group
+                </button>
+                <div className="h-px bg-white/5 my-1" />
+                <button 
+                  onClick={() => { 
+                    setIsAddingContact(true);
+                    setIsCreatingGroup(false);
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-whatsapp-green transition-all"
+                >
+                  <UserPlus size={16} /> Add Contact by Phone
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
+
+        {/* Search Overlay */}
+        <AnimatePresence>
+          {showSearch && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="absolute top-16 left-0 right-0 bg-whatsapp-sidebar-dark border-b border-white/5 px-6 py-3 flex items-center gap-4 z-40 overflow-hidden shadow-xl"
+            >
+              <div className="flex-1 relative">
+                <SearchIcon className="absolute left-3 top-2.5 text-slate-500" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search in chat..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-black/20 border border-white/5 rounded-xl text-sm text-white outline-none focus:border-whatsapp-green"
+                  autoFocus
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-mono text-slate-500 mr-2 uppercase">
+                  {searchResults.length > 0 ? `${searchResults.length - currentSearchIndex} of ${searchResults.length}` : "No matches"}
+                </span>
+                <button 
+                  onClick={() => navigateSearch(1)} 
+                  disabled={searchResults.length === 0}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg disabled:opacity-30"
+                >
+                  <ChevronUp size={18} />
+                </button>
+                <button 
+                  onClick={() => navigateSearch(-1)} 
+                  disabled={searchResults.length === 0}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg disabled:opacity-30"
+                >
+                  <ChevronDown size={18} />
+                </button>
+                <div className="w-px h-5 bg-white/10 mx-1" />
+                <button 
+                  onClick={() => { setShowSearch(false); setSearchQuery(""); setSearchResults([]); setCurrentSearchIndex(-1); }}
+                  className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Add Contact Panel Overlay */}
         <AnimatePresence>
@@ -375,10 +551,13 @@ export default function ChatWindow({ selectedChat, onlineUsers = [], lastSeenMap
             return (
               <Message 
                 key={m._id} 
+                id={`msg-${m._id}`}
                 message={m} 
                 isOwn={(m.sender?._id || m.sender)?.toString() === myUserId?.toString()}
                 onDeleteMe={(msgId) => socket.emit("delete-for-me", { messageId: msgId })}
                 onDeleteEveryone={(msgId) => socket.emit("delete-for-everyone", { messageId: msgId, chatId: selectedChat?._id })}
+                searchQuery={searchQuery}
+                isHighlighted={searchResults[currentSearchIndex] === i}
               />
             );
           })}

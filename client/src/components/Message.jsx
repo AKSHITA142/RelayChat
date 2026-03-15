@@ -18,7 +18,7 @@ import { getLoggedInUser } from "../utils/auth";
 import socket from "../services/socket";
 import api from "../services/api"; // Added api import
 
-export default function Message({ message, isOwn, onDeleteMe, onDeleteEveryone, chatType }) {
+export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryone, chatType, searchQuery = "", isHighlighted = false }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
@@ -27,6 +27,22 @@ export default function Message({ message, isOwn, onDeleteMe, onDeleteEveryone, 
   const myId = getLoggedInUser()?._id;
   const msg = message; // for easier access
   const isMe = isOwn;
+
+  const renderContentWithHighlights = (content) => {
+    if (!searchQuery.trim()) return content;
+    const parts = content.split(new RegExp(`(${searchQuery})`, "gi"));
+    return (
+      <>
+        {parts.map((part, i) => 
+          part.toLowerCase() === searchQuery.toLowerCase() ? (
+            <mark key={i} className="bg-amber-400/40 text-inherit rounded-sm px-0.5 border-b border-amber-500/50">
+              {part}
+            </mark>
+          ) : part
+        )}
+      </>
+    );
+  };
 
   const formatTime = (dateStr) => {
     try {
@@ -110,6 +126,7 @@ export default function Message({ message, isOwn, onDeleteMe, onDeleteEveryone, 
 
   return (
     <motion.div 
+      id={id}
       variants={bubbleVariants}
       initial="hidden"
       animate="visible"
@@ -118,8 +135,8 @@ export default function Message({ message, isOwn, onDeleteMe, onDeleteEveryone, 
       <div 
         className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-sm transition-all relative ${
           isMe 
-            ? "bg-whatsapp-green text-whatsapp-bg-dark rounded-tr-none" 
-            : "bg-white/10 text-slate-200 rounded-tl-none border border-white/5"
+            ? (isHighlighted ? "bg-amber-100 ring-4 ring-amber-400/50 scale-[1.02]" : "bg-whatsapp-green text-whatsapp-bg-dark rounded-tr-none")
+            : (isHighlighted ? "bg-amber-100 ring-4 ring-amber-400/50 scale-[1.02] text-whatsapp-bg-dark" : "bg-white/10 text-slate-200 rounded-tl-none border border-white/5")
         }`}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -182,11 +199,15 @@ export default function Message({ message, isOwn, onDeleteMe, onDeleteEveryone, 
               </a>
             )}
             {msg.content && !msg.fileType?.startsWith("audio/") && msg.content !== msg.fileName && (
-              <p className="text-sm px-1 leading-relaxed">{msg.content}</p>
+              <p className="text-sm px-1 leading-relaxed">
+                {renderContentWithHighlights(msg.content)}
+              </p>
             )}
           </div>
         ) : (
-          <p className="text-[15px] leading-relaxed break-words">{msg.content}</p>
+          <p className="text-[15px] leading-relaxed break-words">
+            {renderContentWithHighlights(msg.content)}
+          </p>
         )}
 
         <div className={`flex items-center justify-end gap-1.5 mt-1 ${isMe ? "opacity-70" : "opacity-50"}`}>

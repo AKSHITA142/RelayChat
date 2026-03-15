@@ -33,6 +33,10 @@ export default function Chat() {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [lastSeenMap, setLastSeenMap] = useState({});
   const [contacts, setContacts] = useState(() => getLoggedInUser()?.contacts || []);
+  
+  // Shared UI States for Side Panels
+  const [isAddingContact, setIsAddingContact] = useState(false);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
 
   useEffect(() => {
     socket.on("online-users", users => {
@@ -137,6 +141,10 @@ export default function Chat() {
         selectedChat={selectedChat}
         onlineUsers={onlineUsers}
         contacts={contacts}
+        isAddingContact={isAddingContact}
+        setIsAddingContact={setIsAddingContact}
+        isCreatingGroup={isCreatingGroup}
+        setIsCreatingGroup={setIsCreatingGroup}
       />
 
       <ChatWindow
@@ -146,6 +154,8 @@ export default function Chat() {
         contacts={contacts}
         setContacts={setContacts}
         setChats={setChats}
+        setIsAddingContact={setIsAddingContact}
+        setIsCreatingGroup={setIsCreatingGroup}
       />
     </motion.div>
   );

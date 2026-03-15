@@ -4,18 +4,27 @@ import { Search, Plus, Users, X, Check, Loader2, MessageSquare, Phone } from "lu
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
 
-export default function Sidebar({ chats, setChats, setSelectedChat, selectedChat, onlineUsers = [], contacts = []}) {
+export default function Sidebar({ 
+  chats, 
+  setChats, 
+  setSelectedChat, 
+  selectedChat, 
+  onlineUsers = [], 
+  contacts = [],
+  isAddingContact,
+  setIsAddingContact,
+  isCreatingGroup,
+  setIsCreatingGroup
+}) {
   const myUserId = getLoggedInUser()?._id;
   const [search, setSearch] = useState("");
   
-  // Contact Discovery State
-  const [isAddingContact, setIsAddingContact] = useState(false);
+  // Contact Discovery State (lifted partially)
   const [contactPhone, setContactPhone] = useState("");
   const [contactLoading, setContactLoading] = useState(false);
   const [contactError, setContactError] = useState("");
 
-  // Group Creation State
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  // Group Creation State (lifted partially)
   const [groupName, setGroupName] = useState("");
   const [selectedGroupUsers, setSelectedGroupUsers] = useState([]);
 
