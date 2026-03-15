@@ -24,7 +24,8 @@ import {
   Shield,
   Info,
   Phone,
-  Plus
+  Plus,
+  Video as VideoIcon
 } from "lucide-react";
 import Message from "./Message";
 import VoiceRecorder from "./VoiceRecorder";
@@ -42,7 +43,8 @@ export default function ChatWindow({
   setContacts, 
   setChats,
   setIsAddingContact,
-  setIsCreatingGroup
+  setIsCreatingGroup,
+  setActiveVideoCall
 }) {
   const myUserId = getLoggedInUser()?._id;
   const [isTyping, setIsTyping] = useState(false);
@@ -485,6 +487,20 @@ export default function ChatWindow({
 
         {/* Header Actions */}
         <div className="flex items-center gap-3 relative" ref={menuRef}>
+          {!selectedChat.isGroup && (
+            <motion.button 
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => {
+                const myName = getLoggedInUser()?.name || "Someone";
+                setActiveVideoCall({ to: otherUser?._id, fromName: myName, isIncoming: false });
+              }}
+              className="p-2 text-slate-400 hover:text-whatsapp-green hover:bg-white/5 rounded-lg transition-all"
+            >
+              <VideoIcon size={20} />
+            </motion.button>
+          )}
+          
           <button 
             onClick={() => setShowMenu(!showMenu)}
             className={`p-2 rounded-lg transition-all ${showMenu ? 'bg-whatsapp-green text-whatsapp-bg-dark' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}

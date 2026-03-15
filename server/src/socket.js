@@ -214,7 +214,36 @@ function initSocket(server) {
         messageId: msgId,
       });
     });
+    
+    // --- VIDEO CALL SIGNALING ---
+    socket.on("call-user", ({ to, offer, fromName }) => {
+      console.log(`📞 CALL-USER: from ${socket.userId} to ${to}`);
+      io.to(to.toString()).emit("incoming-call", {
+        from: socket.userId,
+        fromName,
+        offer
+      });
+    });
 
+    socket.on("answer-call", ({ to, answer }) => {
+      console.log(`✅ ANSWER-CALL: to ${to}`);
+      io.to(to.toString()).emit("call-accepted", {
+        answer
+      });
+    });
+
+    socket.on("ice-candidate", ({ to, candidate }) => {
+      console.log(`❄️ ICE-CANDIDATE: to ${to}`);
+      io.to(to.toString()).emit("ice-candidate", {
+        candidate
+      });
+    });
+
+    socket.on("end-call", ({ to }) => {
+      console.log(`📵 END-CALL: to ${to}`);
+      io.to(to.toString()).emit("call-ended");
+    });
+    // ----------------------------
 
     // DISCONNECT
     socket.on("disconnect", async () => {

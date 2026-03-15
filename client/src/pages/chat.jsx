@@ -4,6 +4,8 @@ import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
 import socket, { connectSocket } from "../services/socket";
 import { getLoggedInUser } from "../utils/auth";
+import VideoCall from "../components/VideoCall";
+import { AnimatePresence } from "framer-motion";
 
 export default function Chat() {
   const containerRef = useRef(null);
@@ -37,6 +39,7 @@ export default function Chat() {
   // Shared UI States for Side Panels
   const [isAddingContact, setIsAddingContact] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [activeVideoCall, setActiveVideoCall] = useState(null);
 
   useEffect(() => {
     socket.on("online-users", users => {
@@ -122,6 +125,17 @@ export default function Chat() {
     return () => socket.off("chat-updated", chatUpdateHandler);
   }, []);
 
+  // Video Call Signaling
+  useEffect(() => {
+    const handleIncomingCall = ({ from, fromName, offer }) => {
+      console.log("📞 Incoming call from:", fromName);
+      setActiveVideoCall({ to: from, fromName, offer, isIncoming: true });
+    };
+
+    socket.on("incoming-call", handleIncomingCall);
+    return () => socket.off("incoming-call", handleIncomingCall);
+  }, []);
+
   //  CRITICAL: join ALL chat rooms once chats load
   useEffect(() => {
     if (!chats.length) return;
@@ -168,7 +182,18 @@ export default function Chat() {
         setChats={setChats}
         setIsAddingContact={setIsAddingContact}
         setIsCreatingGroup={setIsCreatingGroup}
+        setActiveVideoCall={setActiveVideoCall}
       />
+
+      {/* Global Video Call Overlay */}
+      <AnimatePresence>
+        {activeVideoCall && (
+          <VideoCall 
+            {...activeVideoCall} 
+            onClose={() => setActiveVideoCall(null)} 
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
