@@ -4,10 +4,6 @@ const jwt = require("jsonwebtoken");
 const redisClient = require("../config/redis");
 const { sendSms } = require("../utils/sms");
 
-
-
-
-
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;

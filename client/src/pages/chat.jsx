@@ -112,6 +112,16 @@ export default function Chat() {
     return () => socket.off("chat-renamed", renameHandler);
   }, []);
 
+  // Listen for chat membership/data updates
+  useEffect(() => {
+    const chatUpdateHandler = (updatedChat) => {
+      setChats(prev => prev.map(c => c._id === updatedChat._id ? updatedChat : c));
+      setSelectedChat(prev => (prev?._id === updatedChat._id ? updatedChat : prev));
+    };
+    socket.on("chat-updated", chatUpdateHandler);
+    return () => socket.off("chat-updated", chatUpdateHandler);
+  }, []);
+
   //  CRITICAL: join ALL chat rooms once chats load
   useEffect(() => {
     if (!chats.length) return;
@@ -149,6 +159,8 @@ export default function Chat() {
 
       <ChatWindow
         selectedChat={selectedChat}
+        chats={chats}
+        setSelectedChat={setSelectedChat}
         onlineUsers={onlineUsers}
         lastSeenMap={lastSeenMap}
         contacts={contacts}

@@ -5,7 +5,7 @@ const { getIO } = require("../socket");
 
 exports.createChat = async (req, res) => {
   try {
-    const { userId } = req.body; // other user
+    const { userId } = req.body; 
 
     if (!userId) {
       return res.status(400).json({
@@ -13,10 +13,10 @@ exports.createChat = async (req, res) => {
       });0
     }
 
-    // check if chat already exists
+   
     let chat = await Chat.findOne({
       isGroup: false,
-      //$all is a MongoDB query operator.
+     
       participants: { $all: [req.user.id, userId] }
     });
 
@@ -24,7 +24,7 @@ exports.createChat = async (req, res) => {
       return res.status(200).json(chat);
     }
 
-    // create new chat
+    
     chat = await Chat.create({
       participants: [req.user.id, userId],
       isGroup: false
@@ -42,8 +42,7 @@ exports.createChat = async (req, res) => {
 exports.getMyChats = async (req, res) => {
   const userId = req.user.id;
 
-  //populate means:Replace the LastMessage ObjectId with the actual referenced document
-  //lean does:Returns plain JavaScript objects instead of Mongoose documents
+  
   const chats = await Chat.find({ participants: userId })
     .populate("participants", "name email phoneNumber")
     .populate("lastMessage")
@@ -57,6 +56,7 @@ exports.getMyChats = async (req, res) => {
     unreadCount: chat.unreadCounts?.[userId] || 0,
     isGroup: chat.isGroup,
     groupName: chat.groupName,
+    groupAdmin: chat.groupAdmin,
     createdAt: chat.createdAt
   }));
 
@@ -76,7 +76,7 @@ exports.createGroup = async (req, res) => {
   const fullGroupChat = await Chat.findOne({ _id: chat._id })
     .populate("participants", "name email phoneNumber");
 
-  // Emit to all participants including creator so they get the chat real-time
+  
   const io = getIO();
   if (io) {
     fullGroupChat.participants.forEach(p => {
@@ -88,27 +88,95 @@ exports.createGroup = async (req, res) => {
 };
 
 exports.addToGroup = async (req, res) => {
-  const chat = await Chat.findById(req.params.chatId);
+  try {
+    const { chatId } = req.params;
+    const { userId } = req.body;
 
-  if (chat.groupAdmin.toString() !== req.user.id)
-    return res.status(403).json({ msg: "Only admin" });
+    const chat = await Chat.findById(chatId);
+    if (!chat) return res.status(404).json({ message: "Chat not found" });
 
-  chat.participants.addToSet(req.body.userId);
-  await chat.save();
+    if (!chat.isGroup) {
+      return res.status(400).json({ message: "Not a group chat" });
+    }
 
-  res.json(chat);
+    if (chat.groupAdmin.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Only admin can add members" });
+    }
+
+    if (chat.participants.some(p => p.toString() === userId)) {
+      return res.status(400).json({ message: "User already in group" });
+    }
+
+    chat.participants.push(userId);
+    await chat.save();
+
+    const fullGroupChat = await Chat.findById(chatId)
+      .populate("participants", "name email phoneNumber")
+      .populate("lastMessage");
+
+    
+    const io = getIO();
+    if (io) {
+      io.to(userId).emit("new-chat", fullGroupChat);
+      
+
+      chat.participants.forEach(p => {
+        if (p.toString() !== userId) {
+          io.to(p.toString()).emit("chat-updated", fullGroupChat);
+        }
+      });
+    }
+
+    res.json(fullGroupChat);
+  } catch (err) {
+    console.error("addToGroup error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 exports.removeFromGroup = async (req, res) => {
-  const chat = await Chat.findById(req.params.chatId);
+  try {
+    const { chatId } = req.params;
+    const { userId } = req.body;
 
-  if (chat.groupAdmin.toString() !== req.user.id)
-    return res.status(403).json({ msg: "Only admin" });
+    const chat = await Chat.findById(chatId);
+    if (!chat) return res.status(404).json({ message: "Chat not found" });
 
-  chat.participants.pull(req.body.userId);
-  await chat.save();
+    if (!chat.isGroup) {
+      return res.status(400).json({ message: "Not a group chat" });
+    }
 
-  res.json(chat);
+    if (chat.groupAdmin.toString() !== req.user.id && userId !== req.user.id) {
+      return res.status(403).json({ message: "Action not authorized" });
+    }
+
+    chat.participants.pull(userId);
+
+
+    if (chat.groupAdmin.toString() === userId && chat.participants.length > 0) {
+      chat.groupAdmin = chat.participants[0];
+    }
+
+    await chat.save();
+
+    const fullGroupChat = await Chat.findById(chatId)
+      .populate("participants", "name email phoneNumber");
+
+    const io = getIO();
+    if (io) {
+      
+      io.to(userId).emit("removed-from-chat", { chatId });
+
+      chat.participants.forEach(p => {
+        io.to(p.toString()).emit("chat-updated", fullGroupChat);
+      });
+    }
+
+    res.json(fullGroupChat || { message: "User removed successfully", chatId });
+  } catch (err) {
+    console.error("removeFromGroup error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 exports.startChatByPhone = async (req, res) => {
@@ -119,7 +187,6 @@ exports.startChatByPhone = async (req, res) => {
       return res.status(400).json({ message: "Phone number is required" });
     }
 
-    // Normalizing could be added here if needed, assuming exact match
     const targetUser = await User.findOne({ phoneNumber: phone });
 
     if (!targetUser) {
@@ -130,7 +197,7 @@ exports.startChatByPhone = async (req, res) => {
       return res.status(400).json({ message: "You cannot start a chat with yourself" });
     }
 
-    // Check if chat already exists
+  
     let chat = await Chat.findOne({
       isGroup: false,
       participants: { $all: [req.user.id, targetUser._id] }
@@ -140,11 +207,10 @@ exports.startChatByPhone = async (req, res) => {
       return res.status(200).json({
         chat_id: chat._id,
         receiver_id: targetUser._id,
-        chat: chat // Returning full chat object for consistency with other frontend logic
+        chat: chat 
       });
     }
 
-    // Create new chat
     chat = await Chat.create({
       participants: [req.user.id, targetUser._id],
       isGroup: false
@@ -181,7 +247,6 @@ exports.renameGroup = async (req, res) => {
     chat.groupName = name.trim();
     await chat.save();
 
-    // Notify all participants
     const io = getIO();
     if (io) {
       chat.participants.forEach(p => {

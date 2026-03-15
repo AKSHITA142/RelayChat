@@ -18,7 +18,13 @@ import {
   Mic,
   Search as SearchIcon,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  UserMinus,
+  AlertTriangle,
+  Shield,
+  Info,
+  Phone,
+  Plus
 } from "lucide-react";
 import Message from "./Message";
 import VoiceRecorder from "./VoiceRecorder";
@@ -28,6 +34,8 @@ import { getLoggedInUser } from "../utils/auth";
 
 export default function ChatWindow({ 
   selectedChat, 
+  setSelectedChat,
+  chats = [],
   onlineUsers = [], 
   lastSeenMap = {}, 
   contacts = [], 
@@ -48,6 +56,13 @@ export default function ChatWindow({
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [tempGroupName, setTempGroupName] = useState("");
+  
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [showRemoveMember, setShowRemoveMember] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [adminNotice, setAdminNotice] = useState("");
+  const [phoneToAdd, setPhoneToAdd] = useState("");
+  const [isAddingByPhone, setIsAddingByPhone] = useState(false);
 
   const otherUser = Array.isArray(selectedChat?.participants) 
     ? selectedChat.participants.find(u => u && (u._id?.toString() || u.toString()) !== myUserId?.toString())
@@ -84,6 +99,16 @@ export default function ChatWindow({
   const [searchResults, setSearchResults] = useState([]);
 
   const menuRef = useRef(null);
+
+  const pastChatUsers = Array.from(new Map(
+    chats
+      .filter(c => !c.isGroup)
+      .map(c => {
+        const u = c.participants.find(p => (p?._id?.toString() || p?.toString()) !== myUserId?.toString());
+        return u ? [(u._id || u).toString(), u] : null;
+      })
+      .filter(Boolean)
+  ).values());
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -165,7 +190,7 @@ export default function ChatWindow({
       console.error(err);
     }
   };
-  
+
   const handleAddContact = async () => {
     if (!newContactName.trim()) return;
     try {
@@ -181,6 +206,54 @@ export default function ChatWindow({
       setNewContactName("");
     } catch(err) {
       console.error(err);
+    }
+  };
+
+  const handleAddMemberToGroup = async (userId) => {
+    try {
+      const res = await api.post(`/chat/${selectedChat._id}/add-to-group`, { userId });
+      // Update the chat in local state
+      setChats(prev => prev.map(c => c._id === selectedChat._id ? res.data : c));
+      setSelectedChat(res.data);
+      setShowAddMember(false);
+      setPhoneToAdd("");
+    } catch (err) {
+      console.error(err);
+      setAdminNotice(err.response?.data?.message || "Failed to add member");
+      setTimeout(() => setAdminNotice(""), 3000);
+    } finally {
+      setIsAddingByPhone(false);
+    }
+  };
+
+  const handleAddMemberByPhone = async () => {
+    if (!phoneToAdd.trim()) return;
+    setIsAddingByPhone(true);
+    try {
+      const res = await api.post("/chat/start", { phone: phoneToAdd.trim() });
+      const targetUserId = res.data.chat?.participants?.find(p => (p._id || p).toString() !== myUserId?.toString())?._id || res.data.receiver_id;
+      
+      if (!targetUserId) throw new Error("User not found");
+      
+      await handleAddMemberToGroup(targetUserId);
+    } catch (err) {
+      console.error(err);
+      setAdminNotice(err.response?.data?.message || "User not found or unreachable");
+      setTimeout(() => setAdminNotice(""), 3000);
+      setIsAddingByPhone(false);
+    }
+  };
+
+  const handleRemoveMemberFromGroup = async (userId) => {
+    try {
+      const res = await api.post(`/chat/${selectedChat._id}/remove-from-group`, { userId });
+      setChats(prev => prev.map(c => c._id === selectedChat._id ? res.data : c));
+      setSelectedChat(res.data);
+      setShowRemoveMember(false);
+    } catch (err) {
+      console.error(err);
+      setAdminNotice(err.response?.data?.message || "Failed to remove member");
+      setTimeout(() => setAdminNotice(""), 3000);
     }
   };
 
@@ -201,6 +274,16 @@ export default function ChatWindow({
       });
     socket.emit("join-chat", selectedChat._id);
     socket.emit("mark-seen", { chatId: selectedChat._id });
+
+    // Reset overlays on chat change
+    setShowParticipants(false);
+    setShowAddMember(false);
+    setShowRemoveMember(false);
+    setShowMenu(false);
+    setShowSearch(false);
+    setShowAddContact(false);
+    setAdminNotice("");
+    setIsRenaming(false);
   }, [selectedChat]);
 
   useEffect(() => {
@@ -424,11 +507,54 @@ export default function ChatWindow({
                   <SearchIcon size={16} /> Search Messages
                 </button>
                 <button 
+                  onClick={() => { setShowParticipants(true); setShowMenu(false); }}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-whatsapp-green transition-all"
+                >
+                  <Users size={16} /> View Participants
+                </button>
+                <button 
                   onClick={() => { setIsRenaming(true); setTempGroupName(displayName); setShowMenu(false); }}
                   className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-whatsapp-green transition-all"
                 >
                   <Edit2 size={16} /> Rename {selectedChat.isGroup ? "Group" : "Chat"}
                 </button>
+                
+                {selectedChat.isGroup && (
+                  <>
+                    <button 
+                      onClick={() => { 
+                        const adminId = selectedChat.groupAdmin?._id?.toString() || selectedChat.groupAdmin?.toString();
+                        if (adminId && adminId === myUserId?.toString()) {
+                          setShowAddMember(true); 
+                          setShowMenu(false); 
+                        } else {
+                          setAdminNotice("Only group admin can add members");
+                          setShowMenu(false);
+                          setTimeout(() => setAdminNotice(""), 3000);
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-whatsapp-green transition-all"
+                    >
+                      <UserPlus size={16} /> Add Member
+                    </button>
+                    <button 
+                      onClick={() => { 
+                        const adminId = selectedChat.groupAdmin?._id?.toString() || selectedChat.groupAdmin?.toString();
+                        if (adminId && adminId === myUserId?.toString()) {
+                          setShowRemoveMember(true); 
+                          setShowMenu(false); 
+                        } else {
+                          setAdminNotice("Only group admin can remove members");
+                          setShowMenu(false);
+                          setTimeout(() => setAdminNotice(""), 3000);
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-rose-400 transition-all"
+                    >
+                      <UserMinus size={16} /> Remove Member
+                    </button>
+                  </>
+                )}
                 {!selectedChat?.isGroup && !savedContact && (
                   <button 
                     onClick={() => { setShowAddContact(true); setShowMenu(false); }}
@@ -463,84 +589,6 @@ export default function ChatWindow({
             )}
           </AnimatePresence>
         </div>
-
-        {/* Search Overlay */}
-        <AnimatePresence>
-          {showSearch && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="absolute top-16 left-0 right-0 bg-whatsapp-sidebar-dark border-b border-white/5 px-6 py-3 flex items-center gap-4 z-40 overflow-hidden shadow-xl"
-            >
-              <div className="flex-1 relative">
-                <SearchIcon className="absolute left-3 top-2.5 text-slate-500" size={16} />
-                <input
-                  type="text"
-                  placeholder="Search in chat..."
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-black/20 border border-white/5 rounded-xl text-sm text-white outline-none focus:border-whatsapp-green"
-                  autoFocus
-                />
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] font-mono text-slate-500 mr-2 uppercase">
-                  {searchResults.length > 0 ? `${searchResults.length - currentSearchIndex} of ${searchResults.length}` : "No matches"}
-                </span>
-                <button 
-                  onClick={() => navigateSearch(1)} 
-                  disabled={searchResults.length === 0}
-                  className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg disabled:opacity-30"
-                >
-                  <ChevronUp size={18} />
-                </button>
-                <button 
-                  onClick={() => navigateSearch(-1)} 
-                  disabled={searchResults.length === 0}
-                  className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg disabled:opacity-30"
-                >
-                  <ChevronDown size={18} />
-                </button>
-                <div className="w-px h-5 bg-white/10 mx-1" />
-                <button 
-                  onClick={() => { setShowSearch(false); setSearchQuery(""); setSearchResults([]); setCurrentSearchIndex(-1); }}
-                  className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Add Contact Panel Overlay */}
-        <AnimatePresence>
-          {showAddContact && (
-            <motion.div 
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="absolute top-20 left-6 right-6 p-4 glass-card border-whatsapp-green/30 flex flex-col md:flex-row items-center gap-4 z-50"
-            >
-              <div className="flex-1 w-full relative">
-                <UserCheck className="absolute left-3 top-2.5 text-whatsapp-green" size={18} />
-                <input 
-                  type="text" 
-                  placeholder="Saving contact as..." 
-                  value={newContactName}
-                  onChange={(e) => setNewContactName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-black/40 border border-white/5 rounded-xl text-sm outline-none focus:border-whatsapp-green"
-                  autoFocus
-                />
-              </div>
-              <div className="flex gap-2 w-full md:w-auto">
-                <button onClick={handleAddContact} className="flex-1 md:flex-none px-6 py-2 bg-whatsapp-green text-whatsapp-bg-dark font-bold text-xs uppercase rounded-xl">Save</button>
-                <button onClick={() => setShowAddContact(false)} className="px-3 py-2 bg-white/5 text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"><X size={18} /></button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* Messages */}
@@ -702,6 +750,301 @@ export default function ChatWindow({
           )}
         </AnimatePresence>
       </footer>
+
+      {/* Overlays */}
+      <AnimatePresence>
+        {showSearch && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="absolute top-16 left-0 right-0 bg-whatsapp-sidebar-dark border-b border-white/5 px-6 py-3 flex items-center gap-4 z-40 overflow-hidden shadow-xl"
+          >
+            <div className="flex-1 relative">
+              <SearchIcon className="absolute left-3 top-2.5 text-slate-500" size={16} />
+              <input
+                type="text"
+                placeholder="Search in chat..."
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-black/20 border border-white/5 rounded-xl text-sm text-white outline-none focus:border-whatsapp-green"
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-mono text-slate-500 mr-2 uppercase">
+                {searchResults.length > 0 ? `${searchResults.length - currentSearchIndex} of ${searchResults.length}` : "No matches"}
+              </span>
+              <button 
+                onClick={() => navigateSearch(1)} 
+                disabled={searchResults.length === 0}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg disabled:opacity-30"
+              >
+                <ChevronUp size={18} />
+              </button>
+              <button 
+                onClick={() => navigateSearch(-1)} 
+                disabled={searchResults.length === 0}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg disabled:opacity-30"
+              >
+                <ChevronDown size={18} />
+              </button>
+              <div className="w-px h-5 bg-white/10 mx-1" />
+              <button 
+                onClick={() => { setShowSearch(false); setSearchQuery(""); setSearchResults([]); setCurrentSearchIndex(-1); }}
+                className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAddContact && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-20 left-6 right-6 p-4 glass-card border-whatsapp-green/30 flex flex-col md:flex-row items-center gap-4 z-50"
+          >
+            <div className="flex-1 w-full relative">
+              <UserCheck className="absolute left-3 top-2.5 text-whatsapp-green" size={18} />
+              <input 
+                type="text" 
+                placeholder="Saving contact as..." 
+                value={newContactName}
+                onChange={(e) => setNewContactName(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-black/40 border border-white/5 rounded-xl text-sm outline-none focus:border-whatsapp-green"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 w-full md:w-auto">
+              <button onClick={handleAddContact} className="flex-1 md:flex-none px-6 py-2 bg-whatsapp-green text-whatsapp-bg-dark font-bold text-xs uppercase rounded-xl">Save</button>
+              <button onClick={() => setShowAddContact(false)} className="px-3 py-2 bg-white/5 text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"><X size={18} /></button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {adminNotice && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="absolute top-20 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-6 py-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl backdrop-blur-xl shadow-2xl"
+          >
+            <AlertTriangle size={18} />
+            <span className="text-sm font-bold">{adminNotice}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAddMember && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-whatsapp-bg-dark/95 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+          >
+            <div className="glass-card w-full max-w-md p-6 flex flex-col max-h-[80vh]">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <UserPlus size={20} className="text-whatsapp-green" />
+                  Expand Your Circle
+                </h3>
+                <button onClick={() => setShowAddMember(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-500 transition-all">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-whatsapp-green uppercase tracking-wider px-1">Quick Add by Phone</p>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Phone size={14} className="absolute left-3 top-3 text-slate-500" />
+                      <input
+                        type="text"
+                        placeholder="Phone (+91...)"
+                        value={phoneToAdd}
+                        onChange={(e) => setPhoneToAdd(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 bg-black/20 border border-white/5 rounded-xl text-sm outline-none focus:border-whatsapp-green transition-all"
+                      />
+                    </div>
+                    <button 
+                      onClick={handleAddMemberByPhone}
+                      disabled={isAddingByPhone || !phoneToAdd.trim()}
+                      className="px-4 py-2 bg-whatsapp-green text-whatsapp-bg-dark font-bold rounded-xl text-xs hover:brightness-110 disabled:opacity-50 transition-all"
+                    >
+                      {isAddingByPhone ? <Loader2 size={16} className="animate-spin" /> : "Add"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1">Suggested from Chats</p>
+                  {pastChatUsers.filter(u => !contacts.some(c => c.userId?.toString() === (u._id || u).toString())).length === 0 && (
+                    <p className="text-[10px] text-slate-500 px-1 italic">No new suggestions from recent chats.</p>
+                  )}
+                  {pastChatUsers
+                    .filter(u => !contacts.some(c => c.userId?.toString() === (u._id || u).toString()))
+                    .map(user => {
+                      const isAlreadyIn = Array.isArray(selectedChat.participants) && selectedChat.participants.some(p => (p?._id || p).toString() === (user._id || user).toString());
+                      return (
+                        <div key={user._id || user} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:border-whatsapp-green/30 transition-all">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-whatsapp-green/10 flex items-center justify-center text-[10px] font-bold text-whatsapp-green uppercase tracking-tighter">
+                              {user.name?.[0] || user.phoneNumber?.slice(-2) || "?"}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-white">{user.name || user.phoneNumber}</p>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-widest leading-none mt-1">{isAlreadyIn ? "In Group" : "Recent Chat"}</p>
+                            </div>
+                          </div>
+                          {isAlreadyIn ? (
+                            <div className="p-1.5 text-whatsapp-green/40">
+                              <Check size={16} />
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => handleAddMemberToGroup(user._id || user)}
+                              className="p-2 bg-whatsapp-green/10 text-whatsapp-green rounded-lg hover:bg-whatsapp-green hover:text-whatsapp-bg-dark transition-all"
+                            >
+                              <Plus size={16} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1">Your Contacts</p>
+                  {contacts.filter(c => c.userId?.toString() !== myUserId?.toString()).length === 0 && <p className="text-center text-slate-500 py-6 text-[10px] italic">No contacts available.</p>}
+                  {contacts.filter(c => c.userId?.toString() !== myUserId?.toString()).map(contact => {
+                    const isAlreadyIn = Array.isArray(selectedChat.participants) && selectedChat.participants.some(p => (p?._id || p).toString() === contact.userId?.toString());
+                    return (
+                      <div key={contact.userId} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:border-whatsapp-green/30 transition-all">
+                        <div>
+                          <p className="text-sm font-bold text-white">{contact.savedName}</p>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-widest leading-none mt-1">{isAlreadyIn ? "In Group" : "Connect"}</p>
+                        </div>
+                        {isAlreadyIn ? (
+                          <div className="p-1.5 text-whatsapp-green/40">
+                            <Check size={16} />
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => handleAddMemberToGroup(contact.userId)}
+                            className="p-2 bg-whatsapp-green/10 text-whatsapp-green rounded-lg hover:bg-whatsapp-green hover:text-whatsapp-bg-dark transition-all"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showRemoveMember && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-whatsapp-bg-dark/95 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+          >
+            <div className="glass-card w-full max-w-md p-6 flex flex-col max-h-[80vh]">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-rose-400 flex items-center gap-2">
+                  <UserMinus size={20} />
+                  Manage Collective
+                </h3>
+                <button onClick={() => setShowRemoveMember(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-500 transition-all">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-2">
+                {Array.isArray(selectedChat.participants) && selectedChat.participants.filter(p => p && (p._id || p).toString() !== myUserId?.toString()).map(p => (
+                  <div key={p._id || p} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:border-rose-500/30 transition-all">
+                    <div>
+                      <p className="text-sm font-bold text-white">{p.name || "Member"}</p>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-widest">{p.phoneNumber || "Participant"}</p>
+                    </div>
+                    <button 
+                      onClick={() => handleRemoveMemberFromGroup(p._id || p)}
+                      className="px-4 py-1.5 bg-rose-500 text-white text-xs font-bold rounded-lg hover:bg-rose-600 active:scale-95 transition-all"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showParticipants && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-whatsapp-bg-dark/95 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+          >
+            <div className="glass-card w-full max-w-md p-6 flex flex-col max-h-[80vh]">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Info size={20} className="text-whatsapp-green" />
+                  Chat Participants
+                </h3>
+                <button onClick={() => setShowParticipants(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-500 transition-all">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-2">
+                {Array.isArray(selectedChat.participants) && selectedChat.participants.map(p => {
+                  const participantId = p?._id?.toString() || p?.toString();
+                  const adminId = selectedChat.groupAdmin?._id?.toString() || selectedChat.groupAdmin?.toString();
+                  const isAdmin = selectedChat.isGroup && adminId && participantId && adminId === participantId;
+                  return (
+                    <div key={p._id || p} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-whatsapp-green/10 flex items-center justify-center font-bold text-whatsapp-green">
+                          {(p.name?.[0] || "?").toUpperCase()}
+                        </div>
+                          <div>
+                            <p className="text-sm font-bold text-white flex items-center gap-2">
+                              {p.name || "Member"}
+                              {(p._id || p).toString() === myUserId?.toString() && <span className="text-[10px] text-slate-500 font-normal opacity-70">(You)</span>}
+                              {isAdmin && <span className="text-[10px] text-whatsapp-green font-semibold bg-whatsapp-green/10 px-1.5 py-0.5 rounded border border-whatsapp-green/20">(Admin)</span>}
+                            </p>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-widest leading-none mt-0.5">{p.phoneNumber || "Participant"}</p>
+                          </div>
+                      </div>
+                      {isAdmin && (
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-whatsapp-green/10 text-whatsapp-green text-[10px] font-black uppercase rounded-lg border border-whatsapp-green/20">
+                          <Shield size={10} />
+                          Admin
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
