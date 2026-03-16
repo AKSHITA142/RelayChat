@@ -31,8 +31,10 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   useEffect(() => {
     ringerRef.current.loop = true;
     return () => {
-      ringerRef.current.pause();
-      ringerRef.current.src = "";
+      if (ringerRef.current) {
+        ringerRef.current.pause();
+        ringerRef.current.src = "";
+      }
     };
   }, []);
 
@@ -61,7 +63,9 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
       stopRinger();
     }
     return () => {
-      stopRinger();
+      if (ringerRef.current) {
+        stopRinger();
+      }
     };
   }, [status]);
 

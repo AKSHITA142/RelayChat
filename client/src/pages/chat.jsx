@@ -191,15 +191,17 @@ export default function Chat() {
           <VideoCall 
             {...activeVideoCall} 
             onClose={() => {
-              const personId = (activeVideoCall.to?._id || activeVideoCall.to)?.toString();
-              
-              if (personId) {
-                const targetChat = chats.find(c => 
-                  !c.isGroup && c.participants?.some(p => (p._id || p).toString() === personId)
-                );
+              if (activeVideoCall) {
+                const personId = (activeVideoCall.to?._id || activeVideoCall.to)?.toString();
                 
-                if (targetChat) {
-                  setSelectedChat(targetChat);
+                if (personId) {
+                  const targetChat = chats.find(c => 
+                    !c.isGroup && c.participants?.some(p => (p._id || p).toString() === personId)
+                  );
+                  
+                  if (targetChat) {
+                    setSelectedChat(targetChat);
+                  }
                 }
               }
               setActiveVideoCall(null);
