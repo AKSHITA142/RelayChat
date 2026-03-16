@@ -1,7 +1,5 @@
 const twilio = require('twilio');
 
-// Initialize the Twilio client using environment variables
-// This will throw an error if the variables are not set properly.
 let client;
 try {
   if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {

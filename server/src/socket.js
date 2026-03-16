@@ -33,6 +33,13 @@ function initSocket(server) {
 
   io.on("connection", async (socket) => {
     console.log("🔵 SOCKET CONNECTED:", socket.id, socket.userId);
+
+    // Safety Shield: Prevent crashes from invalid/stale demo IDs
+    if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
+      console.warn(`⚠️ Socket connection refused: Invalid User ID format (${socket.userId}). Please clear browser storage.`);
+      return socket.disconnect();
+    }
+
     socket.join(socket.userId.toString());
 
     //  JOIN CHAT ROOM

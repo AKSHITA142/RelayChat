@@ -17,7 +17,7 @@ const getProfile = async (req, res) => {
 
 const searchUsers = async (req, res) => {
   try {
-    //Basically Keyword is users collections..
+    
     const keyword = req.query.search
       ? {
           $or: [
@@ -43,7 +43,6 @@ const checkPhoneNumber = async (req, res) => {
       return res.status(400).json({ message: "Phone number is required" });
     }
 
-    // Normalizing could be added here if needed, but assuming exact match for now
     const user = await User.findOne({ phoneNumber: phone });
 
     if (user) {
@@ -72,16 +71,14 @@ const saveContact = async (req, res) => {
 
     const user = await User.findById(req.user.id);
 
-    // Check if contact already exists
+
     const existingContactIndex = user.contacts.findIndex(
       c => c.userId.toString() === targetUserId
     );
 
     if (existingContactIndex > -1) {
-      // Update existing name
       user.contacts[existingContactIndex].savedName = savedName;
     } else {
-      // Add new contact
       user.contacts.push({ userId: targetUserId, savedName });
     }
 

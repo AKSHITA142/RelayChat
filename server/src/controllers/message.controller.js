@@ -42,7 +42,6 @@ exports.deleteMessageForEveryone = async (req, res) => {
       return res.status(404).json({ message: "Message not found" });
     }
 
-    // Only sender can delete for everyone
     if (message.sender.toString() !== userId) {
       return res.status(403).json({ message: "Unauthorized: Only sender can delete for everyone" });
     }
@@ -106,32 +105,26 @@ exports.reactToMessage = async (req, res) => {
       return res.status(404).json({ message: "Message not found" });
     }
 
-    // Find if this user already reacted with THIS SAME emoji
     const existingIndex = message.reactions.findIndex(
       (r) => r.user.toString() === userId.toString() && r.emoji === emoji
     );
 
     if (existingIndex > -1) {
-      // If same emoji, remove it (toggle off)
       message.reactions.splice(existingIndex, 1);
     } else {
-      // If different emoji or no reaction, update user's reaction
       const userReactionIndex = message.reactions.findIndex(
         (r) => r.user.toString() === userId.toString()
       );
       
       if (userReactionIndex > -1) {
-        // Replace existing emoji
         message.reactions[userReactionIndex].emoji = emoji;
       } else {
-        // Add new reaction
         message.reactions.push({ emoji, user: userId });
       }
     }
 
     await message.save();
     
-    // Populate for frontend consistency
     const updatedMessage = await Message.findById(messageId).populate("sender", "_id name");
 
     const { getIO } = require("../socket");
