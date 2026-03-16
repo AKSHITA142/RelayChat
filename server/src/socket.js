@@ -32,243 +32,200 @@ function initSocket(server) {
   });
 
   io.on("connection", async (socket) => {
-    console.log("🔵 SOCKET CONNECTED:", socket.id, socket.userId);
+    try {
+      console.log("🔵 SOCKET CONNECTED:", socket.id, socket.userId);
 
-    // Safety Shield: Prevent crashes from invalid/stale demo IDs
-    if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
-      console.warn(`⚠️ Socket connection refused: Invalid User ID format (${socket.userId}). Please clear browser storage.`);
-      return socket.disconnect();
-    }
-
-    socket.join(socket.userId.toString());
-
-    //  JOIN CHAT ROOM
-    socket.on("join-chat", (chatId, cb) => {
-      const roomId = chatId.toString();
-      socket.join(roomId);
-
-      console.log("🟣 JOIN-CHAT:", socket.userId, roomId);
-      cb && cb();
-    });
-
-
-    // TYPING
-    socket.on("typing", (chatId) => {
-      try {
-        const roomId = chatId.toString();
-        console.log("✍️ TYPING:", socket.userId, roomId);
-
-        socket.to(roomId).emit("typing", {
-          userId: socket.userId,
-        });
-      } catch (err) {
-        console.error("Typing emit error:", err);
+      // Safety Shield: Prevent crashes from invalid/stale demo IDs
+      if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
+        console.warn(`⚠️ Socket connection refused: Invalid User ID format (${socket.userId}). Please clear browser storage.`);
+        return socket.disconnect();
       }
-    });
 
-    // STOP TYPING
-    socket.on("stop-typing", (chatId) => {
-      try {
+      socket.join(socket.userId.toString());
+
+      //  JOIN CHAT ROOM
+      socket.on("join-chat", (chatId, cb) => {
         const roomId = chatId.toString();
-        console.log("🛑 STOP-TYPING:", socket.userId, roomId);
-
-        socket.to(roomId).emit("stop-typing", {
-          userId: socket.userId,
-        });
-      } catch (err) {
-        console.error("Stop-typing emit error:", err);
-      }
-    });
-    // OPEN CHAT
-    socket.on("open-chat", async (chatId) => {
-      const roomId = chatId.toString();
-      const chat = await Chat.findById(roomId);
-      chat.unreadCounts.set(socket.userId, 0);
-      await chat.save();
-      socket.to(roomId).emit("chat-opened");//this is just for clerification
-    });
-    // MARK CURRENT USER ONLINE (first)
-    await User.findByIdAndUpdate(socket.userId, {
-      isOnline: true,
-      lastSeen: null,
-    });
-
-    //  SEND EXISTING ONLINE USERS
-    const onlineUsers = await User.find({
-      isOnline: true,
-      _id: { $ne: socket.userId },
-    }).select("_id");
-
-    socket.emit(
-      "online-users",
-      onlineUsers.map(u => ({ _id: u._id }))
-    );
+        socket.join(roomId);
+        console.log("🟣 JOIN-CHAT:", socket.userId, roomId);
+        cb && cb();
+      });
 
 
-    // BROADCAST USER ONLINE
-    socket.broadcast.emit("user-online", {
-      userId: socket.userId,
-    });
-
-    // SEND MESSAGE
-    socket.on("send-message", async ({ chatId, content }) => {
-      console.log("📥 RECEIVED SEND-MESSAGE:", { chatId, content, userId: socket.userId });
-      try {
-        const roomId = chatId.toString();
-
-
-        if (!mongoose.Types.ObjectId.isValid(roomId)) {
-          console.log(" Invalid chatId");
-          return;
+      // TYPING
+      socket.on("typing", (chatId) => {
+        try {
+          const roomId = chatId.toString();
+          socket.to(roomId).emit("typing", { userId: socket.userId });
+        } catch (err) {
+          console.error("Typing emit error:", err);
         }
+      });
 
-        // 2 Check chat exists
-        const chat = await Chat.findById(roomId);
-        if (!chat) {
-          console.log(" Chat not found in DB");
-          return;
+      // STOP TYPING
+      socket.on("stop-typing", (chatId) => {
+        try {
+          const roomId = chatId.toString();
+          socket.to(roomId).emit("stop-typing", { userId: socket.userId });
+        } catch (err) {
+          console.error("Stop-typing emit error:", err);
         }
-        // 3 Save message
+      });
 
-        const message = await Message.create({
-          sender: socket.userId,
-          chat: roomId,
-          content,
-        });
-        console.log(" Message saved:", message._id);
-
-        // 4 Update last message
-        chat.lastMessage = message._id;
-        await chat.save();
-        console.log("✅ Chat updated with lastMessage and bumped updatedAt");
-
-        message.status = "delivered";
-        await message.save();
-
-        // notify sender
-        socket.emit("message-delivered", {
-          messageId: message._id,
-        });
-        const populatedMessage = await Message.findById(message._id).populate("sender", "_id name");
-        io.to(roomId).emit("new-message", populatedMessage);
-
-        // notify receivers
-        socket.to(roomId).emit("message-delivered", {
-          messageId: message._id,
-        });
-
-        chat.participants.forEach((userId) => {
-          if (userId.toString() !== socket.userId) {
-            const count = chat.unreadCounts.get(userId.toString()) || 0;
-            chat.unreadCounts.set(userId.toString(), count + 1);
+      // OPEN CHAT
+      socket.on("open-chat", async (chatId) => {
+        try {
+          const roomId = chatId.toString();
+          const chat = await Chat.findById(roomId);
+          if (chat) {
+            chat.unreadCounts.set(socket.userId, 0);
+            await chat.save();
+            socket.to(roomId).emit("chat-opened");
           }
-        });
-
-        await chat.save();
-
-      } catch (err) {
-
-        console.error("🔥 SEND MESSAGE ERROR:", err);
-      }
-    });
-    // MARK SEEN
-    socket.on("mark-seen", async ({ chatId }) => {
-      const roomId = chatId.toString();
-      const messages = await Message.updateMany(
-        {
-          // $addToSet avoids duplicates
-          // Only marks others messages
-          chat: roomId,
-          sender: { $ne: socket.userId },
-          seenBy: { $ne: socket.userId },
-        },
-        {
-          $addToSet: { seenBy: socket.userId },
-          $set: { status: "seen" },
+        } catch (err) {
+          console.error("Open chat error:", err);
         }
-      );
-
-      socket.to(roomId).emit("message-seen", {
-        chatId: roomId,
-        userId: socket.userId,
-      });
-    });
-    socket.on("delete-for-me", async ({ messageId }) => {
-      console.log("🗑️ DELETE-FOR-ME:", messageId, "by", socket.userId);
-      const msgId = messageId.toString();
-      await Message.findByIdAndUpdate(msgId, {
-        $addToSet: { deletedFor: socket.userId },
       });
 
-      socket.emit("message-deleted-for-me", { messageId: msgId });
-    });
-
-    socket.on("delete-for-everyone", async ({ messageId, chatId }) => {
-      console.log("🧨 DELETE-FOR-EVERYONE:", messageId, "in chat", chatId);
-      const msgId = messageId.toString();
-      const roomId = chatId.toString();
-      const msg = await Message.findById(msgId);
-      if (!msg || msg.sender.toString() !== socket.userId) {
-        console.log("❌ Unauthorized or not found");
-        return;
-      }
-
-      msg.isDeleted = true;
-      msg.content = "This message was deleted";
-      await msg.save();
-
-      io.to(roomId).emit("message-deleted-for-everyone", {
-        messageId: msgId,
-      });
-    });
-    
-    // --- VIDEO CALL SIGNALING ---
-    socket.on("call-user", ({ to, offer, fromName }) => {
-      console.log(`📞 CALL-USER: from ${socket.userId} to ${to}`);
-      io.to(to.toString()).emit("incoming-call", {
-        from: socket.userId,
-        fromName,
-        offer
-      });
-    });
-
-    socket.on("answer-call", ({ to, answer }) => {
-      console.log(`✅ ANSWER-CALL: to ${to}`);
-      io.to(to.toString()).emit("call-accepted", {
-        answer
-      });
-    });
-
-    socket.on("ice-candidate", ({ to, candidate }) => {
-      console.log(`❄️ ICE-CANDIDATE: to ${to}`);
-      io.to(to.toString()).emit("ice-candidate", {
-        candidate
-      });
-    });
-
-    socket.on("end-call", ({ to }) => {
-      console.log(`📵 END-CALL: to ${to}`);
-      io.to(to.toString()).emit("call-ended");
-    });
-    // ----------------------------
-
-    // DISCONNECT
-    socket.on("disconnect", async () => {
+      // MARK CURRENT USER ONLINE
       await User.findByIdAndUpdate(socket.userId, {
-        isOnline: false,
-        lastSeen: new Date(),
+        isOnline: true,
+        lastSeen: null,
       });
 
-      socket.broadcast.emit("user-offline", {
-        userId: socket.userId,
-        lastSeen: new Date(),
+      //  SEND EXISTING ONLINE USERS
+      const onlineUsers = await User.find({
+        isOnline: true,
+        _id: { $ne: socket.userId },
+      }).select("_id");
+
+      socket.emit("online-users", onlineUsers.map(u => ({ _id: u._id })));
+
+      // BROADCAST USER ONLINE
+      socket.broadcast.emit("user-online", { userId: socket.userId });
+
+      // SEND MESSAGE
+      socket.on("send-message", async ({ chatId, content }) => {
+        try {
+          const roomId = chatId.toString();
+          if (!mongoose.Types.ObjectId.isValid(roomId)) return;
+
+          const chat = await Chat.findById(roomId);
+          if (!chat) return;
+
+          const message = await Message.create({
+            sender: socket.userId,
+            chat: roomId,
+            content,
+          });
+
+          chat.lastMessage = message._id;
+          await chat.save();
+
+          message.status = "delivered";
+          await message.save();
+
+          socket.emit("message-delivered", { messageId: message._id });
+          const populatedMessage = await Message.findById(message._id).populate("sender", "_id name");
+          io.to(roomId).emit("new-message", populatedMessage);
+
+          socket.to(roomId).emit("message-delivered", { messageId: message._id });
+
+          chat.participants.forEach((userId) => {
+            if (userId.toString() !== socket.userId) {
+              const count = chat.unreadCounts.get(userId.toString()) || 0;
+              chat.unreadCounts.set(userId.toString(), count + 1);
+            }
+          });
+          await chat.save();
+        } catch (err) {
+          console.error("🔥 SEND MESSAGE ERROR:", err);
+        }
       });
 
-      console.log(" Disconnected:", socket.userId);
+      // MARK SEEN
+      socket.on("mark-seen", async ({ chatId }) => {
+        try {
+          const roomId = chatId.toString();
+          await Message.updateMany(
+            { chat: roomId, sender: { $ne: socket.userId }, seenBy: { $ne: socket.userId } },
+            { $addToSet: { seenBy: socket.userId }, $set: { status: "seen" } }
+          );
+          socket.to(roomId).emit("message-seen", { chatId: roomId, userId: socket.userId });
+        } catch (err) {
+          console.error("Mark seen error:", err);
+        }
+      });
 
-    });
+      socket.on("delete-for-me", async ({ messageId }) => {
+        try {
+          const msgId = messageId.toString();
+          await Message.findByIdAndUpdate(msgId, { $addToSet: { deletedFor: socket.userId } });
+          socket.emit("message-deleted-for-me", { messageId: msgId });
+        } catch (err) {
+          console.error("Delete for me error:", err);
+        }
+      });
 
+      socket.on("restore-for-me", async ({ messageId }) => {
+        try {
+          const msgId = messageId.toString();
+          await Message.findByIdAndUpdate(msgId, { $pull: { deletedFor: socket.userId } });
+          socket.emit("message-restored-for-me", { messageId: msgId });
+        } catch (err) {
+          console.error("Restore for me error:", err);
+        }
+      });
 
+      socket.on("delete-for-everyone", async ({ messageId, chatId }) => {
+        try {
+          const msgId = messageId.toString();
+          const roomId = chatId.toString();
+          const msg = await Message.findById(msgId);
+          if (!msg || msg.sender.toString() !== socket.userId) return;
+
+          msg.isDeleted = true;
+          msg.content = "This message was deleted";
+          await msg.save();
+
+          io.to(roomId).emit("message-deleted-for-everyone", { messageId: msgId });
+        } catch (err) {
+          console.error("Delete for everyone error:", err);
+        }
+      });
+      
+      // --- VIDEO CALL SIGNALING ---
+      socket.on("call-user", ({ to, offer, fromName }) => {
+        io.to(to.toString()).emit("incoming-call", { from: socket.userId, fromName, offer });
+      });
+
+      socket.on("answer-call", ({ to, answer }) => {
+        io.to(to.toString()).emit("call-accepted", { answer });
+      });
+
+      socket.on("ice-candidate", ({ to, candidate }) => {
+        io.to(to.toString()).emit("ice-candidate", { candidate });
+      });
+
+      socket.on("end-call", ({ to }) => {
+        io.to(to.toString()).emit("call-ended");
+      });
+
+      // DISCONNECT
+      socket.on("disconnect", async () => {
+        try {
+          await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
+          socket.broadcast.emit("user-offline", { userId: socket.userId, lastSeen: new Date() });
+          console.log(" Disconnected:", socket.userId);
+        } catch (err) {
+          console.error("Disconnect sync error:", err);
+        }
+      });
+
+    } catch (err) {
+      console.error("🚨 CRITICAL SOCKET ERROR:", err);
+      socket.disconnect();
+    }
   });
 }
 

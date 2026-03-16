@@ -190,7 +190,20 @@ export default function Chat() {
         {activeVideoCall && (
           <VideoCall 
             {...activeVideoCall} 
-            onClose={() => setActiveVideoCall(null)} 
+            onClose={() => {
+              const personId = (activeVideoCall.to?._id || activeVideoCall.to)?.toString();
+              
+              if (personId) {
+                const targetChat = chats.find(c => 
+                  !c.isGroup && c.participants?.some(p => (p._id || p).toString() === personId)
+                );
+                
+                if (targetChat) {
+                  setSelectedChat(targetChat);
+                }
+              }
+              setActiveVideoCall(null);
+            }} 
           />
         )}
       </AnimatePresence>

@@ -16,12 +16,23 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        "media-src": ["'self'", "http://localhost:5002"],
-        "connect-src": ["'self'", "http://localhost:5002", "ws://localhost:5002"],
-        "img-src": ["'self'", "data:", "http://localhost:5002"],
+        // Allow STUN servers for WebRTC ICE negotiation
+        "connect-src": [
+          "'self'",
+          "http://localhost:5002",
+          "ws://localhost:5002",
+          "stun:stun.l.google.com:19302",
+          "stun:stun1.l.google.com:19302",
+          "stun:stun2.l.google.com:19302",
+        ],
+        // Allow browser to capture and play media (microphone/camera/speakers)
+        "media-src": ["'self'", "blob:", "mediastream:"],
+        "img-src":   ["'self'", "data:", "http://localhost:5002"],
       },
     },
-    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginResourcePolicy:     { policy: "cross-origin" },
+    crossOriginOpenerPolicy:       { policy: "unsafe-none" },   // needed for SharedArrayBuffer + WebRTC on some browsers
+    crossOriginEmbedderPolicy:     false,                        // don't block mediastream
   })
 );
 

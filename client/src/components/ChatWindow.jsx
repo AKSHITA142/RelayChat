@@ -99,6 +99,7 @@ export default function ChatWindow({
   const [searchQuery, setSearchQuery] = useState("");
   const [currentSearchIndex, setCurrentSearchIndex] = useState(-1);
   const [searchResults, setSearchResults] = useState([]);
+  const [showDeleted, setShowDeleted] = useState(false);
 
   const menuRef = useRef(null);
 
@@ -261,7 +262,7 @@ export default function ChatWindow({
 
   useEffect(() => {
     if (!selectedChat) return;
-    api.get(`/message/${selectedChat._id}`)
+    api.get(`/message/${selectedChat._id}?includeDeleted=${showDeleted}`)
       .then(res => {
         if (Array.isArray(res.data)) {
           const sorted = res.data.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
@@ -286,7 +287,7 @@ export default function ChatWindow({
     setShowAddContact(false);
     setAdminNotice("");
     setIsRenaming(false);
-  }, [selectedChat]);
+  }, [selectedChat, showDeleted]);
 
   useEffect(() => {
     const handleTyping = () => setIsTyping(true);
@@ -320,7 +321,17 @@ export default function ChatWindow({
     };
 
     const deleteForMeHandler = ({ messageId }) => {
-      setMessages(prev => prev.filter(m => m._id !== messageId));
+      if (!showDeleted) {
+        setMessages(prev => prev.filter(m => m._id !== messageId));
+      } else {
+        // If showing deleted, we just need to re-fetch or update the message status locally
+        // For simplicity, let's just update the local message object if we have it
+        setMessages(prev => prev.map(m => m._id === messageId ? { ...m, deletedFor: [...(m.deletedFor || []), myUserId] } : m));
+      }
+    };
+
+    const restoreForMeHandler = ({ messageId }) => {
+      setMessages(prev => prev.map(m => m._id === messageId ? { ...m, deletedFor: (m.deletedFor || []).filter(id => id !== myUserId) } : m));
     };
 
     const deleteForEveryoneHandler = ({ messageId }) => {
@@ -336,6 +347,7 @@ export default function ChatWindow({
     socket.on("message-delivered", statusHandler);
     socket.on("message-seen", seenHandler);
     socket.on("message-deleted-for-me", deleteForMeHandler);
+    socket.on("message-restored-for-me", restoreForMeHandler);
     socket.on("message-deleted-for-everyone", deleteForEveryoneHandler);
     socket.on("message-reacted", reactionHandler);
 
@@ -344,10 +356,11 @@ export default function ChatWindow({
       socket.off("message-delivered", statusHandler);
       socket.off("message-seen", seenHandler);
       socket.off("message-deleted-for-me", deleteForMeHandler);
+      socket.off("message-restored-for-me", restoreForMeHandler);
       socket.off("message-deleted-for-everyone", deleteForEveryoneHandler);
       socket.off("message-reacted", reactionHandler);
     };
-  }, [selectedChat, myUserId]);
+  }, [selectedChat, myUserId, showDeleted]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -493,7 +506,7 @@ export default function ChatWindow({
               whileTap={{ scale: 0.9 }}
               onClick={() => {
                 const myName = getLoggedInUser()?.name || "Someone";
-                setActiveVideoCall({ to: otherUser?._id, fromName: myName, isIncoming: false });
+                setActiveVideoCall({ to: otherUser?._id || otherUser, fromName: myName, isIncoming: false });
               }}
               className="p-2 text-slate-400 hover:text-whatsapp-green hover:bg-white/5 rounded-lg transition-all"
             >
@@ -579,6 +592,13 @@ export default function ChatWindow({
                     <UserPlus size={16} /> Add to Contacts
                   </button>
                 )}
+                <div className="h-px bg-white/5 my-1" />
+                <button 
+                  onClick={() => { setShowDeleted(!showDeleted); setShowMenu(false); }}
+                  className={`w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm transition-all ${showDeleted ? 'text-whatsapp-green bg-whatsapp-green/5' : 'text-slate-300 hover:bg-white/5 hover:text-whatsapp-green'}`}
+                >
+                  <Cpu size={16} /> {showDeleted ? "Hide Retracted" : "Reveal Hidden Messages"}
+                </button>
                 <div className="h-px bg-white/5 my-1" />
                 <button 
                   onClick={() => { 

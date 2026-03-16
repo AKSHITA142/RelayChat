@@ -60,6 +60,11 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
     setShowMenu(false);
   };
 
+  const handleRestoreForMe = () => {
+    socket.emit("restore-for-me", { messageId: msg._id });
+    setShowMenu(false);
+  };
+
   const handleDeleteForEveryone = () => {
     if (window.confirm("Permanently delete this message for all participants?")) {
       onDeleteEveryone(msg._id);
@@ -134,9 +139,11 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
     >
       <div 
         className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-sm transition-all relative ${
-          isMe 
-            ? (isHighlighted ? "bg-amber-100 ring-4 ring-amber-400/50 scale-[1.02]" : "bg-whatsapp-green text-whatsapp-bg-dark rounded-tr-none")
-            : (isHighlighted ? "bg-amber-100 ring-4 ring-amber-400/50 scale-[1.02] text-whatsapp-bg-dark" : "bg-white/10 text-slate-200 rounded-tl-none border border-white/5")
+          msg.deletedFor?.includes(myId)
+            ? "bg-slate-800/50 text-slate-500 border border-dashed border-slate-600 grayscale opacity-40"
+            : isMe 
+              ? (isHighlighted ? "bg-amber-100 ring-4 ring-amber-400/50 scale-[1.02]" : "bg-whatsapp-green text-whatsapp-bg-dark rounded-tr-none")
+              : (isHighlighted ? "bg-amber-100 ring-4 ring-amber-400/50 scale-[1.02] text-whatsapp-bg-dark" : "bg-white/10 text-slate-200 rounded-tl-none border border-white/5")
         }`}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -272,14 +279,24 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
               exit={{ scale: 0.9, opacity: 0, y: 10 }}
               className={`absolute bottom-full mb-2 z-[101] min-w-[160px] glass-card overflow-hidden py-1 border border-white/20 shadow-2xl ${isMe ? "right-4" : "left-4"}`}
             >
-              <button 
-                onClick={handleDeleteForMe}
-                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-              >
-                <Trash2 size={16} className="text-slate-500" />
-                Remove for me
-              </button>
-              {isMe && (
+              {msg.deletedFor?.includes(myId) ? (
+                <button 
+                  onClick={handleRestoreForMe}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-whatsapp-green hover:bg-whatsapp-green/10 transition-colors"
+                >
+                  <Clock size={16} className="text-whatsapp-green" />
+                  Bring it back
+                </button>
+              ) : (
+                <button 
+                  onClick={handleDeleteForMe}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <Trash2 size={16} className="text-slate-500" />
+                  Remove for me
+                </button>
+              )}
+              {isMe && !msg.isDeleted && (
                 <button 
                   onClick={handleDeleteForEveryone}
                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
