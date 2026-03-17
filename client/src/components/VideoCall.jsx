@@ -15,6 +15,8 @@ const PC_CONFIG = {
   ],
 };
 
+const CALL_TIMEOUT_MS = 30_000; // 30 seconds — auto-cut if unanswered (same as WhatsApp)
+
 /* ─── Ringer — stored on window so it survives HMR and is always killable ─── */
 const RINGER_URL = "https://assets.mixkit.co/active_storage/sfx/1350/1350-preview.mp3";
 
@@ -176,14 +178,19 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   /* ── outgoing call ── */
   const startCall = useCallback(async () => {
     log("📤 startCall");
-    // No timeout — caller waits until receiver picks up or manually cancels
     const stream = await getMedia();
     const pc = buildPC();
     stream.getTracks().forEach(t => pc.addTrack(t, stream));
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit("call-user", { to, offer, fromName });
-  }, [to, fromName, getMedia, buildPC]);
+
+    // Auto-cut after 30 s if receiver never answers
+    ringTimer.current = setTimeout(() => {
+      log("⏰ No answer — auto-cutting call");
+      endCall();
+    }, CALL_TIMEOUT_MS);
+  }, [to, fromName, getMedia, buildPC, endCall]);
 
   /* ── accept incoming call ── */
   const acceptCall = useCallback(async () => {
@@ -207,12 +214,19 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   /* ── socket events ── */
   useEffect(() => {
     if (!isIncoming) {
-      startCall();
+      startCall(); // timer is started inside startCall
     } else {
-      // Play ringer for the receiver until they accept or reject
+      // Play ringer for the receiver
       startRinger();
+      // Auto-dismiss incoming call after 30 s if receiver ignores it
+      ringTimer.current = setTimeout(() => {
+        log("⏰ Receiver didn't answer — auto-dismissing");
+        stopRinger();
+        socket.emit("end-call", { to });
+        cleanup();
+        onClose();
+      }, CALL_TIMEOUT_MS);
     }
-    // No auto-timeout — receiver can take as long as they want
 
     // Caller receives answer
     socket.off("call-accepted");
@@ -220,7 +234,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
       log("✅ call-accepted");
       stopRinger();   // stop ring-back
       broadcastStop();
-      clearRingTimer();
+      clearRingTimer(); // cancel the 30 s timeout — call was answered
       const pc = pcRef.current;
       if (!pc) return;
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
