@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Phone, PhoneOff, Mic, MicOff, Video, VideoOff, User, Loader2,
@@ -10,217 +10,217 @@ const PC_CONFIG = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
   ],
 };
 
+/* ─── Ringer — stored on window so it survives HMR and is always killable ─── */
+const RINGER_URL = "https://assets.mixkit.co/active_storage/sfx/1350/1350-preview.mp3";
+
+function startRinger() {
+  stopRinger(); // always kill old one first
+  const a = new Audio(RINGER_URL);
+  a.loop = true;
+  a.play().catch(() => {});
+  window.__ringer = a;
+}
+
+function stopRinger() {
+  const a = window.__ringer;
+  if (a) {
+    try { a.pause(); a.currentTime = 0; a.src = ""; } catch(_) {}
+    window.__ringer = null;
+  }
+}
+
+// Expose so console can always kill it: window.__stopRinger()
+window.__stopRinger = stopRinger;
+
+// Kill any rogue audio from previous HMR cycle right now
+stopRinger();
+
+function broadcastStop() {} // no-op
+
+
+/* ─────────────────────────────────────────────
+   VideoCall Component
+───────────────────────────────────────────── */
 export default function VideoCall({ to, fromName, isIncoming, initialOffer, onClose }) {
-  /* ─── UI state ─── */
-  const [status,   setStatus]   = useState(isIncoming ? "incoming" : "calling");
-  const [isMuted,  setIsMuted]  = useState(false);
-  const [vidOff,   setVidOff]   = useState(false);
-
-  /* ─── refs ─── */
-  const localRef  = useRef(null);   // local  <video muted>
-  const remoteRef = useRef(null);   // remote <video> – NOT muted
-  const pcRef     = useRef(null);
-  const lsRef     = useRef(null);   // local MediaStream
-  const remoteStreamRef = useRef(new MediaStream());
-  const queueRef  = useRef([]);     // pending ICE candidates
-  const ringerRef = useRef(new Audio("https://assets.mixkit.co/active_storage/sfx/1350/1350-preview.mp3"));
-
-  useEffect(() => {
-    ringerRef.current.loop = true;
-    return () => {
-      if (ringerRef.current) {
-        ringerRef.current.pause();
-        ringerRef.current.src = "";
-      }
-    };
-  }, []);
-
-  const stopRinger = () => {
-    try {
-      if (ringerRef.current) {
-        log("🔇 Hard killing ringer src");
-        ringerRef.current.pause();
-        ringerRef.current.volume = 0;
-        ringerRef.current.currentTime = 0;
-        ringerRef.current.src = "";
-        ringerRef.current.load();
-        ringerRef.current = null;
-      }
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    if (status === "incoming" || status === "calling") {
-      if (!ringerRef.current) {
-        ringerRef.current = new Audio("https://assets.mixkit.co/active_storage/sfx/1350/1350-preview.mp3");
-        ringerRef.current.loop = true;
-      }
-      ringerRef.current.play().catch(log);
-    } else {
-      stopRinger();
-    }
-    return () => {
-      if (ringerRef.current) {
-        stopRinger();
-      }
-    };
-  }, [status]);
-
-  /* ────────────────────────────────────────
-     Helpers
-  ──────────────────────────────────────── */
   const log = (...a) => console.log("[VC]", ...a);
 
-  /** Drain the ICE queue once remoteDescription is set. */
-  const drainQueue = async (pc) => {
-    while (queueRef.current.length) {
-      const c = queueRef.current.shift();
-      await pc.addIceCandidate(new RTCIceCandidate(c)).catch(log);
-    }
-  };
+  const [status, setStatus] = useState(isIncoming ? "incoming" : "calling");
+  const [isMuted, setIsMuted] = useState(false);
+  const [vidOff, setVidOff] = useState(false);
 
-  /** Ask for camera + mic. */
-  const getMedia = async () => {
+  const localRef  = useRef(null);
+  const remoteRef = useRef(null);
+  const pcRef     = useRef(null);
+  const lsRef     = useRef(null);
+  const remoteStream = useRef(new MediaStream());
+  const iceQueue  = useRef([]);
+  const ringTimer = useRef(null);  // 30-second ringing timeout
+
+  /* ── clear ringing timeout ── */
+  const clearRingTimer = useCallback(() => {
+    if (ringTimer.current) {
+      clearTimeout(ringTimer.current);
+      ringTimer.current = null;
+    }
+  }, []);
+
+  /* ── full cleanup ── */
+  const cleanup = useCallback(() => {
+    log("🧹 cleanup");
+    stopRinger();
+    broadcastStop();
+    clearRingTimer();
+    lsRef.current?.getTracks().forEach(t => t.stop());
+    pcRef.current?.close();
+    lsRef.current = null;
+    pcRef.current = null;
+    remoteStream.current = new MediaStream();
+  }, [clearRingTimer]);
+
+  /* ── end call ── */
+  const endCall = useCallback(async () => {
+    log("🔚 endCall");
+    stopRinger();            // stop ringer first (if receiver rejects)
+    clearRingTimer();
+    socket.emit("end-call", { to });
+    cleanup();
+    onClose();
+  }, [to, cleanup, clearRingTimer, onClose]);
+
+  /* ── get camera + mic ── */
+  const getMedia = useCallback(async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      audio: { echoCancellation: true, noiseSuppression: true },
     });
     lsRef.current = stream;
-
-    // show local preview (muted so no echo)
-    if (localRef.current) {
-      localRef.current.srcObject = stream;
-    }
-
-    log("🎤 Local audio tracks:", stream.getAudioTracks().map(t => `${t.label} enabled=${t.enabled}`));
+    if (localRef.current) localRef.current.srcObject = stream;
     return stream;
-  };
+  }, []);
 
-  /** Build RTCPeerConnection, set up track handler. */
-  const buildPC = () => {
+  /* ── drain ICE queue ── */
+  const drainIce = useCallback(async () => {
+    const pc = pcRef.current;
+    if (!pc || !pc.remoteDescription) return;
+    while (iceQueue.current.length) {
+      const c = iceQueue.current.shift();
+      await pc.addIceCandidate(new RTCIceCandidate(c)).catch(log);
+    }
+  }, []);
+
+  /* ── build RTCPeerConnection ── */
+  const buildPC = useCallback(() => {
     const pc = new RTCPeerConnection(PC_CONFIG);
 
-    /* Send ICE candidates to the other side */
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) socket.emit("ice-candidate", { to, candidate });
     };
 
-    /* Log state transitions */
     pc.oniceconnectionstatechange = () => {
       log("ICE →", pc.iceConnectionState);
-      if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed" || pc.iceConnectionState === "closed") {
-        log("⚠️ Connection lost, closing call");
-        cleanup();
-        onClose();
-      }
-    };
-    pc.onconnectionstatechange = () => {
-      log("Conn →", pc.connectionState);
-      if (pc.connectionState === "disconnected" || pc.connectionState === "failed" || pc.connectionState === "closed") {
-        log("⚠️ Connection closed, exiting UI");
+      // Only close on hard failure, not on 'disconnected' (transient)
+      if (pc.iceConnectionState === "failed") {
+        log("❌ ICE failed, ending call");
         cleanup();
         onClose();
       }
     };
 
-    /*
-     * KEY FIX: every incoming track is added to ONE MediaStream.
-     * That stream is attached to the remote <video> element.
-     * The <video> element is NOT muted, so it plays audio + video.
-     */
-    pc.ontrack = ({ track, streams }) => {
-      log(`🎥 ontrack kind=${track.kind} readyState=${track.readyState}`);
+    pc.ontrack = ({ track }) => {
+      log("🎥 ontrack:", track.kind);
+      // Safety: stop ringer when media arrives (extra guard)
+      stopRinger();
 
-      // Add track to our persistent stream
-      if (!remoteStreamRef.current.getTracks().find(t => t.id === track.id)) {
-        remoteStreamRef.current.addTrack(track);
+      if (!remoteStream.current.getTracks().find(t => t.id === track.id)) {
+        remoteStream.current.addTrack(track);
       }
-
-      // Attach the stream to the video element every time a track arrives
-      if (remoteRef.current) {
-        remoteRef.current.srcObject = remoteStreamRef.current;
-        remoteRef.current.play().catch(e => log("play err:", e));
+      if (remoteRef.current && remoteRef.current.srcObject !== remoteStream.current) {
+        remoteRef.current.srcObject = remoteStream.current;
+        remoteRef.current.play().catch(() => {});
       }
-
-      // Mark call as connected once we start getting media
       setStatus("connected");
     };
 
     pcRef.current = pc;
     return pc;
-  };
+  }, [to, cleanup, onClose]);
 
-  /* ────────────────────────────────────────
-     Outgoing call
-  ──────────────────────────────────────── */
-  const startCall = async () => {
+  /* ── outgoing call ── */
+  const startCall = useCallback(async () => {
+    log("📤 startCall");
+    // No timeout — caller waits until receiver picks up or manually cancels
     const stream = await getMedia();
     const pc = buildPC();
-
-    // Add ALL local tracks to the peer connection
-    stream.getTracks().forEach(t => {
-      log(`➕ addTrack ${t.kind}`);
-      pc.addTrack(t, stream);
-    });
-
+    stream.getTracks().forEach(t => pc.addTrack(t, stream));
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    log("📤 Sending offer to", to);
     socket.emit("call-user", { to, offer, fromName });
-  };
+  }, [to, fromName, getMedia, buildPC]);
 
-  /* ────────────────────────────────────────
-     Accept incoming call
-  ──────────────────────────────────────── */
-  const acceptCall = async () => {
-    stopRinger(); // EXPLICIT STOP
+  /* ── accept incoming call ── */
+  const acceptCall = useCallback(async () => {
+    log("📞 acceptCall");
+    stopRinger();      // ← STOP RINGER IMMEDIATELY on green button click
+    clearRingTimer();
     setStatus("connecting");
+
     const stream = await getMedia();
     const pc = buildPC();
-
-    stream.getTracks().forEach(t => {
-      log(`➕ addTrack ${t.kind}`);
-      pc.addTrack(t, stream);
-    });
+    stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
     await pc.setRemoteDescription(new RTCSessionDescription(initialOffer));
-    await drainQueue(pc);
-
+    await drainIce();
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-    log("📤 Sending answer to", to);
     socket.emit("answer-call", { to, answer });
     setStatus("connected");
-  };
+  }, [to, initialOffer, getMedia, buildPC, drainIce, clearRingTimer]);
 
-  /* ────────────────────────────────────────
-     Socket events
-  ──────────────────────────────────────── */
+  /* ── socket events ── */
   useEffect(() => {
-    if (!isIncoming) startCall();
+    if (!isIncoming) {
+      startCall();
+    } else {
+      // Play ringer for the receiver until they accept or reject
+      startRinger();
+    }
+    // No auto-timeout — receiver can take as long as they want
 
+    // Caller receives answer
+    socket.off("call-accepted");
     socket.on("call-accepted", async ({ answer }) => {
+      log("✅ call-accepted");
+      stopRinger();   // stop ring-back
+      broadcastStop();
+      clearRingTimer();
       const pc = pcRef.current;
       if (!pc) return;
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
-      await drainQueue(pc);
+      await drainIce();
       setStatus("connected");
     });
 
+    socket.off("ice-candidate");
     socket.on("ice-candidate", async ({ candidate }) => {
       const pc = pcRef.current;
       if (pc?.remoteDescription) {
         await pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(log);
       } else {
-        queueRef.current.push(candidate);
+        iceQueue.current.push(candidate);
       }
     });
 
-    socket.on("call-ended", () => {
-      stopRinger(); // EXPLICIT STOP
+    socket.off("call-ended");
+    socket.on("call-ended", async () => {
+      log("🔴 call-ended by remote");
+      stopRinger();
+      broadcastStop();
+      clearRingTimer();
       cleanup();
       onClose();
     });
@@ -229,58 +229,24 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
       socket.off("call-accepted");
       socket.off("ice-candidate");
       socket.off("call-ended");
+      stopRinger();
+      clearRingTimer();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ────────────────────────────────────────
-     Cleanup
-  ──────────────────────────────────────── */
-  const cleanup = () => {
-    stopRinger();
-    lsRef.current?.getTracks().forEach(t => t.stop());
-    pcRef.current?.close();
-    lsRef.current = null;
-    pcRef.current = null;
-    remoteStreamRef.current = new MediaStream();
-  };
-
-  const endCall = () => {
-    try {
-      log("🔚 endCall triggered (cut button)");
-      log("📤 Emitting end-call to:", to);
-      socket.emit("end-call", { to });
-      cleanup();
-      onClose();
-    } catch (err) {
-      log("🚨 endCall error:", err);
-      // fallback: close UI anyway
-      cleanup();
-      onClose();
-    }
-  };
-
-  /* ────────────────────────────────────────
-     Controls
-  ──────────────────────────────────────── */
+  /* ── mic / video controls ── */
   const toggleMute = () => {
     const track = lsRef.current?.getAudioTracks()[0];
-    if (track) {
-      track.enabled = isMuted;   // flip: if currently muted → enable
-      setIsMuted(m => !m);
-    }
+    if (track) { track.enabled = !track.enabled; setIsMuted(m => !m); }
   };
 
   const toggleVideo = () => {
     const track = lsRef.current?.getVideoTracks()[0];
-    if (track) {
-      track.enabled = vidOff;
-      setVidOff(v => !v);
-    }
+    if (track) { track.enabled = !track.enabled; setVidOff(v => !v); }
   };
 
-  /* ────────────────────────────────────────
-     Render
-  ──────────────────────────────────────── */
+  /* ── render ── */
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -288,22 +254,25 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     >
       <div className="relative w-full max-w-4xl aspect-video bg-whatsapp-sidebar-dark rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
 
-        {/* Remote video (NOT muted — plays both audio & video) */}
+        {/* Remote video */}
         <div className="flex-1 bg-black relative">
           <video
             ref={remoteRef}
-            autoPlay
-            playsInline
-            /* intentionally NOT muted so audio plays */
+            data-call-video="remote"
+            autoPlay playsInline
             className="w-full h-full object-cover"
           />
 
-          {/* Placeholder when no remote stream yet */}
+          {/* Pre-connect placeholder */}
           {status !== "connected" && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center space-y-4 bg-whatsapp-sidebar-dark">
-              <div className="w-24 h-24 rounded-full bg-whatsapp-green/10 flex items-center justify-center border border-whatsapp-green/20">
+              <motion.div
+                animate={{ scale: [1, 1.15, 1] }}
+                transition={{ repeat: Infinity, duration: 1.5 }}
+                className="w-24 h-24 rounded-full bg-whatsapp-green/10 flex items-center justify-center border border-whatsapp-green/30"
+              >
                 <User size={48} className="text-whatsapp-green" />
-              </div>
+              </motion.div>
               <div className="text-center">
                 <h3 className="text-xl font-bold text-white">{fromName || "User"}</h3>
                 <p className="text-slate-400 text-sm mt-1 flex items-center gap-2 justify-center">
@@ -320,7 +289,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
             drag dragConstraints={{ left: 20, top: 20, right: 300, bottom: 200 }}
             className="absolute top-6 right-6 w-32 md:w-48 aspect-video bg-whatsapp-bg-dark rounded-2xl overflow-hidden border-2 border-white/10 shadow-xl z-20 cursor-grab"
           >
-            <video ref={localRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+            <video ref={localRef} data-call-video="local" autoPlay muted playsInline className="w-full h-full object-cover" />
             {vidOff && (
               <div className="absolute inset-0 bg-whatsapp-bg-dark flex items-center justify-center">
                 <VideoOff size={24} className="text-slate-500" />
@@ -329,7 +298,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
           </motion.div>
         </div>
 
-        {/* Controls */}
+        {/* Controls bar */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-whatsapp-sidebar-dark/80 backdrop-blur-2xl rounded-3xl border border-white/10 flex items-center gap-6 z-30 shadow-2xl">
           {status === "incoming" ? (
             <>
@@ -354,16 +323,13 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
               >
                 {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
               </motion.button>
-
               <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                 onClick={toggleVideo}
                 className={`p-4 rounded-2xl transition-all ${vidOff ? "bg-rose-500/20 text-rose-400" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}
               >
                 {vidOff ? <VideoOff size={24} /> : <Video size={24} />}
               </motion.button>
-
               <div className="w-[1px] h-8 bg-white/10" />
-
               <motion.button whileHover={{ scale: 1.1, rotate: 135 }} whileTap={{ scale: 0.9 }}
                 onClick={endCall}
                 className="w-14 h-14 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/40"
@@ -377,3 +343,12 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     </motion.div>
   );
 }
+
+
+
+
+
+
+
+
+

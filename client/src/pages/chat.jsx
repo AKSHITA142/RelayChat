@@ -29,6 +29,8 @@ export default function Chat() {
 
   useEffect(() => {
     connectSocket();
+    // Kill any rogue ringer audio left over from a previous call/hot-reload
+    document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch(_){} });
   }, []);
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
@@ -129,9 +131,10 @@ export default function Chat() {
   useEffect(() => {
     const handleIncomingCall = ({ from, fromName, offer }) => {
       console.log("📞 Incoming call from:", fromName);
-      setActiveVideoCall({ to: from, fromName, offer, isIncoming: true });
+      setActiveVideoCall({ to: from, fromName, offer, isIncoming: true, callId: Date.now() });
     };
 
+    socket.off("incoming-call"); // PREVENT DUPLICATES
     socket.on("incoming-call", handleIncomingCall);
     return () => socket.off("incoming-call", handleIncomingCall);
   }, []);
@@ -186,9 +189,10 @@ export default function Chat() {
       />
 
       {/* Global Video Call Overlay */}
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {activeVideoCall && (
           <VideoCall 
+            key={activeVideoCall.callId || "call"}
             {...activeVideoCall} 
             onClose={() => {
               if (activeVideoCall) {

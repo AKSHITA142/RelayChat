@@ -506,7 +506,12 @@ export default function ChatWindow({
               whileTap={{ scale: 0.9 }}
               onClick={() => {
                 const myName = getLoggedInUser()?.name || "Someone";
-                setActiveVideoCall({ to: otherUser?._id || otherUser, fromName: myName, isIncoming: false });
+                setActiveVideoCall({ 
+                  to: otherUser?._id || otherUser, 
+                  fromName: myName, 
+                  isIncoming: false,
+                  callId: Date.now()
+                });
               }}
               className="p-2 text-slate-400 hover:text-whatsapp-green hover:bg-white/5 rounded-lg transition-all"
             >
