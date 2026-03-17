@@ -131,7 +131,7 @@ export default function Chat() {
   useEffect(() => {
     const handleIncomingCall = ({ from, fromName, offer }) => {
       console.log("📞 Incoming call from:", fromName);
-      setActiveVideoCall({ to: from, fromName, offer, isIncoming: true, callId: Date.now() });
+      setActiveVideoCall({ to: from, fromName, initialOffer: offer, isIncoming: true, callId: Date.now() });
     };
 
     socket.off("incoming-call"); // PREVENT DUPLICATES
