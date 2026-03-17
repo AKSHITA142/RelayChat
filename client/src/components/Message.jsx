@@ -28,9 +28,10 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
 
   // WaveformPlayer colors: always readable against the bubble bg
   // Own bubble: white accent + white/80 track (bubble is vibrant color)
-  // Other bubble: primary accent + dark track (bubble is light pastel)
-  const waveformAccent = isOwn ? "#ffffff"      : primary;
-  const waveformTrack  = isOwn ? "#ffffff"      : (theme ? "#1a1a2e" : "#1a1a2e");
+  // Other bubble: primary accent + contrasting track (bubble is light pastel or dark)
+  const isDarkTheme    = theme?.background === "#121212";
+  const waveformAccent = isOwn ? "#ffffff" : primary;
+  const waveformTrack  = isOwn ? "#ffffff" : (isDarkTheme ? "#ffffff" : "#000000"); // Use white for dark theme, black for light themes
   const [showMenu, setShowMenu] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [isPressing, setIsPressing] = useState(false);

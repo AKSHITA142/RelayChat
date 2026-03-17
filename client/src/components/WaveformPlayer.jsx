@@ -50,9 +50,9 @@ export default function WaveformPlayer({
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   // Derive readable colors from props
-  const unplayedColor = `${trackColor}45`; // ~27% opacity
-  const timeColor     = `${trackColor}80`; // ~50% opacity
-  const iconColor     = `${trackColor}55`;
+  const unplayedColor = `${trackColor}66`; // ~40% opacity
+  const timeColor     = `${trackColor}b3`; // ~70% opacity
+  const iconColor     = `${trackColor}a1`; // ~63% opacity
 
   return (
     <div
