@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Smile, 
@@ -25,10 +25,13 @@ import {
   Info,
   Phone,
   Plus,
-  Video as VideoIcon
+  Video as VideoIcon,
+  Palette
 } from "lucide-react";
 import Message from "./Message";
 import VoiceRecorder from "./VoiceRecorder";
+import ThemeSelector from "./ThemeSelector";
+import { useChatTheme, THEMES } from "../hooks/useChatTheme";
 import socket from "../services/socket";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
@@ -100,6 +103,18 @@ export default function ChatWindow({
   const [currentSearchIndex, setCurrentSearchIndex] = useState(-1);
   const [searchResults, setSearchResults] = useState([]);
   const [showDeleted, setShowDeleted] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
+
+  // Per-chat theme
+  const [savedThemeName, setSavedThemeName] = useChatTheme(selectedChat?._id);
+  const [activeThemeName, setActiveThemeName] = useState(savedThemeName);
+  const theme = THEMES[activeThemeName] || THEMES.blue;
+
+  const handleThemeSelect = useCallback((name) => {
+    setActiveThemeName(name);
+    setSavedThemeName(name);
+    setShowThemePicker(false);
+  }, [setSavedThemeName]);
 
   const menuRef = useRef(null);
 
@@ -287,7 +302,16 @@ export default function ChatWindow({
     setShowAddContact(false);
     setAdminNotice("");
     setIsRenaming(false);
+    setShowThemePicker(false);
   }, [selectedChat, showDeleted]);
+
+  // Sync theme when chat changes
+  useEffect(() => {
+    if (selectedChat?._id) {
+      const stored = localStorage.getItem(`chat-theme-${selectedChat._id}`) || "blue";
+      setActiveThemeName(stored);
+    }
+  }, [selectedChat?._id]);
 
   useEffect(() => {
     const handleTyping = () => setIsTyping(true);
@@ -425,12 +449,17 @@ export default function ChatWindow({
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-whatsapp-bg-dark relative overflow-hidden">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] invert" />
+    <div
+      className="flex-1 flex flex-col h-full relative overflow-hidden"
+      style={{ background: theme.background, transition: "background 0.4s ease, color 0.3s ease" }}
+    >
+      {/* NO pattern overlay on light themes — removed for clarity */}
 
       {/* Header */}
-      <div className="h-16 px-6 bg-whatsapp-sidebar-dark/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between z-10">
+      <div
+        className="h-16 px-6 backdrop-blur-xl border-b border-white/5 flex items-center justify-between z-20"
+        style={{ background: "#111b21" }}
+      >
         <div className="flex items-center gap-4">
           <div className="relative">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold bg-whatsapp-green/10 text-whatsapp-green`}>
@@ -500,6 +529,30 @@ export default function ChatWindow({
 
         {/* Header Actions */}
         <div className="flex items-center gap-3 relative" ref={menuRef}>
+          {/* Theme Picker Button */}
+          <div className="relative">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setShowThemePicker(p => !p)}
+              className="p-2 rounded-lg transition-all"
+              style={{
+                background: showThemePicker ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.05)",
+                color: "#fff",
+              }}
+              title="Change chat theme"
+            >
+              <Palette size={20} />
+            </motion.button>
+            {showThemePicker && (
+              <ThemeSelector
+                currentTheme={activeThemeName}
+                onSelect={handleThemeSelect}
+                onClose={() => setShowThemePicker(false)}
+              />
+            )}
+          </div>
+
           {!selectedChat.isGroup && (
             <motion.button 
               whileHover={{ scale: 1.1 }}
@@ -513,7 +566,8 @@ export default function ChatWindow({
                   callId: Date.now()
                 });
               }}
-              className="p-2 text-slate-400 hover:text-whatsapp-green hover:bg-white/5 rounded-lg transition-all"
+              className="p-2 rounded-lg transition-all text-white/90 hover:text-white hover:bg-white/10"
+              style={{ background: "rgba(255,255,255,0.05)" }}
             >
               <VideoIcon size={20} />
             </motion.button>
@@ -521,7 +575,7 @@ export default function ChatWindow({
           
           <button 
             onClick={() => setShowMenu(!showMenu)}
-            className={`p-2 rounded-lg transition-all ${showMenu ? 'bg-whatsapp-green text-whatsapp-bg-dark' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+            className={`p-2 rounded-lg transition-all ${showMenu ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
           >
             <MoreHorizontal size={20} />
           </button>
@@ -647,6 +701,7 @@ export default function ChatWindow({
                 onDeleteEveryone={(msgId) => socket.emit("delete-for-everyone", { messageId: msgId, chatId: selectedChat?._id })}
                 searchQuery={searchQuery}
                 isHighlighted={searchResults[currentSearchIndex] === i}
+                theme={theme}
               />
             );
           })}
@@ -655,7 +710,10 @@ export default function ChatWindow({
       </div>
 
       {/* Footer Interface */}
-      <footer className="p-4 bg-whatsapp-bg-dark/80 backdrop-blur-xl border-t border-white/5 z-10 relative">
+      <footer
+        className="p-4 border-t border-white/5 z-10 relative"
+        style={{ background: "#111b21" }}
+      >
         <AnimatePresence mode="wait">
           {isVoiceRecording ? (
             <motion.div
@@ -698,13 +756,13 @@ export default function ChatWindow({
                 <div className="flex items-center gap-1">
                   <button 
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                    className={`p-2 rounded-xl transition-all ${showEmojiPicker ? 'bg-whatsapp-green text-whatsapp-bg-dark' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                    className={`p-2 rounded-xl transition-all ${showEmojiPicker ? 'bg-white/30 text-white' : 'text-white/80 hover:text-white hover:bg-white/20'}`}
                   >
                     <Smile size={22} />
                   </button>
                   <button 
                     onClick={() => fileInputRef.current.click()}
-                    className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/5 transition-all"
+                    className="p-2 text-white/80 hover:text-white rounded-xl hover:bg-white/20 transition-all"
                   >
                     <Paperclip size={22} />
                   </button>
@@ -732,8 +790,15 @@ export default function ChatWindow({
                       }, 1500);
                     }}
                     onKeyDown={e => e.key === "Enter" && handleSend()}
-                    placeholder="Express yourself..." 
-                    className="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-3 text-sm text-slate-200 outline-none focus:border-whatsapp-green transition-all placeholder:text-slate-600"
+                    placeholder="Express yourself..."
+                    className="w-full rounded-2xl px-5 py-3 text-sm outline-none transition-all placeholder:text-white/50"
+                    style={{
+                      background: "rgba(255,255,255,0.2)",
+                      border: "1.5px solid rgba(255,255,255,0.3)",
+                      color: "#ffffff",
+                    }}
+                    onFocus={e => { e.target.style.borderColor = "rgba(255,255,255,0.7)"; }}
+                    onBlur={e  => { e.target.style.borderColor = "rgba(255,255,255,0.3)"; }}
                   />
                 </div>
 
@@ -743,7 +808,8 @@ export default function ChatWindow({
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleSend}
-                    className="p-3 bg-whatsapp-green text-whatsapp-bg-dark rounded-2xl shadow-lg shadow-whatsapp-green/20 hover:brightness-110 active:brightness-90 transition-all"
+                    className="p-3 rounded-2xl shadow-lg hover:brightness-110 active:brightness-90 transition-all text-blue-600"
+                    style={{ background: "#ffffff", boxShadow: "0 4px 15px rgba(0,0,0,0.2)" }}
                   >
                     <Send size={22} />
                   </motion.button>
@@ -753,7 +819,12 @@ export default function ChatWindow({
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setIsVoiceRecording(true)}
-                    className="p-3 bg-white/5 text-whatsapp-green border border-white/10 rounded-2xl hover:bg-whatsapp-green hover:text-whatsapp-bg-dark transition-all"
+                    className="p-3 rounded-2xl border transition-all"
+                    style={{
+                      background: "rgba(255,255,255,0.2)",
+                      borderColor: "rgba(255,255,255,0.4)",
+                      color: "#ffffff",
+                    }}
                   >
                     <Mic size={22} />
                   </motion.button>

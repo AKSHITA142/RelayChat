@@ -18,7 +18,19 @@ import { getLoggedInUser } from "../utils/auth";
 import socket from "../services/socket";
 import api from "../services/api"; // Added api import
 
-export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryone, chatType, searchQuery = "", isHighlighted = false }) {
+export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryone, chatType, searchQuery = "", isHighlighted = false, theme = null }) {
+  // Fallback colours when no theme is supplied
+  const ownBg     = theme?.bubbleOwn    || "#25D366";
+  const otherBg   = theme?.bubbleOther  || "rgba(255,255,255,0.1)";
+  const ownText   = theme?.textOwn      || "#0d1117";
+  const otherText = theme?.textOther    || "#e2e8f0";
+  const primary   = theme?.primary      || "#25D366";
+
+  // WaveformPlayer colors: always readable against the bubble bg
+  // Own bubble: white accent + white/80 track (bubble is vibrant color)
+  // Other bubble: primary accent + dark track (bubble is light pastel)
+  const waveformAccent = isOwn ? "#ffffff"      : primary;
+  const waveformTrack  = isOwn ? "#ffffff"      : (theme ? "#1a1a2e" : "#1a1a2e");
   const [showMenu, setShowMenu] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
@@ -141,10 +153,16 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
         className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-sm transition-all relative ${
           msg.deletedFor?.includes(myId)
             ? "bg-slate-800/50 text-slate-500 border border-dashed border-slate-600 grayscale opacity-40"
-            : isMe 
-              ? (isHighlighted ? "bg-amber-100 ring-4 ring-amber-400/50 scale-[1.02]" : "bg-whatsapp-green text-whatsapp-bg-dark rounded-tr-none")
-              : (isHighlighted ? "bg-amber-100 ring-4 ring-amber-400/50 scale-[1.02] text-whatsapp-bg-dark" : "bg-white/10 text-slate-200 rounded-tl-none border border-white/5")
+            : isHighlighted
+              ? "ring-4 ring-amber-400/50 scale-[1.02]"
+              : ""
         }`}
+        style={msg.deletedFor?.includes(myId) ? {} : {
+          background: isHighlighted ? "#fef3c7" : (isOwn ? ownBg : otherBg),
+          color: isHighlighted ? "#1a1a1a" : (isOwn ? ownText : otherText),
+          borderRadius: isOwn ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+          transition: "background 0.4s ease, color 0.3s ease",
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           setShowMenu(true);
@@ -181,7 +199,12 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
               </div>
             ) : msg.fileType?.startsWith("audio/") ? (
               <div className="py-1">
-                <WaveformPlayer url={`http://localhost:5002${msg.fileUrl}`} />
+                <WaveformPlayer
+                  url={`http://localhost:5002${msg.fileUrl}`}
+                  accentColor={waveformAccent}
+                  trackColor={waveformTrack}
+                  playIconColor={isOwn ? primary : "#ffffff"}
+                />
                 {msg.content && msg.content !== "🎤 Voice Message" && (
                    <p className="text-sm px-1 mt-2 leading-relaxed italic opacity-80">{msg.content}</p>
                 )}
@@ -212,7 +235,10 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
             )}
           </div>
         ) : (
-          <p className="text-[15px] leading-relaxed break-words">
+          <p
+            className="text-[15px] leading-relaxed break-words"
+            style={{ color: isOwn ? ownText : otherText }}
+          >
             {renderContentWithHighlights(msg.content)}
           </p>
         )}
