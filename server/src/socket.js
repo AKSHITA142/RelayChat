@@ -216,7 +216,7 @@ function initSocket(server) {
           ).populate("sender", "_id name")
            .populate("seenBy.userId", "_id name phoneNumber");
           
-          // Broadcast updated messages to all users in the room
+          // Broadcast updated messages to all users(participants) in the room
           io.to(roomId).emit("message-seen", { 
             chatId: roomId, 
             readerId: socket.userId,
