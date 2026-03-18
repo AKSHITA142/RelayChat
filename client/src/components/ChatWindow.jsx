@@ -1,5 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+// Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
+void motion;
+
 import { 
   Smile, 
   Paperclip, 
@@ -84,7 +88,7 @@ export default function ChatWindow({
       const date = new Date(lastSeen);
       if (isNaN(date.getTime())) return "Offline";
       return `Available ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    } catch (e) {
+    } catch {
       return "Offline";
     }
   })();
@@ -109,6 +113,15 @@ export default function ChatWindow({
   const [savedThemeName, setSavedThemeName] = useChatTheme(selectedChat?._id);
   const [activeThemeName, setActiveThemeName] = useState(savedThemeName);
   const theme = THEMES[activeThemeName] || THEMES.blue;
+
+  // Message info modal
+  const [showMessageInfo, setShowMessageInfo] = useState(false);
+  const [selectedMessageForInfo, setSelectedMessageForInfo] = useState(null);
+
+  const handleShowMessageInfo = (message) => {
+    setSelectedMessageForInfo(message);
+    setShowMessageInfo(true);
+  };
 
   const handleThemeSelect = useCallback((name) => {
     setActiveThemeName(name);
@@ -176,7 +189,7 @@ export default function ChatWindow({
       formData.append("chatId", selectedChat._id);
       formData.append("content", "🎤 Voice Message");
 
-      const res = await api.post("/message/upload", formData);
+      await api.post("/message/upload", formData);
       setIsVoiceRecording(false);
     } catch (err) {
       console.error("Error sending voice message:", err);
@@ -338,9 +351,26 @@ export default function ChatWindow({
       setMessages(prev => prev.map(m => m._id === messageId ? { ...m, status: "delivered" } : m));
     };
 
-    const seenHandler = ({ chatId, userId }) => {
-      if (chatId?.toString() === selectedChat?._id?.toString() && userId?.toString() !== myUserId?.toString()) {
-        setMessages(prev => prev.map(m => m.status !== "seen" ? { ...m, status: "seen" } : m));
+    const seenHandler = ({ chatId, userId, messages: updatedMessages }) => {
+      if (chatId?.toString() === selectedChat?._id?.toString()) {
+        // If we have updated messages from server, use those
+        if (updatedMessages && Array.isArray(updatedMessages)) {
+          setMessages(prev => 
+            prev.map(m => {
+              const updated = updatedMessages.find(um => um._id.toString() === m._id.toString());
+              return updated ? { ...m, seenBy: updated.seenBy } : m;
+            })
+          );
+        } else {
+          // Fallback: add userId to seenBy for all sent messages
+          setMessages(prev => 
+            prev.map(m => 
+              m.sender && (m.sender._id || m.sender).toString() === myUserId?.toString()
+                ? { ...m, seenBy: [...new Set([...(m.seenBy || []), userId])] }
+                : m
+            )
+          );
+        }
       }
     };
 
@@ -458,7 +488,7 @@ export default function ChatWindow({
       {/* Header */}
       <div
         className="h-16 px-6 backdrop-blur-xl border-b border-white/5 flex items-center justify-between z-20"
-        style={{ background: "#111b21" }}
+        style={{ background: "#111b21ea" }}
       >
         <div className="flex items-center gap-4">
           <div className="relative">
@@ -537,8 +567,8 @@ export default function ChatWindow({
               onClick={() => setShowThemePicker(p => !p)}
               className="p-2 rounded-lg transition-all"
               style={{
-                background: showThemePicker ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.05)",
-                color: "#fff",
+                background: showThemePicker ? theme.primary : "rgba(0,0,0,0.08)",
+                color: showThemePicker ? "#fff" : theme.primary,
               }}
               title="Change chat theme"
             >
@@ -566,8 +596,8 @@ export default function ChatWindow({
                   callId: Date.now()
                 });
               }}
-              className="p-2 rounded-lg transition-all text-white/90 hover:text-white hover:bg-white/10"
-              style={{ background: "rgba(255,255,255,0.05)" }}
+              className="p-2 rounded-lg transition-all"
+              style={{ color: theme.primary, background: "rgba(0,0,0,0.06)" }}
             >
               <VideoIcon size={20} />
             </motion.button>
@@ -575,7 +605,7 @@ export default function ChatWindow({
           
           <button 
             onClick={() => setShowMenu(!showMenu)}
-            className={`p-2 rounded-lg transition-all ${showMenu ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
+            className={`p-2 rounded-lg transition-all ${showMenu ? 'bg-whatsapp-green text-whatsapp-bg-dark' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
           >
             <MoreHorizontal size={20} />
           </button>
@@ -699,6 +729,7 @@ export default function ChatWindow({
                 isOwn={(m.sender?._id || m.sender)?.toString() === myUserId?.toString()}
                 onDeleteMe={(msgId) => socket.emit("delete-for-me", { messageId: msgId })}
                 onDeleteEveryone={(msgId) => socket.emit("delete-for-everyone", { messageId: msgId, chatId: selectedChat?._id })}
+                onShowMessageInfo={handleShowMessageInfo}
                 searchQuery={searchQuery}
                 isHighlighted={searchResults[currentSearchIndex] === i}
                 theme={theme}
@@ -712,7 +743,7 @@ export default function ChatWindow({
       {/* Footer Interface */}
       <footer
         className="p-4 border-t border-white/5 z-10 relative"
-        style={{ background: "#111b21" }}
+        style={{ background: "#111b21ea", backdropFilter: "blur(20px)" }}
       >
         <AnimatePresence mode="wait">
           {isVoiceRecording ? (
@@ -1154,6 +1185,172 @@ export default function ChatWindow({
                 })}
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Message Info Modal */}
+      <AnimatePresence>
+        {showMessageInfo && selectedMessageForInfo && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-whatsapp-bg-dark/95 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+            onClick={() => setShowMessageInfo(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-card w-full max-w-md p-6 flex flex-col max-h-[80vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Info size={20} className="text-whatsapp-green" />
+                  Message Info
+                </h3>
+                <button onClick={() => setShowMessageInfo(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-500 transition-all">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+                {/* Message Content */}
+                <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+                  <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 font-bold">Message</p>
+                  <p className="text-sm text-white break-words">{selectedMessageForInfo.content}</p>
+                </div>
+
+                {/* Sent Time */}
+                <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+                  <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 font-bold">Sent</p>
+                  <p className="text-sm text-white">
+                    {new Date(selectedMessageForInfo.createdAt).toLocaleString([], { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      hour: '2-digit', 
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+
+                {/* Delivery Status */}
+                {(selectedMessageForInfo.sender?._id || selectedMessageForInfo.sender)?.toString() === myUserId?.toString() && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Delivery Status</p>
+                    <div className="space-y-2">
+                      {/* Show for each participant */}
+                      {selectedChat.isGroup ? (
+                        selectedChat.participants.map(participant => {
+                          const participantId = participant?._id?.toString() || participant?.toString();
+                          if (participantId === myUserId?.toString()) return null;
+                          
+                          // Find read receipt for this participant
+                          const readReceipt = selectedMessageForInfo.seenBy && 
+                            selectedMessageForInfo.seenBy.find(receipt => 
+                              receipt?.userId?._id?.toString?.() === participantId || 
+                              receipt?.userId?.toString?.() === participantId || 
+                              receipt === participantId
+                            );
+                          
+                          const formatTimestamp = (dateStr) => {
+                            if (!dateStr) return new Date(selectedMessageForInfo.deliveredAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                            return new Date(dateStr).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                          };
+                          
+                          return (
+                            <div key={participantId} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 hover:bg-white/8 transition-all">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-whatsapp-green/10 flex items-center justify-center font-bold text-whatsapp-green text-xs">
+                                  {(participant.name?.[0] || "?").toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-semibold text-white">{participant.name || "Member"}</p>
+                                  <p className="text-xs text-slate-500">{participant.phoneNumber || "Unknown"}</p>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                {readReceipt && readReceipt.readAt ? (
+                                  <>
+                                    <span className="flex items-center gap-1.5 px-3 py-1 bg-sky-500/10 border border-sky-500/30 rounded-full text-xs font-bold text-sky-400">
+                                      <CheckCheck size={12} />
+                                      Read
+                                    </span>
+                                    <p className="text-[10px] text-slate-500">{formatTimestamp(readReceipt.readAt)}</p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="flex items-center gap-1.5 px-3 py-1 bg-slate-500/10 border border-slate-500/30 rounded-full text-xs font-bold text-slate-400">
+                                      <Check size={12} />
+                                      Delivered
+                                    </span>
+                                    <p className="text-[10px] text-slate-500">{formatTimestamp(selectedMessageForInfo.deliveredAt)}</p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        // 1:1 Chat
+                        selectedChat.participants.map(participant => {
+                          const participantId = participant?._id?.toString() || participant?.toString();
+                          if (participantId === myUserId?.toString()) return null;
+                          
+                          // Find read receipt for this participant
+                          const readReceipt = selectedMessageForInfo.seenBy && 
+                            selectedMessageForInfo.seenBy.find(receipt => 
+                              receipt?.userId?._id?.toString?.() === participantId || 
+                              receipt?.userId?.toString?.() === participantId || 
+                              receipt === participantId
+                            );
+                          
+                          const formatTimestamp = (dateStr) => {
+                            if (!dateStr) return new Date(selectedMessageForInfo.deliveredAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                            return new Date(dateStr).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                          };
+                          
+                          return (
+                            <div key={participantId} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 hover:bg-white/8 transition-all">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-whatsapp-green/10 flex items-center justify-center font-bold text-whatsapp-green text-xs">
+                                  {(participant.name?.[0] || "?").toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-semibold text-white">{savedContact?.savedName || participant.name || "Unknown"}</p>
+                                  <p className="text-xs text-slate-500">{participant.phoneNumber || "Contact"}</p>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                {readReceipt && readReceipt.readAt ? (
+                                  <>
+                                    <span className="flex items-center gap-1.5 px-3 py-1 bg-sky-500/10 border border-sky-500/30 rounded-full text-xs font-bold text-sky-400">
+                                      <CheckCheck size={12} />
+                                      Read
+                                    </span>
+                                    <p className="text-[10px] text-slate-500">{formatTimestamp(readReceipt.readAt)}</p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="flex items-center gap-1.5 px-3 py-1 bg-slate-500/10 border border-slate-500/30 rounded-full text-xs font-bold text-slate-400">
+                                      <Check size={12} />
+                                      Delivered
+                                    </span>
+                                    <p className="text-[10px] text-slate-500">{formatTimestamp(selectedMessageForInfo.deliveredAt)}</p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2 } from "lucide-react";
 import { motion } from "framer-motion";
 
+// Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
+void motion;
+
 export default function WaveformPlayer({
   url,
   accentColor = "#25D366",   // played-bar + button colour
@@ -24,6 +27,7 @@ export default function WaveformPlayer({
       const x = Math.sin(seed + i * 2.3) * 0.5 + 0.5;
       return 0.2 + x * 0.78;
     });
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWaveform(bars);
   }, [url]);
 

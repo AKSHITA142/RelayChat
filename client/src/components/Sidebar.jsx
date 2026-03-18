@@ -4,6 +4,7 @@ import { Search, Plus, Users, X, Check, Loader2, MessageSquare, Phone } from "lu
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
 
+void motion;
 export default function Sidebar({ 
   chats, 
   setChats, 
@@ -296,4 +297,4 @@ export default function Sidebar({
       </div>
     </div>
   );
-}
+}

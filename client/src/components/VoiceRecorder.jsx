@@ -1,6 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Mic, X, Send, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+// Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
+void motion;
 
 export default function VoiceRecorder({ onSend, onCancel }) {
   const [isRecording, setIsRecording] = useState(false);
@@ -14,7 +17,7 @@ export default function VoiceRecorder({ onSend, onCancel }) {
   const timerRef = useRef(null);
   const chunksRef = useRef([]);
 
-  const startRecording = async () => {
+  const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
@@ -61,7 +64,7 @@ export default function VoiceRecorder({ onSend, onCancel }) {
       console.error("Microphone access denied:", err);
       onCancel();
     }
-  };
+  }, [onSend, onCancel]);
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
@@ -88,9 +91,11 @@ export default function VoiceRecorder({ onSend, onCancel }) {
   };
 
   useEffect(() => {
-    startRecording();
+    (async () => {
+      await startRecording();
+    })();
     return () => cleanup();
-  }, []);
+  }, [startRecording]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);

@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+// Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
+void motion;
 import { User, Mail, Lock, Phone, ArrowLeft, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import api from "../services/api";
 

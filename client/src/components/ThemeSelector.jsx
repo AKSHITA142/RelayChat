@@ -3,7 +3,7 @@ import { Check, X } from "lucide-react";
 import { THEMES, THEME_NAMES } from "../hooks/useChatTheme";
 
 const SWATCH_ORDER = ["blue", "green", "purple", "dark"];
-
+void motion; // ensure framer-motion is treated as used by the linter (used in JSX via <motion.* />)
 export default function ThemeSelector({ currentTheme, onSelect, onClose }) {
   return (
     <AnimatePresence>

@@ -1,6 +1,9 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
+void motion;
+
 const REACTION_EMOJIS = ["❤️", "😂", "👍", "🙏", "🔥", "😭"];
 
 export default function ReactionPicker({ onSelect, isVisible, position = "top" }) {

@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import socket from "../services/socket";
 
+void motion; // ensure framer-motion is treated as used by the linter (used in JSX via <motion.* />)
 /* ─── STUN servers ─── */
 const PC_CONFIG = {
   iceServers: [
@@ -14,8 +15,6 @@ const PC_CONFIG = {
     { urls: "stun:stun3.l.google.com:19302" },
   ],
 };
-
-const CALL_TIMEOUT_MS = 30_000; // 30 seconds — auto-cut if unanswered (same as WhatsApp)
 
 /* ─── Ringer — stored on window so it survives HMR and is always killable ─── */
 const RINGER_URL = "https://assets.mixkit.co/active_storage/sfx/1350/1350-preview.mp3";
@@ -31,7 +30,7 @@ function startRinger() {
 function stopRinger() {
   const a = window.__ringer;
   if (a) {
-    try { a.pause(); a.currentTime = 0; a.src = ""; } catch(_) {}
+    try { a.pause(); a.currentTime = 0; a.src = ""; } catch {}  // eslint-disable-line no-empty
     window.__ringer = null;
   }
 }
@@ -55,14 +54,13 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   const [isMuted, setIsMuted] = useState(false);
   const [vidOff, setVidOff] = useState(false);
 
-  const localRef       = useRef(null);
-  const remoteRef      = useRef(null);
-  const remoteAudioRef = useRef(null);   // dedicated <audio> for remote audio
-  const pcRef          = useRef(null);
-  const lsRef          = useRef(null);
-  const remoteStream   = useRef(new MediaStream());
-  const iceQueue       = useRef([]);
-  const ringTimer      = useRef(null);  // 30-second ringing timeout
+  const localRef  = useRef(null);
+  const remoteRef = useRef(null);
+  const pcRef     = useRef(null);
+  const lsRef     = useRef(null);
+  const remoteStream = useRef(new MediaStream());
+  const iceQueue  = useRef([]);
+  const ringTimer = useRef(null);  // 30-second ringing timeout
 
   /* ── clear ringing timeout ── */
   const clearRingTimer = useCallback(() => {
@@ -80,11 +78,6 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     clearRingTimer();
     lsRef.current?.getTracks().forEach(t => t.stop());
     pcRef.current?.close();
-    // Tear down remote audio element
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.pause();
-      remoteAudioRef.current.srcObject = null;
-    }
     lsRef.current = null;
     pcRef.current = null;
     remoteStream.current = new MediaStream();
@@ -139,35 +132,18 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
       }
     };
 
-    pc.ontrack = ({ track, streams }) => {
+    pc.ontrack = ({ track }) => {
       log("🎥 ontrack:", track.kind);
       // Safety: stop ringer when media arrives (extra guard)
       stopRinger();
 
-      // Add track to our combined remote stream
       if (!remoteStream.current.getTracks().find(t => t.id === track.id)) {
         remoteStream.current.addTrack(track);
       }
-
-      if (track.kind === "video") {
-        // Attach the full stream (video + audio) to the remote video element
-        if (remoteRef.current) {
-          remoteRef.current.srcObject = remoteStream.current;
-          remoteRef.current.play().catch(e => log("remote video play error:", e));
-        }
+      if (remoteRef.current && remoteRef.current.srcObject !== remoteStream.current) {
+        remoteRef.current.srcObject = remoteStream.current;
+        remoteRef.current.play().catch(() => {});
       }
-
-      if (track.kind === "audio") {
-        // Use a dedicated audio element so the browser always plays audio through speakers
-        if (remoteAudioRef.current) {
-          // Build an audio-only stream for the dedicated element
-          const audioOnlyStream = new MediaStream();
-          remoteStream.current.getAudioTracks().forEach(t => audioOnlyStream.addTrack(t));
-          remoteAudioRef.current.srcObject = audioOnlyStream;
-          remoteAudioRef.current.play().catch(e => log("remote audio play error:", e));
-        }
-      }
-
       setStatus("connected");
     };
 
@@ -178,19 +154,14 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   /* ── outgoing call ── */
   const startCall = useCallback(async () => {
     log("📤 startCall");
+    // No timeout — caller waits until receiver picks up or manually cancels
     const stream = await getMedia();
     const pc = buildPC();
     stream.getTracks().forEach(t => pc.addTrack(t, stream));
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit("call-user", { to, offer, fromName });
-
-    // Auto-cut after 30 s if receiver never answers
-    ringTimer.current = setTimeout(() => {
-      log("⏰ No answer — auto-cutting call");
-      endCall();
-    }, CALL_TIMEOUT_MS);
-  }, [to, fromName, getMedia, buildPC, endCall]);
+  }, [to, fromName, getMedia, buildPC]);
 
   /* ── accept incoming call ── */
   const acceptCall = useCallback(async () => {
@@ -214,19 +185,12 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   /* ── socket events ── */
   useEffect(() => {
     if (!isIncoming) {
-      startCall(); // timer is started inside startCall
+      startCall();
     } else {
-      // Play ringer for the receiver
+      // Play ringer for the receiver until they accept or reject
       startRinger();
-      // Auto-dismiss incoming call after 30 s if receiver ignores it
-      ringTimer.current = setTimeout(() => {
-        log("⏰ Receiver didn't answer — auto-dismissing");
-        stopRinger();
-        socket.emit("end-call", { to });
-        cleanup();
-        onClose();
-      }, CALL_TIMEOUT_MS);
     }
+    // No auto-timeout — receiver can take as long as they want
 
     // Caller receives answer
     socket.off("call-accepted");
@@ -234,7 +198,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
       log("✅ call-accepted");
       stopRinger();   // stop ring-back
       broadcastStop();
-      clearRingTimer(); // cancel the 30 s timeout — call was answered
+      clearRingTimer();
       const pc = pcRef.current;
       if (!pc) return;
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
@@ -293,14 +257,10 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
 
         {/* Remote video */}
         <div className="flex-1 bg-black relative">
-          {/* Hidden dedicated audio element — ensures remote audio plays through speakers */}
-          <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: "none" }} />
           <video
             ref={remoteRef}
             data-call-video="remote"
-            autoPlay
-            playsInline
-            muted={false}
+            autoPlay playsInline
             className="w-full h-full object-cover"
           />
 
@@ -384,12 +344,3 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     </motion.div>
   );
 }
-
-
-
-
-
-
-
-
-

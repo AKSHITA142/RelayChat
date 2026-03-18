@@ -10,7 +10,8 @@ import {
   MoreVertical,
   Download,
   Clock,
-  Mic
+  Mic,
+  Info
 } from "lucide-react";
 import ReactionPicker from "./ReactionPicker";
 import WaveformPlayer from "./WaveformPlayer";
@@ -18,7 +19,8 @@ import { getLoggedInUser } from "../utils/auth";
 import socket from "../services/socket";
 import api from "../services/api"; // Added api import
 
-export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryone, chatType, searchQuery = "", isHighlighted = false, theme = null }) {
+void motion; // Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
+export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryone, onShowMessageInfo, searchQuery = "", isHighlighted = false, theme = null }) {
   // Fallback colours when no theme is supplied
   const ownBg     = theme?.bubbleOwn    || "#25D366";
   const otherBg   = theme?.bubbleOther  || "rgba(255,255,255,0.1)";
@@ -34,7 +36,6 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
   const waveformTrack  = isOwn ? "#ffffff" : (isDarkTheme ? "#ffffff" : "#000000"); // Use white for dark theme, black for light themes
   const [showMenu, setShowMenu] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
-  const [isPressing, setIsPressing] = useState(false);
   const pressTimerRef = useRef(null);
   
   const myId = getLoggedInUser()?._id;
@@ -63,7 +64,7 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
       const date = new Date(dateStr);
       if (isNaN(date.getTime())) return "";
       return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    } catch (e) {
+    } catch {
       return "";
     }
   };
@@ -97,19 +98,22 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
   const startPress = () => {
     pressTimerRef.current = setTimeout(() => {
       setShowReactions(true);
-      setIsPressing(false);
     }, 500);
-    setIsPressing(true);
   };
 
   const endPress = () => {
     clearTimeout(pressTimerRef.current);
-    setIsPressing(false);
   };
 
   const renderStatus = () => {
     if (!isMe || msg?.isDeleted) return null;
     
+    // Check if message has seenBy array (read receipts)
+    if (msg?.seenBy && Array.isArray(msg.seenBy) && msg.seenBy.length > 0) {
+      return <CheckCheck className="text-sky-400" size={14} />;
+    }
+    
+    // Fallback to status field for backward compatibility
     switch (msg?.status) {
       case "seen":
         return <CheckCheck className="text-sky-400" size={14} />;
@@ -306,6 +310,21 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
               exit={{ scale: 0.9, opacity: 0, y: 10 }}
               className={`absolute bottom-full mb-2 z-[101] min-w-[160px] glass-card overflow-hidden py-1 border border-white/20 shadow-2xl ${isMe ? "right-4" : "left-4"}`}
             >
+              {isMe && (
+                <>
+                  <button 
+                    onClick={() => {
+                      onShowMessageInfo(msg);
+                      setShowMenu(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-sky-400 hover:bg-sky-500/10 hover:text-sky-300 transition-colors"
+                  >
+                    <Info size={16} className="text-sky-400" />
+                    View Info
+                  </button>
+                  <div className="h-px bg-white/10" />
+                </>
+              )}
               {msg.deletedFor?.includes(myId) ? (
                 <button 
                   onClick={handleRestoreForMe}

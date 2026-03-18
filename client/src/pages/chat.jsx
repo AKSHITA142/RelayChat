@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+
+// Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
+void motion;
+
 import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
 import socket, { connectSocket } from "../services/socket";
@@ -30,7 +34,8 @@ export default function Chat() {
   useEffect(() => {
     connectSocket();
     // Kill any rogue ringer audio left over from a previous call/hot-reload
-    document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch(_){} });
+    // eslint-disable-next-line no-empty
+    document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch {} });
   }, []);
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
