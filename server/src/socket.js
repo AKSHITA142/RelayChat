@@ -42,6 +42,7 @@ function initSocket(server) {
       }
 
       socket.join(socket.userId.toString());
+      socket.data.activeChatId = null;
 
       //  JOIN CHAT ROOM
       socket.on("join-chat", (chatId, cb) => {
@@ -76,6 +77,7 @@ function initSocket(server) {
       socket.on("open-chat", async (chatId) => {
         try {
           const roomId = chatId.toString();
+          socket.data.activeChatId = roomId;
           const chat = await Chat.findById(roomId);
           if (chat) {
             chat.unreadCounts.set(socket.userId, 0);
@@ -84,6 +86,13 @@ function initSocket(server) {
           }
         } catch (err) {
           console.error("Open chat error:", err);
+        }
+      });
+
+      socket.on("close-chat", (chatId) => {
+        const roomId = chatId?.toString?.();
+        if (socket.data.activeChatId === roomId) {
+          socket.data.activeChatId = null;
         }
       });
 
@@ -126,13 +135,52 @@ function initSocket(server) {
           await message.save();
 
           socket.emit("message-delivered", { messageId: message._id });
-          const populatedMessage = await Message.findById(message._id).populate("sender", "_id name");
+          let populatedMessage = await Message.findById(message._id)
+            .populate("sender", "_id name")
+            .populate("seenBy.userId", "_id name phoneNumber");
           io.to(roomId).emit("new-message", populatedMessage);
 
           socket.to(roomId).emit("message-delivered", { messageId: message._id });
 
+          const roomSockets = await io.in(roomId).fetchSockets();
+          const activeReaders = Array.from(
+            new Set(
+              roomSockets
+                .filter((roomSocket) =>
+                  roomSocket.userId?.toString() !== socket.userId.toString() &&
+                  roomSocket.data.activeChatId === roomId
+                )
+                .map((roomSocket) => roomSocket.userId.toString())
+            )
+          );
+
+          if (activeReaders.length > 0) {
+            const readAt = new Date();
+            message.seenBy = activeReaders.map((readerId) => ({
+              userId: readerId,
+              readAt,
+            }));
+            message.status = "seen";
+            await message.save();
+
+            populatedMessage = await Message.findById(message._id)
+              .populate("sender", "_id name")
+              .populate("seenBy.userId", "_id name phoneNumber");
+
+            io.to(roomId).emit("message-seen", {
+              chatId: roomId,
+              readerIds: activeReaders,
+              readAt,
+              messageIds: [message._id.toString()],
+              messages: [populatedMessage]
+            });
+          }
+
           chat.participants.forEach((userId) => {
-            if (userId.toString() !== socket.userId) {
+            if (
+              userId.toString() !== socket.userId &&
+              !activeReaders.includes(userId.toString())
+            ) {
               const count = chat.unreadCounts.get(userId.toString()) || 0;
               chat.unreadCounts.set(userId.toString(), count + 1);
             }
@@ -147,6 +195,7 @@ function initSocket(server) {
       socket.on("mark-seen", async ({ chatId }) => {
         try {
           const roomId = chatId.toString();
+          const readAt = new Date();
           
           // Update messages to add read receipt with timestamp
           await Message.updateMany(
@@ -156,7 +205,8 @@ function initSocket(server) {
               seenBy: { $not: { $elemMatch: { userId: socket.userId } } }
             },
             { 
-              $push: { seenBy: { userId: socket.userId, readAt: new Date() } }
+              $push: { seenBy: { userId: socket.userId, readAt } },
+              $set: { status: "seen" }
             }
           );
           
@@ -169,7 +219,9 @@ function initSocket(server) {
           // Broadcast updated messages to all users in the room
           io.to(roomId).emit("message-seen", { 
             chatId: roomId, 
-            userId: socket.userId, 
+            readerId: socket.userId,
+            readAt,
+            messageIds: messagesWithSeen.map((message) => message._id.toString()),
             messages: messagesWithSeen 
           });
         } catch (err) {

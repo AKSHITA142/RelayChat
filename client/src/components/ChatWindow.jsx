@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
+
 void motion;
 
 import { 
@@ -12,6 +12,7 @@ import {
   Users,
   X, 
   Check, 
+  CheckCheck,
   MoreHorizontal, 
   Cpu, 
   FilePlus, 
@@ -39,6 +40,22 @@ import { useChatTheme, THEMES } from "../hooks/useChatTheme";
 import socket from "../services/socket";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
+
+const getEntityId = (value) => {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    if (value._id) return value._id.toString();
+    if (value.id) return value.id.toString();
+    if (value.userId) return getEntityId(value.userId);
+  }
+  return value?.toString?.() || null;
+};
+
+const findReadReceipt = (message, participantId) => {
+  if (!Array.isArray(message?.seenBy) || !participantId) return null;
+  return message.seenBy.find((receipt) => getEntityId(receipt?.userId ?? receipt) === participantId) || null;
+};
 
 export default function ChatWindow({ 
   selectedChat, 
@@ -116,11 +133,20 @@ export default function ChatWindow({
 
   // Message info modal
   const [showMessageInfo, setShowMessageInfo] = useState(false);
-  const [selectedMessageForInfo, setSelectedMessageForInfo] = useState(null);
+  const [selectedMessageInfoId, setSelectedMessageInfoId] = useState(null);
 
   const handleShowMessageInfo = (message) => {
-    setSelectedMessageForInfo(message);
+    setSelectedMessageInfoId(message?._id || null);
     setShowMessageInfo(true);
+  };
+
+  const selectedMessageForInfo = selectedMessageInfoId
+    ? messages.find((message) => message?._id?.toString() === selectedMessageInfoId.toString()) || null
+    : null;
+
+  const closeMessageInfo = () => {
+    setShowMessageInfo(false);
+    setSelectedMessageInfoId(null);
   };
 
   const handleThemeSelect = useCallback((name) => {
@@ -289,22 +315,33 @@ export default function ChatWindow({
   };
 
   useEffect(() => {
-    if (!selectedChat) return;
-    api.get(`/message/${selectedChat._id}?includeDeleted=${showDeleted}`)
-      .then(res => {
+    if (!selectedChat?._id) return;
+
+    let isCancelled = false;
+
+    const loadMessages = async () => {
+      try {
+        const res = await api.get(`/message/${selectedChat._id}?includeDeleted=${showDeleted}`);
+        if (isCancelled) return;
+
         if (Array.isArray(res.data)) {
           const sorted = res.data.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
           setMessages(sorted);
         } else {
           setMessages([]);
         }
-      })
-      .catch(err => {
+
+        socket.emit("join-chat", selectedChat._id);
+        socket.emit("open-chat", selectedChat._id);
+        socket.emit("mark-seen", { chatId: selectedChat._id });
+      } catch (err) {
+        if (isCancelled) return;
         console.error("Failed to fetch messages:", err);
         setMessages([]);
-      });
-    socket.emit("join-chat", selectedChat._id);
-    socket.emit("mark-seen", { chatId: selectedChat._id });
+      }
+    };
+
+    loadMessages();
 
     // Reset overlays on chat change
     setShowParticipants(false);
@@ -316,7 +353,32 @@ export default function ChatWindow({
     setAdminNotice("");
     setIsRenaming(false);
     setShowThemePicker(false);
+    closeMessageInfo();
+
+    return () => {
+      isCancelled = true;
+      socket.emit("close-chat", selectedChat._id);
+    };
   }, [selectedChat, showDeleted]);
+
+  useEffect(() => {
+    if (!selectedChat?._id) return;
+
+    const syncActiveChat = () => {
+      if (document.visibilityState === "visible") {
+        socket.emit("open-chat", selectedChat._id);
+        socket.emit("mark-seen", { chatId: selectedChat._id });
+      }
+    };
+
+    window.addEventListener("focus", syncActiveChat);
+    document.addEventListener("visibilitychange", syncActiveChat);
+
+    return () => {
+      window.removeEventListener("focus", syncActiveChat);
+      document.removeEventListener("visibilitychange", syncActiveChat);
+    };
+  }, [selectedChat?._id]);
 
   // Sync theme when chat changes
   useEffect(() => {
@@ -340,9 +402,9 @@ export default function ChatWindow({
   useEffect(() => {
     const handler = (msg) => {
       if (!msg || !selectedChat?._id || !msg.chat) return;
-      if (msg.chat.toString() !== selectedChat._id.toString()) return;
+      if (getEntityId(msg.chat) !== selectedChat._id.toString()) return;
       setMessages(prev => [...prev, msg]);
-      if (msg.sender && (msg.sender?._id || msg.sender)?.toString() !== myUserId?.toString()) {
+      if (getEntityId(msg.sender) !== myUserId?.toString()) {
         socket.emit("mark-seen", { chatId: selectedChat._id });
       }
     };
@@ -351,23 +413,41 @@ export default function ChatWindow({
       setMessages(prev => prev.map(m => m._id === messageId ? { ...m, status: "delivered" } : m));
     };
 
-    const seenHandler = ({ chatId, userId, messages: updatedMessages }) => {
+    const seenHandler = ({ chatId, readerId, readerIds = [], readAt, messageIds = [], messages: updatedMessages }) => {
       if (chatId?.toString() === selectedChat?._id?.toString()) {
-        // If we have updated messages from server, use those
+        const normalizedReaderIds = [
+          ...new Set([readerId, ...readerIds].filter(Boolean).map((value) => value.toString()))
+        ];
+
         if (updatedMessages && Array.isArray(updatedMessages)) {
-          setMessages(prev => 
-            prev.map(m => {
-              const updated = updatedMessages.find(um => um._id.toString() === m._id.toString());
-              return updated ? { ...m, seenBy: updated.seenBy } : m;
+          const updatedById = new Map(
+            updatedMessages.map((message) => [message._id.toString(), message])
+          );
+
+          setMessages(prev =>
+            prev.map((message) => {
+              const updated = updatedById.get(message._id.toString());
+              return updated
+                ? { ...message, seenBy: updated.seenBy, status: updated.status || "seen" }
+                : message;
             })
           );
         } else {
-          // Fallback: add userId to seenBy for all sent messages
-          setMessages(prev => 
-            prev.map(m => 
-              m.sender && (m.sender._id || m.sender).toString() === myUserId?.toString()
-                ? { ...m, seenBy: [...new Set([...(m.seenBy || []), userId])] }
-                : m
+          setMessages(prev =>
+            prev.map((message) =>
+              getEntityId(message.sender) === myUserId?.toString() &&
+              (messageIds.length === 0 || messageIds.includes(message._id?.toString()))
+                ? {
+                    ...message,
+                    status: "seen",
+                    seenBy: [
+                      ...(message.seenBy || []).filter(
+                        (receipt) => !normalizedReaderIds.includes(getEntityId(receipt?.userId ?? receipt))
+                      ),
+                      ...normalizedReaderIds.map((id) => ({ userId: id, readAt }))
+                    ]
+                  }
+                : message
             )
           );
         }
@@ -727,6 +807,8 @@ export default function ChatWindow({
                 id={`msg-${m._id}`}
                 message={m} 
                 isOwn={(m.sender?._id || m.sender)?.toString() === myUserId?.toString()}
+                participantIds={(selectedChat?.participants || []).map((participant) => getEntityId(participant)).filter(Boolean)}
+                isGroupChat={Boolean(selectedChat?.isGroup)}
                 onDeleteMe={(msgId) => socket.emit("delete-for-me", { messageId: msgId })}
                 onDeleteEveryone={(msgId) => socket.emit("delete-for-everyone", { messageId: msgId, chatId: selectedChat?._id })}
                 onShowMessageInfo={handleShowMessageInfo}
@@ -1197,7 +1279,7 @@ export default function ChatWindow({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-whatsapp-bg-dark/95 backdrop-blur-sm z-50 flex items-center justify-center p-6"
-            onClick={() => setShowMessageInfo(false)}
+            onClick={closeMessageInfo}
           >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
@@ -1211,7 +1293,7 @@ export default function ChatWindow({
                   <Info size={20} className="text-whatsapp-green" />
                   Message Info
                 </h3>
-                <button onClick={() => setShowMessageInfo(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-500 transition-all">
+                <button onClick={closeMessageInfo} className="p-2 hover:bg-white/5 rounded-full text-slate-500 transition-all">
                   <X size={20} />
                 </button>
               </div>
@@ -1244,16 +1326,10 @@ export default function ChatWindow({
                       {/* Show for each participant */}
                       {selectedChat.isGroup ? (
                         selectedChat.participants.map(participant => {
-                          const participantId = participant?._id?.toString() || participant?.toString();
+                          const participantId = getEntityId(participant);
                           if (participantId === myUserId?.toString()) return null;
                           
-                          // Find read receipt for this participant
-                          const readReceipt = selectedMessageForInfo.seenBy && 
-                            selectedMessageForInfo.seenBy.find(receipt => 
-                              receipt?.userId?._id?.toString?.() === participantId || 
-                              receipt?.userId?.toString?.() === participantId || 
-                              receipt === participantId
-                            );
+                          const readReceipt = findReadReceipt(selectedMessageForInfo, participantId);
                           
                           const formatTimestamp = (dateStr) => {
                             if (!dateStr) return new Date(selectedMessageForInfo.deliveredAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -1296,16 +1372,10 @@ export default function ChatWindow({
                       ) : (
                         // 1:1 Chat
                         selectedChat.participants.map(participant => {
-                          const participantId = participant?._id?.toString() || participant?.toString();
+                          const participantId = getEntityId(participant);
                           if (participantId === myUserId?.toString()) return null;
                           
-                          // Find read receipt for this participant
-                          const readReceipt = selectedMessageForInfo.seenBy && 
-                            selectedMessageForInfo.seenBy.find(receipt => 
-                              receipt?.userId?._id?.toString?.() === participantId || 
-                              receipt?.userId?.toString?.() === participantId || 
-                              receipt === participantId
-                            );
+                          const readReceipt = findReadReceipt(selectedMessageForInfo, participantId);
                           
                           const formatTimestamp = (dateStr) => {
                             if (!dateStr) return new Date(selectedMessageForInfo.deliveredAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -1357,4 +1427,3 @@ export default function ChatWindow({
     </div>
   );
 }
-

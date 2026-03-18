@@ -19,8 +19,31 @@ import { getLoggedInUser } from "../utils/auth";
 import socket from "../services/socket";
 import api from "../services/api"; // Added api import
 
+const getEntityId = (value) => {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    if (value._id) return value._id.toString();
+    if (value.id) return value.id.toString();
+    if (value.userId) return getEntityId(value.userId);
+  }
+  return value?.toString?.() || null;
+};
+
 void motion; // Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
-export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryone, onShowMessageInfo, searchQuery = "", isHighlighted = false, theme = null }) {
+export default function Message({
+  id,
+  message,
+  isOwn,
+  onDeleteMe,
+  onDeleteEveryone,
+  onShowMessageInfo,
+  searchQuery = "",
+  isHighlighted = false,
+  theme = null,
+  participantIds = [],
+  isGroupChat = false
+}) {
   // Fallback colours when no theme is supplied
   const ownBg     = theme?.bubbleOwn    || "#25D366";
   const otherBg   = theme?.bubbleOther  || "rgba(255,255,255,0.1)";
@@ -107,13 +130,32 @@ export default function Message({ id, message, isOwn, onDeleteMe, onDeleteEveryo
 
   const renderStatus = () => {
     if (!isMe || msg?.isDeleted) return null;
-    
-    // Check if message has seenBy array (read receipts)
-    if (msg?.seenBy && Array.isArray(msg.seenBy) && msg.seenBy.length > 0) {
+
+    const otherParticipantIds = participantIds.filter((participantId) => participantId !== myId?.toString());
+    const seenByIds = Array.isArray(msg?.seenBy)
+      ? [...new Set(msg.seenBy.map((receipt) => getEntityId(receipt?.userId ?? receipt)).filter(Boolean))]
+      : [];
+
+    if (isGroupChat) {
+      const hasAllReads =
+        otherParticipantIds.length > 0 &&
+        otherParticipantIds.every((participantId) => seenByIds.includes(participantId));
+
+      if (hasAllReads) {
+        return <CheckCheck className="text-sky-400" size={14} />;
+      }
+
+      if (msg?.status === "delivered" || msg?.status === "seen" || seenByIds.length > 0) {
+        return <CheckCheck className="text-slate-500" size={14} />;
+      }
+
+      return <Check className="text-slate-500" size={14} />;
+    }
+
+    if (seenByIds.length > 0) {
       return <CheckCheck className="text-sky-400" size={14} />;
     }
-    
-    // Fallback to status field for backward compatibility
+
     switch (msg?.status) {
       case "seen":
         return <CheckCheck className="text-sky-400" size={14} />;
