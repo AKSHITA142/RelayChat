@@ -147,11 +147,31 @@ function initSocket(server) {
       socket.on("mark-seen", async ({ chatId }) => {
         try {
           const roomId = chatId.toString();
+          
+          // Update messages to add read receipt with timestamp
           await Message.updateMany(
-            { chat: roomId, sender: { $ne: socket.userId }, seenBy: { $ne: socket.userId } },
-            { $addToSet: { seenBy: socket.userId }, $set: { status: "seen" } }
+            { 
+              chat: roomId, 
+              sender: { $ne: socket.userId }, 
+              seenBy: { $not: { $elemMatch: { userId: socket.userId } } }
+            },
+            { 
+              $push: { seenBy: { userId: socket.userId, readAt: new Date() } }
+            }
           );
-          socket.to(roomId).emit("message-seen", { chatId: roomId, userId: socket.userId });
+          
+          // Fetch the updated messages with seenBy data
+          const messagesWithSeen = await Message.find(
+            { chat: roomId, sender: { $ne: socket.userId } }
+          ).populate("sender", "_id name")
+           .populate("seenBy.userId", "_id name phoneNumber");
+          
+          // Broadcast updated messages to all users in the room
+          io.to(roomId).emit("message-seen", { 
+            chatId: roomId, 
+            userId: socket.userId, 
+            messages: messagesWithSeen 
+          });
         } catch (err) {
           console.error("Mark seen error:", err);
         }

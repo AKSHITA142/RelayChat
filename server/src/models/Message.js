@@ -35,10 +35,14 @@ const messageSchema = new mongoose.Schema(
     },
     seenBy: [
       {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        readAt: { type: Date }
+      }
     ],
+    deliveredAt: {
+      type: Date,
+      default: () => new Date()
+    },
     deletedFor: [
       { type: mongoose.Schema.Types.ObjectId, ref: "User" }
     ],
