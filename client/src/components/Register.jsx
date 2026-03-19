@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 void motion;
 import { User, Mail, Lock, Phone, ArrowLeft, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import api from "../services/api";
+import { ensureE2EERegistration } from "../services/e2ee";
 
 export default function Register({ onRegister, onBackToLogin }) {
   const [step, setStep] = useState(1); // 1: Details, 2: OTP
@@ -50,6 +51,7 @@ export default function Register({ onRegister, onBackToLogin }) {
       
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
+      await ensureE2EERegistration(api, res.data.user);
       onRegister();
     } catch (err) {
       console.error("Registration Finalization Error:", err);

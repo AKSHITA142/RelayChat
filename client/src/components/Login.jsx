@@ -7,6 +7,7 @@ void motion;
 import { Phone, Mail, Lock, User, ArrowLeft, Send, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import api from "../services/api";
 import { connectSocket } from "../services/socket";
+import { ensureE2EERegistration } from "../services/e2ee";
 
 export default function Login({ onLogin, onSignup }) {
   const [loginMethod, setLoginMethod] = useState("phone"); // Default to Phone OTP
@@ -27,9 +28,10 @@ export default function Login({ onLogin, onSignup }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLoginSuccess = (res) => {
+  const handleLoginSuccess = async (res) => {
     localStorage.setItem("token", res.data.token);
     localStorage.setItem("user", JSON.stringify(res.data.user));
+    await ensureE2EERegistration(api, res.data.user);
     connectSocket();
     onLogin();
   };
@@ -40,7 +42,7 @@ export default function Login({ onLogin, onSignup }) {
     setError("");
     try {
       const res = await api.post("/auth/login", { email, password });
-      handleLoginSuccess(res);
+      await handleLoginSuccess(res);
     } catch (err) {
       console.error("Login error:", err);
       setError(err.response?.data?.message || "Invalid credentials.");
@@ -76,7 +78,7 @@ export default function Login({ onLogin, onSignup }) {
         setIsRegistering(true);
         setError("Success: Phone verified! Complete your profile.");
       } else {
-        handleLoginSuccess(res);
+        await handleLoginSuccess(res);
       }
     } catch (err) {
       console.error("OTP verify error:", err);
@@ -97,7 +99,7 @@ export default function Login({ onLogin, onSignup }) {
         password,
         phoneNumber: phone
       });
-      handleLoginSuccess(res);
+      await handleLoginSuccess(res);
     } catch (err) {
       console.error("Registration failed:", err);
       setError(err.response?.data?.message || "Registration failed.");

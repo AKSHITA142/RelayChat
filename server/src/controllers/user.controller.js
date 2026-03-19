@@ -95,4 +95,51 @@ const saveContact = async (req, res) => {
   }
 };
 
-module.exports = { getProfile, searchUsers, checkPhoneNumber, saveContact };
+const getUserEncryptionKey = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId).select("_id name phoneNumber encryptionPublicKey");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      user: {
+        _id: user._id,
+        name: user.name,
+        phoneNumber: user.phoneNumber,
+        encryptionPublicKey: user.encryptionPublicKey,
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching user encryption key:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const upsertEncryptionKey = async (req, res) => {
+  try {
+    const { publicKey } = req.body;
+
+    if (!publicKey || typeof publicKey !== "object") {
+      return res.status(400).json({ message: "A valid public key is required" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { encryptionPublicKey: publicKey },
+      { new: true }
+    ).select("-password");
+
+    res.status(200).json({
+      message: "Encryption key saved",
+      user
+    });
+  } catch (error) {
+    console.error("Error saving encryption key:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+module.exports = { getProfile, searchUsers, checkPhoneNumber, saveContact, getUserEncryptionKey, upsertEncryptionKey };

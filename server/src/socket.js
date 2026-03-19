@@ -114,7 +114,7 @@ function initSocket(server) {
       socket.broadcast.emit("user-online", { userId: socket.userId });
 
       // SEND MESSAGE
-      socket.on("send-message", async ({ chatId, content }) => {
+      socket.on("send-message", async ({ chatId, content, encryptedPayload, clientTempId }) => {
         try {
           const roomId = chatId.toString();
           if (!mongoose.Types.ObjectId.isValid(roomId)) return;
@@ -125,7 +125,19 @@ function initSocket(server) {
           const message = await Message.create({
             sender: socket.userId,
             chat: roomId,
-            content,
+            content: encryptedPayload ? undefined : content,
+            encryptedContent: encryptedPayload ? {
+              ciphertext: encryptedPayload.ciphertext,
+              iv: encryptedPayload.iv,
+              algorithm: encryptedPayload.algorithm,
+              version: encryptedPayload.version,
+              encryptedKeys: Array.isArray(encryptedPayload.encryptedKeys)
+                ? encryptedPayload.encryptedKeys.map((entry) => ({
+                    userId: entry.userId,
+                    key: entry.key,
+                  }))
+                : []
+            } : undefined,
           });
 
           chat.lastMessage = message._id;
@@ -137,7 +149,12 @@ function initSocket(server) {
           socket.emit("message-delivered", { messageId: message._id });
           let populatedMessage = await Message.findById(message._id)
             .populate("sender", "_id name")
+            .populate("encryptedContent.encryptedKeys.userId", "_id")
             .populate("seenBy.userId", "_id name phoneNumber");
+          populatedMessage = populatedMessage.toObject();
+          if (clientTempId) {
+            populatedMessage.clientTempId = clientTempId;
+          }
           io.to(roomId).emit("new-message", populatedMessage);
 
           socket.to(roomId).emit("message-delivered", { messageId: message._id });
@@ -165,7 +182,12 @@ function initSocket(server) {
 
             populatedMessage = await Message.findById(message._id)
               .populate("sender", "_id name")
+              .populate("encryptedContent.encryptedKeys.userId", "_id")
               .populate("seenBy.userId", "_id name phoneNumber");
+            populatedMessage = populatedMessage.toObject();
+            if (clientTempId) {
+              populatedMessage.clientTempId = clientTempId;
+            }
 
             io.to(roomId).emit("message-seen", {
               chatId: roomId,

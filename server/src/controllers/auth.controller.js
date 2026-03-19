@@ -1,14 +1,76 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const redisClient = require("../config/redis");
 const { sendSms } = require("../utils/sms");
+
+const LEGACY_DB_NAME = "test";
+
+const syncLegacyUserToPrimary = async (query) => {
+  let user = await User.findOne(query);
+  if (user) return user;
+
+  const currentDbName = mongoose.connection?.db?.databaseName;
+  if (!currentDbName || currentDbName === LEGACY_DB_NAME) return null;
+
+  const legacyDb = mongoose.connection.useDb(LEGACY_DB_NAME, { useCache: true });
+  const legacyUser = await legacyDb.collection("users").findOne(query);
+
+  if (!legacyUser) return null;
+
+  const {
+    _id,
+    name,
+    email,
+    phoneNumber,
+    password,
+    role,
+    lastSeen,
+    isOnline,
+    contacts,
+    encryptionPublicKey,
+    createdAt,
+    updatedAt,
+  } = legacyUser;
+
+  try {
+    user = await User.create({
+      _id,
+      name,
+      email,
+      phoneNumber,
+      password,
+      role: role || "user",
+      lastSeen: lastSeen || null,
+      isOnline: Boolean(isOnline),
+      contacts: Array.isArray(contacts) ? contacts : [],
+      encryptionPublicKey: encryptionPublicKey || null,
+      createdAt,
+      updatedAt,
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      user = await User.findOne({
+        $or: [
+          email ? { email } : null,
+          phoneNumber ? { phoneNumber } : null,
+          { _id },
+        ].filter(Boolean)
+      });
+    } else {
+      throw error;
+    }
+  }
+
+  return user;
+};
 
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await syncLegacyUserToPrimary({ email });
     if (!user) {
       return res.status(401).json({
         message: "Invalid credentials"
@@ -35,8 +97,10 @@ exports.login = async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        phoneNumber: user.phoneNumber,
         role: user.role,
-        contacts: user.contacts
+        contacts: user.contacts,
+        encryptionPublicKey: user.encryptionPublicKey
       }
     });
 
@@ -126,8 +190,7 @@ exports.verifyOtp = async (req, res) => {
  
     await redisClient.del(phone);
 
-
-    let user = await User.findOne({ phoneNumber: phone });
+    let user = await syncLegacyUserToPrimary({ phoneNumber: phone });
     
     if (!user) {
       return res.status(202).json({
@@ -151,7 +214,8 @@ exports.verifyOtp = async (req, res) => {
         name: user.name,
         phoneNumber: user.phoneNumber,
         role: user.role,
-        contacts: user.contacts
+        contacts: user.contacts,
+        encryptionPublicKey: user.encryptionPublicKey
       }
     });
 
@@ -170,14 +234,14 @@ exports.completeRegistration = async (req, res) => {
     }
 
     
-    let user = await User.findOne({ phoneNumber });
+    let user = await syncLegacyUserToPrimary({ phoneNumber });
     if (user) {
       return res.status(400).json({ message: "User already exists with this phone number" });
     }
 
     // Optional
     if (email) {
-      const existingEmail = await User.findOne({ email });
+      const existingEmail = await syncLegacyUserToPrimary({ email });
       if (existingEmail) {
         return res.status(400).json({ message: "Email already in use" });
       }
@@ -211,7 +275,8 @@ exports.completeRegistration = async (req, res) => {
         name: user.name,
         phoneNumber: user.phoneNumber,
         role: user.role,
-        contacts: user.contacts
+        contacts: user.contacts,
+        encryptionPublicKey: user.encryptionPublicKey
       }
     });
 

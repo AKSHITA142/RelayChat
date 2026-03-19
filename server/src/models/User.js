@@ -20,6 +20,10 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
     },
+    encryptionPublicKey: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     role: {
       type: String,
       enum: ["user", "admin"],

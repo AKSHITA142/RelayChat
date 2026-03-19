@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Plus, Users, X, Check, Loader2, MessageSquare, Phone } from "lucide-react";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
+import { hydrateChatPreview } from "../services/e2ee";
 
 void motion;
 export default function Sidebar({ 
@@ -31,9 +32,14 @@ export default function Sidebar({
 
   useEffect(() => {
     api.get("/chat/my-chats")
-      .then(res => setChats(res.data))
+      .then(async (res) => {
+        const hydratedChats = await Promise.all(
+          res.data.map((chat) => hydrateChatPreview(chat, myUserId))
+        );
+        setChats(hydratedChats);
+      })
       .catch(console.error);
-  }, [setChats]);
+  }, [setChats, myUserId]);
 
   const handleStartChat = async () => {
     if (!contactPhone.trim()) {

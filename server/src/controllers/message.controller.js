@@ -11,7 +11,10 @@ exports.getMessagesByChat = async (req, res) => {
     query.deletedFor = { $ne: req.user.id };
   }
 
-  const messages = await Message.find(query).sort({ createdAt: 1 });
+  const messages = await Message.find(query)
+    .populate("sender", "_id name phoneNumber")
+    .populate("encryptedContent.encryptedKeys.userId", "_id")
+    .sort({ createdAt: 1 });
 
   res.json(messages);
 };

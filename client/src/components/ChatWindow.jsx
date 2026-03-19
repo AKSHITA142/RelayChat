@@ -40,6 +40,7 @@ import { useChatTheme, THEMES } from "../hooks/useChatTheme";
 import socket from "../services/socket";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
+import { encryptDirectMessage, ensureIdentityKeyPair, hydrateDecryptedMessage } from "../services/e2ee";
 
 const getEntityId = (value) => {
   if (!value) return null;
@@ -125,6 +126,7 @@ export default function ChatWindow({
   const [searchResults, setSearchResults] = useState([]);
   const [showDeleted, setShowDeleted] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
+  const [recipientEncryptionKey, setRecipientEncryptionKey] = useState(null);
 
   // Per-chat theme
   const [savedThemeName, setSavedThemeName] = useChatTheme(selectedChat?._id);
@@ -326,7 +328,10 @@ export default function ChatWindow({
 
         if (Array.isArray(res.data)) {
           const sorted = res.data.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-          setMessages(sorted);
+          const hydratedMessages = await Promise.all(
+            sorted.map((message) => hydrateDecryptedMessage(message, myUserId))
+          );
+          setMessages(hydratedMessages);
         } else {
           setMessages([]);
         }
@@ -359,7 +364,7 @@ export default function ChatWindow({
       isCancelled = true;
       socket.emit("close-chat", selectedChat._id);
     };
-  }, [selectedChat, showDeleted]);
+  }, [selectedChat, showDeleted, myUserId]);
 
   useEffect(() => {
     if (!selectedChat?._id) return;
@@ -379,6 +384,48 @@ export default function ChatWindow({
       document.removeEventListener("visibilitychange", syncActiveChat);
     };
   }, [selectedChat?._id]);
+
+  const selectedChatParticipantIds = (selectedChat?.participants || [])
+    .map((participant) => getEntityId(participant))
+    .filter(Boolean)
+    .join(",");
+  const selectedDirectRecipientId = (selectedChat?.participants || [])
+    .map((participant) => getEntityId(participant))
+    .find((participantId) => participantId !== myUserId?.toString()) || null;
+
+  useEffect(() => {
+    if (selectedChat?.isGroup || !selectedChat?._id) {
+      setRecipientEncryptionKey(null);
+      return;
+    }
+
+    if (!selectedDirectRecipientId) {
+      setRecipientEncryptionKey(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadRecipientKey = async () => {
+      try {
+        const latestRecipient = await api.get(`/user/${selectedDirectRecipientId}/key`);
+        if (!cancelled) {
+          setRecipientEncryptionKey(latestRecipient.data?.user?.encryptionPublicKey || null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to preload recipient encryption key:", error);
+          setRecipientEncryptionKey(null);
+        }
+      }
+    };
+
+    loadRecipientKey();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChat?._id, selectedChat?.isGroup, selectedChatParticipantIds, selectedDirectRecipientId]);
 
   // Sync theme when chat changes
   useEffect(() => {
@@ -400,10 +447,21 @@ export default function ChatWindow({
   }, []);
 
   useEffect(() => {
-    const handler = (msg) => {
+    const handler = async (msg) => {
       if (!msg || !selectedChat?._id || !msg.chat) return;
       if (getEntityId(msg.chat) !== selectedChat._id.toString()) return;
-      setMessages(prev => [...prev, msg]);
+      const hydratedMessage = await hydrateDecryptedMessage(msg, myUserId);
+      setMessages((prev) => {
+        if (msg.clientTempId) {
+          const optimisticIndex = prev.findIndex((message) => message._id === msg.clientTempId);
+          if (optimisticIndex !== -1) {
+            const updatedMessages = [...prev];
+            updatedMessages[optimisticIndex] = hydratedMessage;
+            return updatedMessages;
+          }
+        }
+        return [...prev, hydratedMessage];
+      });
       if (getEntityId(msg.sender) !== myUserId?.toString()) {
         socket.emit("mark-seen", { chatId: selectedChat._id });
       }
@@ -500,15 +558,68 @@ export default function ChatWindow({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!text.trim() && !selectedFile) return;
     if (selectedFile) sendFileAndText();
     else {
-      socket.emit("send-message", {
-        chatId: selectedChat._id,
-        content: text,
-      });
-      setText("");
+      let clientTempId = null;
+      const messageText = text;
+      try {
+        setText("");
+        const recipient = (selectedChat?.participants || []).find(
+          (participant) => getEntityId(participant) !== myUserId?.toString()
+        );
+
+        if (!selectedChat?.isGroup && recipient) {
+          const recipientPublicKey = recipientEncryptionKey;
+
+          if (!recipientPublicKey) {
+            throw new Error("Recipient encryption key is not registered yet");
+          }
+
+          clientTempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          setMessages((prev) => [
+            ...prev,
+            {
+              _id: clientTempId,
+              chat: selectedChat._id,
+              sender: { _id: myUserId },
+              content: messageText,
+              createdAt: new Date().toISOString(),
+              status: "sent",
+              seenBy: [],
+              reactions: [],
+            }
+          ]);
+
+          const { publicKey: senderPublicKey } = await ensureIdentityKeyPair(myUserId);
+          const encryptedPayload = await encryptDirectMessage({
+            content: messageText,
+            senderId: myUserId,
+            recipientId: getEntityId(recipient),
+            senderPublicKey,
+            recipientPublicKey,
+          });
+
+          socket.emit("send-message", {
+            chatId: selectedChat._id,
+            encryptedPayload,
+            clientTempId,
+          });
+        } else {
+          socket.emit("send-message", {
+            chatId: selectedChat._id,
+            content: messageText,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to send encrypted message:", error);
+        if (clientTempId) {
+          setMessages((prev) => prev.filter((message) => message._id !== clientTempId));
+        }
+        setText((current) => current || messageText);
+        window.alert(error.message || "Failed to send encrypted message");
+      }
     }
   };
 

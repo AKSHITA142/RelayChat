@@ -21,7 +21,11 @@ exports.createChat = async (req, res) => {
     });
 
     if (chat) {
-      return res.status(200).json(chat);
+      const populatedChat = await Chat.findById(chat._id)
+        .populate("participants", "name email phoneNumber encryptionPublicKey")
+        .populate("lastMessage");
+
+      return res.status(200).json(populatedChat);
     }
 
     
@@ -30,7 +34,11 @@ exports.createChat = async (req, res) => {
       isGroup: false
     });
 
-    res.status(201).json(chat);
+    const populatedChat = await Chat.findById(chat._id)
+      .populate("participants", "name email phoneNumber encryptionPublicKey")
+      .populate("lastMessage");
+
+    res.status(201).json(populatedChat);
 
   } catch (error) {
     res.status(500).json({
@@ -44,7 +52,7 @@ exports.getMyChats = async (req, res) => {
 
   
   const chats = await Chat.find({ participants: userId })
-    .populate("participants", "name email phoneNumber")
+    .populate("participants", "name email phoneNumber encryptionPublicKey")
     .populate("lastMessage")
     .sort({ updatedAt: -1 })
     .lean();
@@ -74,7 +82,7 @@ exports.createGroup = async (req, res) => {
   });
 
   const fullGroupChat = await Chat.findOne({ _id: chat._id })
-    .populate("participants", "name email phoneNumber");
+    .populate("participants", "name email phoneNumber encryptionPublicKey");
 
   
   const io = getIO();
@@ -111,7 +119,7 @@ exports.addToGroup = async (req, res) => {
     await chat.save();
 
     const fullGroupChat = await Chat.findById(chatId)
-      .populate("participants", "name email phoneNumber")
+      .populate("participants", "name email phoneNumber encryptionPublicKey")
       .populate("lastMessage");
 
     
@@ -160,7 +168,7 @@ exports.removeFromGroup = async (req, res) => {
     await chat.save();
 
     const fullGroupChat = await Chat.findById(chatId)
-      .populate("participants", "name email phoneNumber");
+      .populate("participants", "name email phoneNumber encryptionPublicKey");
 
     const io = getIO();
     if (io) {
@@ -207,7 +215,9 @@ exports.startChatByPhone = async (req, res) => {
       return res.status(200).json({
         chat_id: chat._id,
         receiver_id: targetUser._id,
-        chat: chat 
+        chat: await Chat.findById(chat._id)
+          .populate("participants", "name email phoneNumber encryptionPublicKey")
+          .populate("lastMessage")
       });
     }
 
@@ -216,10 +226,14 @@ exports.startChatByPhone = async (req, res) => {
       isGroup: false
     });
 
+    const populatedChat = await Chat.findById(chat._id)
+      .populate("participants", "name email phoneNumber encryptionPublicKey")
+      .populate("lastMessage");
+
     res.status(201).json({
       chat_id: chat._id,
       receiver_id: targetUser._id,
-      chat: chat
+      chat: populatedChat
     });
 
   } catch (error) {

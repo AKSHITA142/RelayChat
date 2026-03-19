@@ -16,6 +16,36 @@ const messageSchema = new mongoose.Schema(
       type: String,
       required: false
     },
+    encryptedContent: {
+      ciphertext: {
+        type: String,
+        required: false
+      },
+      iv: {
+        type: String,
+        required: false
+      },
+      algorithm: {
+        type: String,
+        required: false
+      },
+      version: {
+        type: Number,
+        required: false
+      },
+      encryptedKeys: [
+        {
+          userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+          },
+          key: {
+            type: String,
+            required: true
+          }
+        }
+      ]
+    },
     fileUrl: {
       type: String,
       required: false

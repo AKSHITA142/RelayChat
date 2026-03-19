@@ -84,7 +84,11 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
 
   const getMedia = useCallback(async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
+      video: {
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 360, max: 720 },
+        frameRate: { ideal: 20, max: 24 },
+      },
       audio: { echoCancellation: true, noiseSuppression: true },
     });
     lsRef.current = stream;

@@ -10,6 +10,8 @@ import socket, { connectSocket } from "../services/socket";
 import { getLoggedInUser } from "../utils/auth";
 import VideoCall from "../components/VideoCall";
 import { AnimatePresence } from "framer-motion";
+import api from "../services/api";
+import { ensureE2EERegistration, hydrateDecryptedMessage } from "../services/e2ee";
 
 export default function Chat() {
   const containerRef = useRef(null);
@@ -33,6 +35,12 @@ export default function Chat() {
 
   useEffect(() => {
     connectSocket();
+    const currentUser = getLoggedInUser();
+    if (currentUser?._id) {
+      ensureE2EERegistration(api, currentUser).catch((error) => {
+        console.error("Failed to initialize E2EE keys:", error);
+      });
+    }
     // Kill any rogue ringer audio left over from a previous call/hot-reload
     // eslint-disable-next-line no-empty
     document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch {} });
@@ -81,12 +89,13 @@ export default function Chat() {
 
   // Update sidebar lastMessage for BOTH users
   useEffect(() => {
-    const handler = (msg) => {
+    const handler = async (msg) => {
+      const hydratedMessage = await hydrateDecryptedMessage(msg, getLoggedInUser()?._id);
       setChats(prev => {
         const msgChatId = (msg.chat?._id || msg.chat)?.toString();
         const chatIdx = prev.findIndex(c => c._id?.toString() === msgChatId);
         if (chatIdx === -1) return prev; 
-        const updatedChat = { ...prev[chatIdx], lastMessage: msg };
+        const updatedChat = { ...prev[chatIdx], lastMessage: hydratedMessage };
         const rest = prev.filter((_, i) => i !== chatIdx);
         return [updatedChat, ...rest];
       });
