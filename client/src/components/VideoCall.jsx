@@ -5,8 +5,8 @@ import {
 } from "lucide-react";
 import socket from "../services/socket";
 
-void motion; // ensure framer-motion is treated as used by the linter (used in JSX via <motion.* />)
-/* ─── STUN servers ─── */
+void motion;
+
 const PC_CONFIG = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
@@ -16,53 +16,44 @@ const PC_CONFIG = {
   ],
 };
 
-/* ─── Ringer — stored on window so it survives HMR and is always killable ─── */
 const RINGER_URL = "https://assets.mixkit.co/active_storage/sfx/1350/1350-preview.mp3";
 
 function startRinger() {
-  stopRinger(); // always kill old one first
-  const a = new Audio(RINGER_URL);
-  a.loop = true;
-  a.play().catch(() => {});
-  window.__ringer = a;
+  stopRinger();
+  const audio = new Audio(RINGER_URL);
+  audio.loop = true;
+  audio.play().catch(() => {});
+  window.__ringer = audio;
 }
 
 function stopRinger() {
-  const a = window.__ringer;
-  if (a) {
-    try { a.pause(); a.currentTime = 0; a.src = ""; } catch {}  // eslint-disable-line no-empty
+  const audio = window.__ringer;
+  if (audio) {
+    try { audio.pause(); audio.currentTime = 0; audio.src = ""; } catch { void 0; }
     window.__ringer = null;
   }
 }
 
-// Expose so console can always kill it: window.__stopRinger()
-window.__stopRinger = stopRinger;
+function broadcastStop() {}
 
-// Kill any rogue audio from previous HMR cycle right now
+window.__stopRinger = stopRinger;
 stopRinger();
 
-function broadcastStop() {} // no-op
-
-
-/* ─────────────────────────────────────────────
-   VideoCall Component
-───────────────────────────────────────────── */
 export default function VideoCall({ to, fromName, isIncoming, initialOffer, onClose }) {
-  const log = (...a) => console.log("[VC]", ...a);
+  const log = (...args) => console.log("[VC]", ...args);
 
   const [status, setStatus] = useState(isIncoming ? "incoming" : "calling");
   const [isMuted, setIsMuted] = useState(false);
   const [vidOff, setVidOff] = useState(false);
 
-  const localRef  = useRef(null);
+  const localRef = useRef(null);
   const remoteRef = useRef(null);
-  const pcRef     = useRef(null);
-  const lsRef     = useRef(null);
+  const pcRef = useRef(null);
+  const lsRef = useRef(null);
   const remoteStream = useRef(new MediaStream());
-  const iceQueue  = useRef([]);
-  const ringTimer = useRef(null);  // 30-second ringing timeout
+  const iceQueue = useRef([]);
+  const ringTimer = useRef(null);
 
-  /* ── clear ringing timeout ── */
   const clearRingTimer = useCallback(() => {
     if (ringTimer.current) {
       clearTimeout(ringTimer.current);
@@ -70,30 +61,27 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     }
   }, []);
 
-  /* ── full cleanup ── */
   const cleanup = useCallback(() => {
-    log("🧹 cleanup");
+    log("cleanup");
     stopRinger();
     broadcastStop();
     clearRingTimer();
-    lsRef.current?.getTracks().forEach(t => t.stop());
+    lsRef.current?.getTracks().forEach((track) => track.stop());
     pcRef.current?.close();
     lsRef.current = null;
     pcRef.current = null;
     remoteStream.current = new MediaStream();
   }, [clearRingTimer]);
 
-  /* ── end call ── */
   const endCall = useCallback(async () => {
-    log("🔚 endCall");
-    stopRinger();            // stop ringer first (if receiver rejects)
+    log("endCall");
+    stopRinger();
     clearRingTimer();
     socket.emit("end-call", { to });
     cleanup();
     onClose();
   }, [to, cleanup, clearRingTimer, onClose]);
 
-  /* ── get camera + mic ── */
   const getMedia = useCallback(async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
@@ -104,17 +92,15 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     return stream;
   }, []);
 
-  /* ── drain ICE queue ── */
   const drainIce = useCallback(async () => {
     const pc = pcRef.current;
     if (!pc || !pc.remoteDescription) return;
     while (iceQueue.current.length) {
-      const c = iceQueue.current.shift();
-      await pc.addIceCandidate(new RTCIceCandidate(c)).catch(log);
+      const candidate = iceQueue.current.shift();
+      await pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(log);
     }
   }, []);
 
-  /* ── build RTCPeerConnection ── */
   const buildPC = useCallback(() => {
     const pc = new RTCPeerConnection(PC_CONFIG);
 
@@ -123,21 +109,17 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     };
 
     pc.oniceconnectionstatechange = () => {
-      log("ICE →", pc.iceConnectionState);
-      // Only close on hard failure, not on 'disconnected' (transient)
+      log("ICE ->", pc.iceConnectionState);
       if (pc.iceConnectionState === "failed") {
-        log("❌ ICE failed, ending call");
         cleanup();
         onClose();
       }
     };
 
     pc.ontrack = ({ track }) => {
-      log("🎥 ontrack:", track.kind);
-      // Safety: stop ringer when media arrives (extra guard)
       stopRinger();
 
-      if (!remoteStream.current.getTracks().find(t => t.id === track.id)) {
+      if (!remoteStream.current.getTracks().find((existing) => existing.id === track.id)) {
         remoteStream.current.addTrack(track);
       }
       if (remoteRef.current && remoteRef.current.srcObject !== remoteStream.current) {
@@ -151,28 +133,25 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     return pc;
   }, [to, cleanup, onClose]);
 
-  /* ── outgoing call ── */
   const startCall = useCallback(async () => {
-    log("📤 startCall");
-    // No timeout — caller waits until receiver picks up or manually cancels
+    log("startCall");
     const stream = await getMedia();
     const pc = buildPC();
-    stream.getTracks().forEach(t => pc.addTrack(t, stream));
+    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit("call-user", { to, offer, fromName });
   }, [to, fromName, getMedia, buildPC]);
 
-  /* ── accept incoming call ── */
   const acceptCall = useCallback(async () => {
-    log("📞 acceptCall");
-    stopRinger();      // ← STOP RINGER IMMEDIATELY on green button click
+    log("acceptCall");
+    stopRinger();
     clearRingTimer();
     setStatus("connecting");
 
     const stream = await getMedia();
     const pc = buildPC();
-    stream.getTracks().forEach(t => pc.addTrack(t, stream));
+    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
     await pc.setRemoteDescription(new RTCSessionDescription(initialOffer));
     await drainIce();
@@ -182,21 +161,16 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     setStatus("connected");
   }, [to, initialOffer, getMedia, buildPC, drainIce, clearRingTimer]);
 
-  /* ── socket events ── */
   useEffect(() => {
     if (!isIncoming) {
       startCall();
     } else {
-      // Play ringer for the receiver until they accept or reject
       startRinger();
     }
-    // No auto-timeout — receiver can take as long as they want
 
-    // Caller receives answer
     socket.off("call-accepted");
     socket.on("call-accepted", async ({ answer }) => {
-      log("✅ call-accepted");
-      stopRinger();   // stop ring-back
+      stopRinger();
       broadcastStop();
       clearRingTimer();
       const pc = pcRef.current;
@@ -218,7 +192,6 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
 
     socket.off("call-ended");
     socket.on("call-ended", async () => {
-      log("🔴 call-ended by remote");
       stopRinger();
       broadcastStop();
       clearRingTimer();
@@ -236,80 +209,96 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── mic / video controls ── */
   const toggleMute = () => {
     const track = lsRef.current?.getAudioTracks()[0];
-    if (track) { track.enabled = !track.enabled; setIsMuted(m => !m); }
+    if (track) {
+      track.enabled = !track.enabled;
+      setIsMuted((current) => !current);
+    }
   };
 
   const toggleVideo = () => {
     const track = lsRef.current?.getVideoTracks()[0];
-    if (track) { track.enabled = !track.enabled; setVidOff(v => !v); }
+    if (track) {
+      track.enabled = !track.enabled;
+      setVidOff((current) => !current);
+    }
   };
 
-  /* ── render ── */
   return (
     <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-3xl flex items-center justify-center p-4"
     >
-      <div className="relative w-full max-w-4xl aspect-video bg-whatsapp-sidebar-dark rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
+      <div className="w-full max-w-5xl flex flex-col items-center gap-4 md:gap-5">
+        <div className="relative w-full max-w-4xl aspect-video bg-whatsapp-sidebar-dark rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+          <div className="w-full h-full bg-black relative">
+            <video
+              ref={remoteRef}
+              data-call-video="remote"
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
 
-        {/* Remote video */}
-        <div className="flex-1 bg-black relative">
-          <video
-            ref={remoteRef}
-            data-call-video="remote"
-            autoPlay playsInline
-            className="w-full h-full object-cover"
-          />
-
-          {/* Pre-connect placeholder */}
-          {status !== "connected" && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center space-y-4 bg-whatsapp-sidebar-dark">
-              <motion.div
-                animate={{ scale: [1, 1.15, 1] }}
-                transition={{ repeat: Infinity, duration: 1.5 }}
-                className="w-24 h-24 rounded-full bg-whatsapp-green/10 flex items-center justify-center border border-whatsapp-green/30"
-              >
-                <User size={48} className="text-whatsapp-green" />
-              </motion.div>
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-white">{fromName || "User"}</h3>
-                <p className="text-slate-400 text-sm mt-1 flex items-center gap-2 justify-center">
-                  {status === "calling"    && "Calling…"}
-                  {status === "incoming"   && "Incoming Video Call"}
-                  {status === "connecting" && <><Loader2 className="animate-spin" size={14} /> Connecting…</>}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Local PiP */}
-          <motion.div
-            drag dragConstraints={{ left: 20, top: 20, right: 300, bottom: 200 }}
-            className="absolute top-6 right-6 w-32 md:w-48 aspect-video bg-whatsapp-bg-dark rounded-2xl overflow-hidden border-2 border-white/10 shadow-xl z-20 cursor-grab"
-          >
-            <video ref={localRef} data-call-video="local" autoPlay muted playsInline className="w-full h-full object-cover" />
-            {vidOff && (
-              <div className="absolute inset-0 bg-whatsapp-bg-dark flex items-center justify-center">
-                <VideoOff size={24} className="text-slate-500" />
+            {status !== "connected" && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center space-y-4 bg-whatsapp-sidebar-dark">
+                <motion.div
+                  animate={{ scale: [1, 1.15, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.5 }}
+                  className="w-24 h-24 rounded-full bg-whatsapp-green/10 flex items-center justify-center border border-whatsapp-green/30"
+                >
+                  <User size={48} className="text-whatsapp-green" />
+                </motion.div>
+                <div className="text-center">
+                  <h3 className="text-xl font-bold text-white">{fromName || "User"}</h3>
+                  <p className="text-slate-400 text-sm mt-1 flex items-center gap-2 justify-center">
+                    {status === "calling" && "Calling..."}
+                    {status === "incoming" && "Incoming Video Call"}
+                    {status === "connecting" && <><Loader2 className="animate-spin" size={14} /> Connecting...</>}
+                  </p>
+                </div>
               </div>
             )}
-          </motion.div>
+
+            <motion.div
+              drag
+              dragConstraints={{ left: 20, top: 20, right: 300, bottom: 200 }}
+              className="absolute top-4 right-4 md:top-6 md:right-6 w-28 md:w-48 aspect-video bg-whatsapp-bg-dark rounded-2xl overflow-hidden border-2 border-white/10 shadow-xl z-20 cursor-grab"
+            >
+              <video
+                ref={localRef}
+                data-call-video="local"
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              {vidOff && (
+                <div className="absolute inset-0 bg-whatsapp-bg-dark flex items-center justify-center">
+                  <VideoOff size={24} className="text-slate-500" />
+                </div>
+              )}
+            </motion.div>
+          </div>
         </div>
 
-        {/* Controls bar */}
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-whatsapp-sidebar-dark/80 backdrop-blur-2xl rounded-3xl border border-white/10 flex items-center gap-6 z-30 shadow-2xl">
+        <div className="px-5 md:px-8 py-3 md:py-4 bg-whatsapp-sidebar-dark/85 backdrop-blur-2xl rounded-3xl border border-white/10 flex items-center gap-4 md:gap-6 z-30 shadow-2xl max-w-[calc(100vw-2rem)]">
           {status === "incoming" ? (
             <>
-              <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
                 onClick={acceptCall}
                 className="w-14 h-14 rounded-full bg-whatsapp-green text-whatsapp-bg-dark flex items-center justify-center shadow-lg"
               >
                 <Phone size={24} />
               </motion.button>
-              <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
                 onClick={endCall}
                 className="w-14 h-14 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-lg"
               >
@@ -318,20 +307,26 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
             </>
           ) : (
             <>
-              <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
                 onClick={toggleMute}
                 className={`p-4 rounded-2xl transition-all ${isMuted ? "bg-rose-500/20 text-rose-400" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}
               >
                 {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
               </motion.button>
-              <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
                 onClick={toggleVideo}
                 className={`p-4 rounded-2xl transition-all ${vidOff ? "bg-rose-500/20 text-rose-400" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}
               >
                 {vidOff ? <VideoOff size={24} /> : <Video size={24} />}
               </motion.button>
               <div className="w-[1px] h-8 bg-white/10" />
-              <motion.button whileHover={{ scale: 1.1, rotate: 135 }} whileTap={{ scale: 0.9 }}
+              <motion.button
+                whileHover={{ scale: 1.1, rotate: 135 }}
+                whileTap={{ scale: 0.9 }}
                 onClick={endCall}
                 className="w-14 h-14 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/40"
               >
