@@ -40,7 +40,7 @@ import { useChatTheme, THEMES } from "../hooks/useChatTheme";
 import socket from "../services/socket";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
-import { encryptAttachmentFile, encryptDirectMessage, ensureIdentityKeyPair, hydrateDecryptedMessage } from "../services/e2ee";
+import { encryptAttachmentFile, encryptDirectMessage, encryptGroupMessage, ensureIdentityKeyPair, hydrateDecryptedMessage } from "../services/e2ee";
 
 const getEntityId = (value) => {
   if (!value) return null;
@@ -127,6 +127,7 @@ export default function ChatWindow({
   const [showDeleted, setShowDeleted] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [recipientEncryptionKey, setRecipientEncryptionKey] = useState(null);
+  const [groupEncryptionKeys, setGroupEncryptionKeys] = useState({});
 
   // Per-chat theme
   const [savedThemeName, setSavedThemeName] = useChatTheme(selectedChat?._id);
@@ -427,6 +428,51 @@ export default function ChatWindow({
     };
   }, [selectedChat?._id, selectedChat?.isGroup, selectedChatParticipantIds, selectedDirectRecipientId]);
 
+  useEffect(() => {
+    if (!selectedChat?._id || !selectedChat?.isGroup) {
+      setGroupEncryptionKeys({});
+      return;
+    }
+
+    const participantIds = selectedChatParticipantIds
+      .split(",")
+      .map((participantId) => participantId.trim())
+      .filter(Boolean);
+
+    if (participantIds.length === 0) {
+      setGroupEncryptionKeys({});
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadGroupKeys = async () => {
+      try {
+        const keyEntries = await Promise.all(
+          participantIds.map(async (participantId) => {
+            const response = await api.get(`/user/${participantId}/key`);
+            return [participantId, response.data?.user?.encryptionPublicKey || null];
+          })
+        );
+
+        if (!cancelled) {
+          setGroupEncryptionKeys(Object.fromEntries(keyEntries.filter(([, key]) => key)));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to preload group encryption keys:", error);
+          setGroupEncryptionKeys({});
+        }
+      }
+    };
+
+    loadGroupKeys();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChat?._id, selectedChat?.isGroup, selectedChatParticipantIds]);
+
   // Sync theme when chat changes
   useEffect(() => {
     if (selectedChat?._id) {
@@ -606,6 +652,49 @@ export default function ChatWindow({
             encryptedPayload,
             clientTempId,
           });
+        } else if (selectedChat?.isGroup) {
+          const participantIds = (selectedChat?.participants || [])
+            .map((participant) => getEntityId(participant))
+            .filter(Boolean);
+          const recipients = participantIds.map((participantId) => ({
+            userId: participantId,
+            publicKey: groupEncryptionKeys[participantId],
+          }));
+          const missingParticipantKey = recipients.find((recipientEntry) => !recipientEntry.publicKey);
+
+          if (missingParticipantKey) {
+            socket.emit("send-message", {
+              chatId: selectedChat._id,
+              content: messageText,
+            });
+            return;
+          }
+
+          clientTempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          setMessages((prev) => [
+            ...prev,
+            {
+              _id: clientTempId,
+              chat: selectedChat._id,
+              sender: { _id: myUserId },
+              content: messageText,
+              createdAt: new Date().toISOString(),
+              status: "sent",
+              seenBy: [],
+              reactions: [],
+            }
+          ]);
+
+          const encryptedPayload = await encryptGroupMessage({
+            content: messageText,
+            recipients,
+          });
+
+          socket.emit("send-message", {
+            chatId: selectedChat._id,
+            encryptedPayload,
+            clientTempId,
+          });
         } else {
           socket.emit("send-message", {
             chatId: selectedChat._id,
@@ -632,10 +721,10 @@ export default function ChatWindow({
         const { publicKey: senderPublicKey } = await ensureIdentityKeyPair(myUserId);
         const { encryptedFile, metadata } = await encryptAttachmentFile({
           file: selectedFile,
-          senderId: myUserId,
-          recipientId: selectedDirectRecipientId,
-          senderPublicKey,
-          recipientPublicKey: recipientEncryptionKey,
+          recipients: [
+            { userId: myUserId, publicKey: senderPublicKey },
+            { userId: selectedDirectRecipientId, publicKey: recipientEncryptionKey },
+          ],
         });
 
         formData.append("file", encryptedFile);
@@ -650,6 +739,36 @@ export default function ChatWindow({
             recipientPublicKey: recipientEncryptionKey,
           });
           formData.append("encryptedPayload", JSON.stringify(encryptedPayload));
+        }
+      } else if (selectedChat?.isGroup) {
+        const participantIds = (selectedChat?.participants || [])
+          .map((participant) => getEntityId(participant))
+          .filter(Boolean);
+        const recipients = participantIds.map((participantId) => ({
+          userId: participantId,
+          publicKey: groupEncryptionKeys[participantId],
+        }));
+        const missingParticipantKey = recipients.find((recipientEntry) => !recipientEntry.publicKey);
+
+        if (!missingParticipantKey) {
+          const { encryptedFile, metadata } = await encryptAttachmentFile({
+            file: selectedFile,
+            recipients,
+          });
+
+          formData.append("file", encryptedFile);
+          formData.append("encryptedFileMetadata", JSON.stringify(metadata));
+
+          if (text.trim()) {
+            const encryptedPayload = await encryptGroupMessage({
+              content: text,
+              recipients,
+            });
+            formData.append("encryptedPayload", JSON.stringify(encryptedPayload));
+          }
+        } else {
+          formData.append("file", selectedFile);
+          if (text.trim()) formData.append("content", text);
         }
       } else {
         formData.append("file", selectedFile);

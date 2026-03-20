@@ -17,6 +17,8 @@ const decryptedAttachmentCache = new Map();
 
 const getPrivateKeyStorageKey = (userId) => `relaychat-e2ee-private-key-${userId}`;
 const getPublicKeyStorageKey = (userId) => `relaychat-e2ee-public-key-${userId}`;
+const E2EE_PUBLIC_KEY_PREFIX = "relaychat-e2ee-public-key-";
+const E2EE_PRIVATE_KEY_PREFIX = "relaychat-e2ee-private-key-";
 
 const toBase64 = (arrayBuffer) => {
   const bytes = new Uint8Array(arrayBuffer);
@@ -44,7 +46,7 @@ const generateIdentityKeyPair = async () => {
   return { publicKey, privateKey };
 };
 
-export const ensureIdentityKeyPair = async (userId) => {
+const getStoredKeyPair = (userId) => {
   const storedPrivateKey = localStorage.getItem(getPrivateKeyStorageKey(userId));
   const storedPublicKey = localStorage.getItem(getPublicKeyStorageKey(userId));
 
@@ -55,6 +57,73 @@ export const ensureIdentityKeyPair = async (userId) => {
     };
   }
 
+  return null;
+};
+
+const cloneStoredKeyPairToUser = (sourceUserId, targetUserId) => {
+  const sourcePrivateKey = localStorage.getItem(getPrivateKeyStorageKey(sourceUserId));
+  const sourcePublicKey = localStorage.getItem(getPublicKeyStorageKey(sourceUserId));
+
+  if (!sourcePrivateKey || !sourcePublicKey) {
+    return null;
+  }
+
+  localStorage.setItem(getPrivateKeyStorageKey(targetUserId), sourcePrivateKey);
+  localStorage.setItem(getPublicKeyStorageKey(targetUserId), sourcePublicKey);
+
+  return {
+    publicKey: JSON.parse(sourcePublicKey),
+    privateKey: JSON.parse(sourcePrivateKey),
+  };
+};
+
+const findStoredKeyPairByPublicKey = (expectedPublicKey) => {
+  const expectedPublicKeyJson = JSON.stringify(expectedPublicKey);
+
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const storageKey = localStorage.key(index);
+    if (!storageKey?.startsWith(E2EE_PUBLIC_KEY_PREFIX)) {
+      continue;
+    }
+
+    const storedPublicKeyJson = localStorage.getItem(storageKey);
+    if (storedPublicKeyJson !== expectedPublicKeyJson) {
+      continue;
+    }
+
+    const sourceUserId = storageKey.slice(E2EE_PUBLIC_KEY_PREFIX.length);
+    const storedPrivateKeyJson = localStorage.getItem(`${E2EE_PRIVATE_KEY_PREFIX}${sourceUserId}`);
+    if (!storedPrivateKeyJson) {
+      continue;
+    }
+
+    return {
+      sourceUserId,
+      publicKey: JSON.parse(storedPublicKeyJson),
+      privateKey: JSON.parse(storedPrivateKeyJson),
+    };
+  }
+
+  return null;
+};
+
+export const ensureIdentityKeyPair = async (userId, expectedPublicKey = null) => {
+  const storedKeyPair = getStoredKeyPair(userId);
+  if (storedKeyPair) {
+    if (!expectedPublicKey || JSON.stringify(storedKeyPair.publicKey) === JSON.stringify(expectedPublicKey)) {
+      return storedKeyPair;
+    }
+  }
+
+  if (expectedPublicKey) {
+    const matchingStoredKeyPair = findStoredKeyPairByPublicKey(expectedPublicKey);
+    if (matchingStoredKeyPair) {
+      return cloneStoredKeyPairToUser(matchingStoredKeyPair.sourceUserId, userId);
+    }
+
+    throw new Error("This device is missing the original encryption key for this account");
+  }
+
   const keyPair = await generateIdentityKeyPair();
   localStorage.setItem(getPrivateKeyStorageKey(userId), JSON.stringify(keyPair.privateKey));
   localStorage.setItem(getPublicKeyStorageKey(userId), JSON.stringify(keyPair.publicKey));
@@ -63,6 +132,16 @@ export const ensureIdentityKeyPair = async (userId) => {
 
 export const ensureE2EERegistration = async (apiClient, user) => {
   if (!user?._id) return null;
+
+  if (user.encryptionPublicKey) {
+    const { publicKey } = await ensureIdentityKeyPair(user._id, user.encryptionPublicKey);
+    const updatedUser = {
+      ...user,
+      encryptionPublicKey: publicKey,
+    };
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+    return updatedUser;
+  }
 
   const { publicKey } = await ensureIdentityKeyPair(user._id);
   const localPublicKeyJson = JSON.stringify(publicKey);
@@ -110,6 +189,21 @@ const importAesKey = async (rawKey, usages) => (
   window.crypto.subtle.importKey("raw", rawKey, { name: AES_ALGORITHM }, false, usages)
 );
 
+const wrapAesKeyForRecipients = async (rawAesKey, recipients) => Promise.all(
+  recipients.map(async ({ userId, publicKey }) => {
+    const wrappedKey = await window.crypto.subtle.encrypt(
+      { name: "RSA-OAEP" },
+      await importPublicKey(publicKey),
+      rawAesKey
+    );
+
+    return {
+      userId,
+      key: toBase64(wrappedKey),
+    };
+  })
+);
+
 export const encryptDirectMessage = async ({ content, senderId, recipientId, senderPublicKey, recipientPublicKey }) => {
   const aesKey = await window.crypto.subtle.generateKey(
     { name: AES_ALGORITHM, length: 256 },
@@ -124,27 +218,45 @@ export const encryptDirectMessage = async ({ content, senderId, recipientId, sen
     textEncoder.encode(content)
   );
 
-  const wrappedSenderKey = await window.crypto.subtle.encrypt(
-    { name: "RSA-OAEP" },
-    await importPublicKey(senderPublicKey),
-    rawAesKey
-  );
-
-  const wrappedRecipientKey = await window.crypto.subtle.encrypt(
-    { name: "RSA-OAEP" },
-    await importPublicKey(recipientPublicKey),
-    rawAesKey
-  );
+  const encryptedKeys = await wrapAesKeyForRecipients(rawAesKey, [
+    { userId: senderId, publicKey: senderPublicKey },
+    { userId: recipientId, publicKey: recipientPublicKey },
+  ]);
 
   return {
     ciphertext: toBase64(ciphertext),
     iv: toBase64(iv.buffer),
     algorithm: AES_ALGORITHM,
     version: MESSAGE_VERSION,
-    encryptedKeys: [
-      { userId: senderId, key: toBase64(wrappedSenderKey) },
-      { userId: recipientId, key: toBase64(wrappedRecipientKey) },
-    ],
+    encryptedKeys,
+  };
+};
+
+export const encryptGroupMessage = async ({ content, recipients }) => {
+  if (!Array.isArray(recipients) || recipients.length === 0) {
+    throw new Error("No group recipients available for encryption");
+  }
+
+  const aesKey = await window.crypto.subtle.generateKey(
+    { name: AES_ALGORITHM, length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+  const rawAesKey = await window.crypto.subtle.exportKey("raw", aesKey);
+  const iv = window.crypto.getRandomValues(new Uint8Array(AES_IV_LENGTH));
+  const ciphertext = await window.crypto.subtle.encrypt(
+    { name: AES_ALGORITHM, iv },
+    aesKey,
+    textEncoder.encode(content)
+  );
+  const encryptedKeys = await wrapAesKeyForRecipients(rawAesKey, recipients);
+
+  return {
+    ciphertext: toBase64(ciphertext),
+    iv: toBase64(iv.buffer),
+    algorithm: AES_ALGORITHM,
+    version: MESSAGE_VERSION,
+    encryptedKeys,
   };
 };
 
@@ -220,11 +332,12 @@ export const hydrateChatPreview = async (chat, currentUserId) => {
 
 export const encryptAttachmentFile = async ({
   file,
-  senderId,
-  recipientId,
-  senderPublicKey,
-  recipientPublicKey,
+  recipients,
 }) => {
+  if (!Array.isArray(recipients) || recipients.length === 0) {
+    throw new Error("No attachment recipients available for encryption");
+  }
+
   const aesKey = await window.crypto.subtle.generateKey(
     { name: AES_ALGORITHM, length: 256 },
     true,
@@ -248,18 +361,7 @@ export const encryptAttachmentFile = async ({
       size: file.size,
     }))
   );
-
-  const wrappedSenderKey = await window.crypto.subtle.encrypt(
-    { name: "RSA-OAEP" },
-    await importPublicKey(senderPublicKey),
-    rawAesKey
-  );
-
-  const wrappedRecipientKey = await window.crypto.subtle.encrypt(
-    { name: "RSA-OAEP" },
-    await importPublicKey(recipientPublicKey),
-    rawAesKey
-  );
+  const encryptedKeys = await wrapAesKeyForRecipients(rawAesKey, recipients);
 
   return {
     encryptedFile: new File(
@@ -274,10 +376,7 @@ export const encryptAttachmentFile = async ({
       algorithm: AES_ALGORITHM,
       version: MESSAGE_VERSION,
       size: file.size,
-      encryptedKeys: [
-        { userId: senderId, key: toBase64(wrappedSenderKey) },
-        { userId: recipientId, key: toBase64(wrappedRecipientKey) },
-      ],
+      encryptedKeys,
     }
   };
 };

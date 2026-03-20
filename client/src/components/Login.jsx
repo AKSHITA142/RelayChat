@@ -31,7 +31,12 @@ export default function Login({ onLogin, onSignup }) {
   const handleLoginSuccess = async (res) => {
     localStorage.setItem("token", res.data.token);
     localStorage.setItem("user", JSON.stringify(res.data.user));
-    await ensureE2EERegistration(api, res.data.user);
+    try {
+      await ensureE2EERegistration(api, res.data.user);
+    } catch (keyError) {
+      console.error("Failed to initialize E2EE keys:", keyError);
+      window.alert(keyError.message || "Your encryption keys could not be restored on this device");
+    }
     connectSocket();
     onLogin();
   };
