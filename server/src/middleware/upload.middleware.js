@@ -12,12 +12,22 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + "-" + file.originalname);
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const extension = path.extname(file.originalname || "") || ".bin";
+    cb(null, `${uniqueSuffix}${extension}`);
   },
 });
 
 const fileFilter = (req, file, cb) => {
+  const isEncryptedBlob =
+    file.mimetype === "application/octet-stream" ||
+    path.extname(file.originalname || "").toLowerCase() === ".bin" ||
+    (file.originalname || "").startsWith("enc-");
+
+  if (isEncryptedBlob || req.body?.encryptedFileMetadata) {
+    return cb(null, true);
+  }
+
   // Accept images, common document types, and audio files
   const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|text|txt|mpeg|mp3|wav|webm|ogg|m4a|mp4/;
   const mimetype = allowedTypes.test(file.mimetype);

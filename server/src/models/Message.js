@@ -50,6 +50,44 @@ const messageSchema = new mongoose.Schema(
       type: String,
       required: false
     },
+    encryptedFile: {
+      iv: {
+        type: String,
+        required: false
+      },
+      metadataIv: {
+        type: String,
+        required: false
+      },
+      metadataCiphertext: {
+        type: String,
+        required: false
+      },
+      algorithm: {
+        type: String,
+        required: false
+      },
+      version: {
+        type: Number,
+        required: false
+      },
+      size: {
+        type: Number,
+        required: false
+      },
+      encryptedKeys: [
+        {
+          userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+          },
+          key: {
+            type: String,
+            required: true
+          }
+        }
+      ]
+    },
     fileType: {
       type: String,
       required: false

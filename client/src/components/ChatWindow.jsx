@@ -40,7 +40,7 @@ import { useChatTheme, THEMES } from "../hooks/useChatTheme";
 import socket from "../services/socket";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
-import { encryptDirectMessage, ensureIdentityKeyPair, hydrateDecryptedMessage } from "../services/e2ee";
+import { encryptAttachmentFile, encryptDirectMessage, ensureIdentityKeyPair, hydrateDecryptedMessage } from "../services/e2ee";
 
 const getEntityId = (value) => {
   if (!value) return null;
@@ -624,18 +624,46 @@ export default function ChatWindow({
   };
 
   const sendFileAndText = async () => {
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-    formData.append("chatId", selectedChat._id);
-    if (text.trim()) formData.append("content", text);
-
     try {
+      const formData = new FormData();
+      formData.append("chatId", selectedChat._id);
+
+      if (!selectedChat?.isGroup && selectedDirectRecipientId && recipientEncryptionKey) {
+        const { publicKey: senderPublicKey } = await ensureIdentityKeyPair(myUserId);
+        const { encryptedFile, metadata } = await encryptAttachmentFile({
+          file: selectedFile,
+          senderId: myUserId,
+          recipientId: selectedDirectRecipientId,
+          senderPublicKey,
+          recipientPublicKey: recipientEncryptionKey,
+        });
+
+        formData.append("file", encryptedFile);
+        formData.append("encryptedFileMetadata", JSON.stringify(metadata));
+
+        if (text.trim()) {
+          const encryptedPayload = await encryptDirectMessage({
+            content: text,
+            senderId: myUserId,
+            recipientId: selectedDirectRecipientId,
+            senderPublicKey,
+            recipientPublicKey: recipientEncryptionKey,
+          });
+          formData.append("encryptedPayload", JSON.stringify(encryptedPayload));
+        }
+      } else {
+        formData.append("file", selectedFile);
+        if (text.trim()) formData.append("content", text);
+      }
+
       await api.post("/message/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       setSelectedFile(null);
+      setText("");
     } catch (err) {
       console.error("Upload failed", err);
+      window.alert(err.response?.data?.message || "Failed to upload attachment");
     }
   };
 

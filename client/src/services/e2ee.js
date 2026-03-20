@@ -13,6 +13,7 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const importedPublicKeyCache = new Map();
 const importedPrivateKeyCache = new Map();
+const decryptedAttachmentCache = new Map();
 
 const getPrivateKeyStorageKey = (userId) => `relaychat-e2ee-private-key-${userId}`;
 const getPublicKeyStorageKey = (userId) => `relaychat-e2ee-public-key-${userId}`;
@@ -215,4 +216,142 @@ export const hydrateChatPreview = async (chat, currentUserId) => {
     ...chat,
     lastMessage: await hydrateDecryptedMessage(chat.lastMessage, currentUserId),
   };
+};
+
+export const encryptAttachmentFile = async ({
+  file,
+  senderId,
+  recipientId,
+  senderPublicKey,
+  recipientPublicKey,
+}) => {
+  const aesKey = await window.crypto.subtle.generateKey(
+    { name: AES_ALGORITHM, length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+  const rawAesKey = await window.crypto.subtle.exportKey("raw", aesKey);
+  const iv = window.crypto.getRandomValues(new Uint8Array(AES_IV_LENGTH));
+  const fileBuffer = await file.arrayBuffer();
+  const encryptedFileBuffer = await window.crypto.subtle.encrypt(
+    { name: AES_ALGORITHM, iv },
+    aesKey,
+    fileBuffer
+  );
+  const metadataIv = window.crypto.getRandomValues(new Uint8Array(AES_IV_LENGTH));
+  const metadataCiphertext = await window.crypto.subtle.encrypt(
+    { name: AES_ALGORITHM, iv: metadataIv },
+    aesKey,
+    textEncoder.encode(JSON.stringify({
+      fileName: file.name,
+      mimeType: file.type || "application/octet-stream",
+      size: file.size,
+    }))
+  );
+
+  const wrappedSenderKey = await window.crypto.subtle.encrypt(
+    { name: "RSA-OAEP" },
+    await importPublicKey(senderPublicKey),
+    rawAesKey
+  );
+
+  const wrappedRecipientKey = await window.crypto.subtle.encrypt(
+    { name: "RSA-OAEP" },
+    await importPublicKey(recipientPublicKey),
+    rawAesKey
+  );
+
+  return {
+    encryptedFile: new File(
+      [encryptedFileBuffer],
+      `enc-${Date.now()}-${window.crypto.randomUUID()}.bin`,
+      { type: "application/octet-stream" }
+    ),
+    metadata: {
+      iv: toBase64(iv.buffer),
+      metadataIv: toBase64(metadataIv.buffer),
+      metadataCiphertext: toBase64(metadataCiphertext),
+      algorithm: AES_ALGORITHM,
+      version: MESSAGE_VERSION,
+      size: file.size,
+      encryptedKeys: [
+        { userId: senderId, key: toBase64(wrappedSenderKey) },
+        { userId: recipientId, key: toBase64(wrappedRecipientKey) },
+      ],
+    }
+  };
+};
+
+const decryptWrappedKeyForUser = async (encryptedKeys, currentUserId) => {
+  const storedPrivateKey = localStorage.getItem(getPrivateKeyStorageKey(currentUserId));
+  if (!storedPrivateKey) {
+    throw new Error("Missing local encryption private key");
+  }
+
+  const encryptedKeyEntry = (encryptedKeys || []).find((entry) => {
+    const entryUserId = entry?.userId?._id || entry?.userId;
+    return entryUserId?.toString() === currentUserId.toString();
+  });
+
+  if (!encryptedKeyEntry?.key) {
+    throw new Error("No encrypted attachment key available for this user");
+  }
+
+  const privateKey = await importPrivateKey(JSON.parse(storedPrivateKey));
+  return window.crypto.subtle.decrypt(
+    { name: "RSA-OAEP" },
+    privateKey,
+    fromBase64(encryptedKeyEntry.key)
+  );
+};
+
+export const getDecryptedAttachmentData = async (message, currentUserId) => {
+  if (!message?.encryptedFile?.iv || !message?.fileUrl) {
+    return message?.fileUrl ? {
+      url: `http://localhost:5002${message.fileUrl}`,
+      fileName: message.fileName || "Attachment",
+      mimeType: message.fileType || "application/octet-stream",
+    } : null;
+  }
+
+  const cacheKey = `${message._id}:${message.updatedAt || message.createdAt || ""}`;
+  if (decryptedAttachmentCache.has(cacheKey)) {
+    return decryptedAttachmentCache.get(cacheKey);
+  }
+
+  const rawAesKey = await decryptWrappedKeyForUser(message.encryptedFile.encryptedKeys, currentUserId);
+  const aesKey = await importAesKey(rawAesKey, ["decrypt"]);
+  const response = await fetch(`http://localhost:5002${message.fileUrl}`);
+  const encryptedFileBuffer = await response.arrayBuffer();
+  const decryptedFileBuffer = await window.crypto.subtle.decrypt(
+    { name: AES_ALGORITHM, iv: new Uint8Array(fromBase64(message.encryptedFile.iv)) },
+    aesKey,
+    encryptedFileBuffer
+  );
+
+  let decryptedMetadata = {
+    fileName: message.fileName || "Attachment",
+    mimeType: message.fileType || "application/octet-stream",
+  };
+
+  if (message.encryptedFile.metadataCiphertext && message.encryptedFile.metadataIv) {
+    const metadataPlaintext = await window.crypto.subtle.decrypt(
+      { name: AES_ALGORITHM, iv: new Uint8Array(fromBase64(message.encryptedFile.metadataIv)) },
+      aesKey,
+      fromBase64(message.encryptedFile.metadataCiphertext)
+    );
+    decryptedMetadata = JSON.parse(textDecoder.decode(metadataPlaintext));
+  }
+
+  const blob = new Blob([decryptedFileBuffer], {
+    type: decryptedMetadata.mimeType || "application/octet-stream"
+  });
+  const attachmentData = {
+    url: URL.createObjectURL(blob),
+    fileName: decryptedMetadata.fileName || "Attachment",
+    mimeType: decryptedMetadata.mimeType || "application/octet-stream",
+    size: decryptedMetadata.size || message.encryptedFile.size || blob.size,
+  };
+  decryptedAttachmentCache.set(cacheKey, attachmentData);
+  return attachmentData;
 };

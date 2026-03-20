@@ -14,6 +14,7 @@ exports.getMessagesByChat = async (req, res) => {
   const messages = await Message.find(query)
     .populate("sender", "_id name phoneNumber")
     .populate("encryptedContent.encryptedKeys.userId", "_id")
+    .populate("encryptedFile.encryptedKeys.userId", "_id")
     .sort({ createdAt: 1 });
 
   res.json(messages);
@@ -95,21 +96,53 @@ exports.uploadFile = async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    const { chatId, content } = req.body;
+    const { chatId, content, encryptedPayload, encryptedFileMetadata } = req.body;
     const fileUrl = `/uploads/${req.file.filename}`;
-    const fileType = req.file.mimetype;
-    const fileName = req.file.originalname;
+    const parsedEncryptedPayload = encryptedPayload ? JSON.parse(encryptedPayload) : null;
+    const parsedEncryptedFileMetadata = encryptedFileMetadata ? JSON.parse(encryptedFileMetadata) : null;
+    const isEncryptedAttachment = Boolean(parsedEncryptedFileMetadata);
+    const fileType = isEncryptedAttachment ? undefined : req.file.mimetype;
+    const fileName = isEncryptedAttachment ? undefined : (req.body.fileName || req.file.originalname);
 
     const message = await Message.create({
       sender: req.user.id,
       chat: chatId,
-      content: content || fileName, // Use content if provided, else fileName
+      content: parsedEncryptedPayload || isEncryptedAttachment ? undefined : (content || fileName),
+      encryptedContent: parsedEncryptedPayload ? {
+        ciphertext: parsedEncryptedPayload.ciphertext,
+        iv: parsedEncryptedPayload.iv,
+        algorithm: parsedEncryptedPayload.algorithm,
+        version: parsedEncryptedPayload.version,
+        encryptedKeys: Array.isArray(parsedEncryptedPayload.encryptedKeys)
+          ? parsedEncryptedPayload.encryptedKeys.map((entry) => ({
+              userId: entry.userId,
+              key: entry.key,
+            }))
+          : []
+      } : undefined,
       fileUrl,
       fileType,
-      fileName
+      fileName,
+      encryptedFile: parsedEncryptedFileMetadata ? {
+        iv: parsedEncryptedFileMetadata.iv,
+        metadataIv: parsedEncryptedFileMetadata.metadataIv,
+        metadataCiphertext: parsedEncryptedFileMetadata.metadataCiphertext,
+        algorithm: parsedEncryptedFileMetadata.algorithm,
+        version: parsedEncryptedFileMetadata.version,
+        size: parsedEncryptedFileMetadata.size,
+        encryptedKeys: Array.isArray(parsedEncryptedFileMetadata.encryptedKeys)
+          ? parsedEncryptedFileMetadata.encryptedKeys.map((entry) => ({
+              userId: entry.userId,
+              key: entry.key,
+            }))
+          : []
+      } : undefined,
     });
 
-    const populatedMessage = await Message.findById(message._id).populate("sender", "_id name");
+    const populatedMessage = await Message.findById(message._id)
+      .populate("sender", "_id name")
+      .populate("encryptedContent.encryptedKeys.userId", "_id")
+      .populate("encryptedFile.encryptedKeys.userId", "_id");
     
     const { getIO } = require("../socket");
     const io = getIO();
@@ -154,7 +187,10 @@ exports.reactToMessage = async (req, res) => {
 
     await message.save();
     
-    const updatedMessage = await Message.findById(messageId).populate("sender", "_id name");
+    const updatedMessage = await Message.findById(messageId)
+      .populate("sender", "_id name")
+      .populate("encryptedContent.encryptedKeys.userId", "_id")
+      .populate("encryptedFile.encryptedKeys.userId", "_id");
 
     const { getIO } = require("../socket");
     const io = getIO();
