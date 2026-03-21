@@ -24,6 +24,26 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
+    encryptionDevices: [
+      {
+        deviceId: {
+          type: String,
+          required: true,
+        },
+        publicKey: {
+          type: mongoose.Schema.Types.Mixed,
+          required: true,
+        },
+        label: {
+          type: String,
+          default: "Browser",
+        },
+        lastSeenAt: {
+          type: Date,
+          default: Date.now,
+        }
+      }
+    ],
     role: {
       type: String,
       enum: ["user", "admin"],

@@ -1,76 +1,38 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const mongoose = require("mongoose");
 const redisClient = require("../config/redis");
 const { sendSms } = require("../utils/sms");
 
-const LEGACY_DB_NAME = "test";
-
-const syncLegacyUserToPrimary = async (query) => {
-  let user = await User.findOne(query);
-  if (user) return user;
-
-  const currentDbName = mongoose.connection?.db?.databaseName;
-  if (!currentDbName || currentDbName === LEGACY_DB_NAME) return null;
-
-  const legacyDb = mongoose.connection.useDb(LEGACY_DB_NAME, { useCache: true });
-  const legacyUser = await legacyDb.collection("users").findOne(query);
-
-  if (!legacyUser) return null;
-
-  const {
-    _id,
-    name,
-    email,
-    phoneNumber,
-    password,
-    role,
-    lastSeen,
-    isOnline,
-    contacts,
-    encryptionPublicKey,
-    createdAt,
-    updatedAt,
-  } = legacyUser;
-
-  try {
-    user = await User.create({
-      _id,
-      name,
-      email,
-      phoneNumber,
-      password,
-      role: role || "user",
-      lastSeen: lastSeen || null,
-      isOnline: Boolean(isOnline),
-      contacts: Array.isArray(contacts) ? contacts : [],
-      encryptionPublicKey: encryptionPublicKey || null,
-      createdAt,
-      updatedAt,
-    });
-  } catch (error) {
-    if (error.code === 11000) {
-      user = await User.findOne({
-        $or: [
-          email ? { email } : null,
-          phoneNumber ? { phoneNumber } : null,
-          { _id },
-        ].filter(Boolean)
-      });
-    } else {
-      throw error;
-    }
+const buildEncryptionDevices = (user) => {
+  if (Array.isArray(user?.encryptionDevices) && user.encryptionDevices.length > 0) {
+    return user.encryptionDevices.map((device) => ({
+      deviceId: device.deviceId,
+      publicKey: device.publicKey,
+      label: device.label || "Browser",
+      lastSeenAt: device.lastSeenAt,
+    }));
   }
 
-  return user;
+  if (user?.encryptionPublicKey) {
+    return [
+      {
+        deviceId: `legacy-${user._id}`,
+        publicKey: user.encryptionPublicKey,
+        label: "Legacy Device",
+        lastSeenAt: user.updatedAt || user.createdAt || null,
+      }
+    ];
+  }
+
+  return [];
 };
 
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await syncLegacyUserToPrimary({ email });
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({
         message: "Invalid credentials"
@@ -100,7 +62,8 @@ exports.login = async (req, res) => {
         phoneNumber: user.phoneNumber,
         role: user.role,
         contacts: user.contacts,
-        encryptionPublicKey: user.encryptionPublicKey
+        encryptionPublicKey: user.encryptionPublicKey,
+        encryptionDevices: buildEncryptionDevices(user)
       }
     });
 
@@ -190,7 +153,7 @@ exports.verifyOtp = async (req, res) => {
  
     await redisClient.del(phone);
 
-    let user = await syncLegacyUserToPrimary({ phoneNumber: phone });
+    let user = await User.findOne({ phoneNumber: phone });
     
     if (!user) {
       return res.status(202).json({
@@ -215,7 +178,8 @@ exports.verifyOtp = async (req, res) => {
         phoneNumber: user.phoneNumber,
         role: user.role,
         contacts: user.contacts,
-        encryptionPublicKey: user.encryptionPublicKey
+        encryptionPublicKey: user.encryptionPublicKey,
+        encryptionDevices: buildEncryptionDevices(user)
       }
     });
 
@@ -233,15 +197,15 @@ exports.completeRegistration = async (req, res) => {
       return res.status(400).json({ message: "Name and Phone Number are required" });
     }
 
-    
-    let user = await syncLegacyUserToPrimary({ phoneNumber });
+    // Check only the primary database to avoid resurrecting legacy records in fresh environments
+    let user = await User.findOne({ phoneNumber });
     if (user) {
       return res.status(400).json({ message: "User already exists with this phone number" });
     }
 
     // Optional
     if (email) {
-      const existingEmail = await syncLegacyUserToPrimary({ email });
+      const existingEmail = await User.findOne({ email });
       if (existingEmail) {
         return res.status(400).json({ message: "Email already in use" });
       }
@@ -276,7 +240,8 @@ exports.completeRegistration = async (req, res) => {
         phoneNumber: user.phoneNumber,
         role: user.role,
         contacts: user.contacts,
-        encryptionPublicKey: user.encryptionPublicKey
+        encryptionPublicKey: user.encryptionPublicKey,
+        encryptionDevices: buildEncryptionDevices(user)
       }
     });
 

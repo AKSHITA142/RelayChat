@@ -293,7 +293,9 @@ export default function Sidebar({
                     </span>
                   </div>
                   <p className={`text-xs truncate ${isSelected ? 'text-whatsapp-bg-dark/70 font-medium' : 'text-slate-500'}`}>
-                    {chat.lastMessage?.content || "No dialogue yet"}
+                    {chat.lastMessage?.content
+                      || chat.lastMessage?.fileName
+                      || (chat.lastMessage?.fileUrl ? "Attachment" : "No dialogue yet")}
                   </p>
                 </div>
               </div>

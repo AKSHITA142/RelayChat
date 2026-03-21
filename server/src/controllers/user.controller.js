@@ -1,12 +1,39 @@
 const User = require("../models/User");
 
+const buildEncryptionDevices = (user) => {
+  if (Array.isArray(user?.encryptionDevices) && user.encryptionDevices.length > 0) {
+    return user.encryptionDevices.map((device) => ({
+      deviceId: device.deviceId,
+      publicKey: device.publicKey,
+      label: device.label || "Browser",
+      lastSeenAt: device.lastSeenAt,
+    }));
+  }
+
+  if (user?.encryptionPublicKey) {
+    return [
+      {
+        deviceId: `legacy-${user._id}`,
+        publicKey: user.encryptionPublicKey,
+        label: "Legacy Device",
+        lastSeenAt: user.updatedAt || user.createdAt || null,
+      }
+    ];
+  }
+
+  return [];
+};
+
 const getProfile = async (req, res) => {
   try {
      const user = await User.findById(req.user.id).select("-password");
 
     res.status(200).json({
       message: "User profile fetched",
-      user
+      user: {
+        ...user.toObject(),
+        encryptionDevices: buildEncryptionDevices(user),
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -98,7 +125,7 @@ const saveContact = async (req, res) => {
 const getUserEncryptionKey = async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await User.findById(userId).select("_id name phoneNumber encryptionPublicKey");
+    const user = await User.findById(userId).select("_id name phoneNumber encryptionPublicKey encryptionDevices");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -110,6 +137,7 @@ const getUserEncryptionKey = async (req, res) => {
         name: user.name,
         phoneNumber: user.phoneNumber,
         encryptionPublicKey: user.encryptionPublicKey,
+        encryptionDevices: buildEncryptionDevices(user),
       }
     });
   } catch (error) {
@@ -120,21 +148,48 @@ const getUserEncryptionKey = async (req, res) => {
 
 const upsertEncryptionKey = async (req, res) => {
   try {
-    const { publicKey } = req.body;
+    const { publicKey, deviceId, deviceLabel } = req.body;
 
-    if (!publicKey || typeof publicKey !== "object") {
-      return res.status(400).json({ message: "A valid public key is required" });
+    if (!publicKey || typeof publicKey !== "object" || !deviceId) {
+      return res.status(400).json({ message: "A valid public key and device ID are required" });
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { encryptionPublicKey: publicKey },
-      { new: true }
-    ).select("-password");
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!Array.isArray(user.encryptionDevices)) {
+      user.encryptionDevices = [];
+    }
+
+    const existingDeviceIndex = Array.isArray(user.encryptionDevices)
+      ? user.encryptionDevices.findIndex((device) => device.deviceId === deviceId)
+      : -1;
+
+    if (existingDeviceIndex >= 0) {
+      user.encryptionDevices[existingDeviceIndex].publicKey = publicKey;
+      user.encryptionDevices[existingDeviceIndex].label = deviceLabel || user.encryptionDevices[existingDeviceIndex].label || "Browser";
+      user.encryptionDevices[existingDeviceIndex].lastSeenAt = new Date();
+    } else {
+      user.encryptionDevices.push({
+        deviceId,
+        publicKey,
+        label: deviceLabel || "Browser",
+        lastSeenAt: new Date(),
+      });
+    }
+
+    // Preserve the last active device key in the legacy field for backward compatibility.
+    user.encryptionPublicKey = publicKey;
+    await user.save();
 
     res.status(200).json({
       message: "Encryption key saved",
-      user
+      user: {
+        ...user.toObject(),
+        encryptionDevices: buildEncryptionDevices(user),
+      }
     });
   } catch (error) {
     console.error("Error saving encryption key:", error);

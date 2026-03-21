@@ -6,6 +6,7 @@ const Message = require("./models/Message");
 const Chat = require("./models/Chat");
 
 let io;
+const pendingHistorySyncRequests = new Map();
 
 function initSocket(server) {
   io = new Server(server, {
@@ -25,6 +26,7 @@ function initSocket(server) {
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       socket.userId = decoded.id;
+      socket.deviceId = socket.handshake.auth?.deviceId || null;
       next();
     } catch {
       next(new Error("Invalid token"));
@@ -96,6 +98,102 @@ function initSocket(server) {
         }
       });
 
+      socket.on("request-history-sync", ({ requesterDeviceId, requesterLabel }, callback) => {
+        try {
+          if (!requesterDeviceId) {
+            callback && callback({ ok: false, deliveredCount: 0, message: "Missing requester device ID" });
+            return;
+          }
+          const requestId = new mongoose.Types.ObjectId().toString();
+          pendingHistorySyncRequests.set(requestId, {
+            requesterSocketId: socket.id,
+            userId: socket.userId.toString(),
+            requesterDeviceId,
+          });
+
+          io.in(socket.userId.toString()).fetchSockets()
+            .then((userSockets) => {
+              const targetSockets = userSockets
+                .filter((userSocket) =>
+                  userSocket.id !== socket.id &&
+                  userSocket.userId?.toString() === socket.userId.toString() &&
+                  userSocket.deviceId !== requesterDeviceId
+                );
+
+              targetSockets.forEach((userSocket) => {
+                  userSocket.emit("history-sync-requested", {
+                    requestId,
+                    requesterDeviceId,
+                    requesterLabel,
+                  });
+                });
+
+              callback && callback({
+                ok: targetSockets.length > 0,
+                deliveredCount: targetSockets.length,
+                message: targetSockets.length > 0
+                  ? "History sync request sent"
+                  : "No other logged-in device was found for this account",
+              });
+            })
+            .catch((fetchError) => {
+              console.error("Fetch sockets for history sync error:", fetchError);
+              callback && callback({
+                ok: false,
+                deliveredCount: 0,
+                message: "Failed to look up trusted devices",
+              });
+            });
+        } catch (err) {
+          console.error("Request history sync error:", err);
+          callback && callback({
+            ok: false,
+            deliveredCount: 0,
+            message: "Failed to request history sync",
+          });
+        }
+      });
+
+      socket.on("respond-history-sync", ({ requestId, approved }) => {
+        try {
+          const pendingRequest = pendingHistorySyncRequests.get(requestId);
+          if (!pendingRequest || pendingRequest.userId !== socket.userId.toString()) {
+            return;
+          }
+
+          io.to(pendingRequest.requesterSocketId).emit("history-sync-response", {
+            requestId,
+            approved: Boolean(approved),
+            approverDeviceId: socket.deviceId,
+            requesterDeviceId: pendingRequest.requesterDeviceId,
+          });
+
+          if (!approved) {
+            pendingHistorySyncRequests.delete(requestId);
+          }
+        } catch (err) {
+          console.error("Respond history sync error:", err);
+        }
+      });
+
+      socket.on("history-sync-finished", ({ requestId, requesterDeviceId, syncedCount = 0 }) => {
+        try {
+          const pendingRequest = pendingHistorySyncRequests.get(requestId);
+          if (!pendingRequest || pendingRequest.userId !== socket.userId.toString()) {
+            return;
+          }
+
+          io.to(pendingRequest.requesterSocketId).emit("history-sync-complete", {
+            requestId,
+            requesterDeviceId: requesterDeviceId || pendingRequest.requesterDeviceId,
+            syncedCount,
+          });
+          pendingHistorySyncRequests.delete(requestId);
+        } catch (err) {
+          console.error("History sync finished error:", err);
+        }
+      });
+
       // MARK CURRENT USER ONLINE
       await User.findByIdAndUpdate(socket.userId, {
         isOnline: true,
@@ -134,6 +232,7 @@ function initSocket(server) {
               encryptedKeys: Array.isArray(encryptedPayload.encryptedKeys)
                 ? encryptedPayload.encryptedKeys.map((entry) => ({
                     userId: entry.userId,
+                    deviceId: entry.deviceId,
                     key: entry.key,
                   }))
                 : []

@@ -14,11 +14,26 @@ const textDecoder = new TextDecoder();
 const importedPublicKeyCache = new Map();
 const importedPrivateKeyCache = new Map();
 const decryptedAttachmentCache = new Map();
+const DEVICE_ID_STORAGE_KEY = "relaychat-e2ee-device-id";
+const HISTORY_SYNC_NEEDED_PREFIX = "relaychat-history-sync-needed-";
 
 const getPrivateKeyStorageKey = (userId) => `relaychat-e2ee-private-key-${userId}`;
 const getPublicKeyStorageKey = (userId) => `relaychat-e2ee-public-key-${userId}`;
 const E2EE_PUBLIC_KEY_PREFIX = "relaychat-e2ee-public-key-";
 const E2EE_PRIVATE_KEY_PREFIX = "relaychat-e2ee-private-key-";
+const getCurrentDeviceId = () => {
+  const existingDeviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+  if (existingDeviceId) return existingDeviceId;
+
+  const newDeviceId = window.crypto.randomUUID();
+  localStorage.setItem(DEVICE_ID_STORAGE_KEY, newDeviceId);
+  return newDeviceId;
+};
+
+const getHistorySyncNeededStorageKey = (userId, deviceId = getCurrentDeviceId()) =>
+  `${HISTORY_SYNC_NEEDED_PREFIX}${userId}-${deviceId}`;
+
+const getCurrentDeviceLabel = () => `${navigator.platform || "Browser"} - ${navigator.userAgent.includes("Mobile") ? "Mobile" : "Browser"}`;
 
 const toBase64 = (arrayBuffer) => {
   const bytes = new Uint8Array(arrayBuffer);
@@ -132,35 +147,56 @@ export const ensureIdentityKeyPair = async (userId, expectedPublicKey = null) =>
 
 export const ensureE2EERegistration = async (apiClient, user) => {
   if (!user?._id) return null;
+  const currentDeviceId = getCurrentDeviceId();
+  const knownDevices = Array.isArray(user.encryptionDevices) ? user.encryptionDevices : [];
+  const currentRegisteredDevice = knownDevices.find((device) => device.deviceId === currentDeviceId);
 
-  if (user.encryptionPublicKey) {
-    const { publicKey } = await ensureIdentityKeyPair(user._id, user.encryptionPublicKey);
+  if (currentRegisteredDevice?.publicKey) {
+    const { publicKey } = await ensureIdentityKeyPair(user._id, currentRegisteredDevice.publicKey);
     const updatedUser = {
       ...user,
       encryptionPublicKey: publicKey,
+      encryptionDevices: knownDevices,
+    };
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+    return updatedUser;
+  }
+
+  if (user.encryptionPublicKey && knownDevices.length === 0) {
+    const { publicKey } = await ensureIdentityKeyPair(user._id, user.encryptionPublicKey);
+    const response = await apiClient.post("/user/encryption-key", {
+      publicKey,
+      deviceId: currentDeviceId,
+      deviceLabel: getCurrentDeviceLabel(),
+    });
+    const updatedUser = {
+      ...user,
+      encryptionPublicKey: response.data.user?.encryptionPublicKey || publicKey,
+      encryptionDevices: response.data.user?.encryptionDevices || [
+        { deviceId: currentDeviceId, publicKey, label: getCurrentDeviceLabel() }
+      ],
     };
     localStorage.setItem("user", JSON.stringify(updatedUser));
     return updatedUser;
   }
 
   const { publicKey } = await ensureIdentityKeyPair(user._id);
-  const localPublicKeyJson = JSON.stringify(publicKey);
-  const remotePublicKeyJson = JSON.stringify(user.encryptionPublicKey || null);
-
-  if (localPublicKeyJson !== remotePublicKeyJson) {
-    const response = await apiClient.post("/user/encryption-key", { publicKey });
-    const updatedUser = {
-      ...user,
-      encryptionPublicKey: response.data.user?.encryptionPublicKey || publicKey,
-    };
-    localStorage.setItem("user", JSON.stringify(updatedUser));
-    return updatedUser;
-  }
-
-  return {
+  const response = await apiClient.post("/user/encryption-key", {
+    publicKey,
+    deviceId: currentDeviceId,
+    deviceLabel: getCurrentDeviceLabel(),
+  });
+  localStorage.setItem(getHistorySyncNeededStorageKey(user._id, currentDeviceId), "true");
+  const updatedUser = {
     ...user,
-    encryptionPublicKey: publicKey,
+    encryptionPublicKey: response.data.user?.encryptionPublicKey || publicKey,
+    encryptionDevices: response.data.user?.encryptionDevices || [
+      { deviceId: currentDeviceId, publicKey, label: getCurrentDeviceLabel() }
+    ],
   };
+  localStorage.setItem("user", JSON.stringify(updatedUser));
+  return updatedUser;
+
 };
 
 const importPublicKey = async (publicKeyJwk) => {
@@ -190,7 +226,7 @@ const importAesKey = async (rawKey, usages) => (
 );
 
 const wrapAesKeyForRecipients = async (rawAesKey, recipients) => Promise.all(
-  recipients.map(async ({ userId, publicKey }) => {
+  recipients.map(async ({ userId, deviceId, publicKey }) => {
     const wrappedKey = await window.crypto.subtle.encrypt(
       { name: "RSA-OAEP" },
       await importPublicKey(publicKey),
@@ -199,12 +235,13 @@ const wrapAesKeyForRecipients = async (rawAesKey, recipients) => Promise.all(
 
     return {
       userId,
+      deviceId,
       key: toBase64(wrappedKey),
     };
   })
 );
 
-export const encryptDirectMessage = async ({ content, senderId, recipientId, senderPublicKey, recipientPublicKey }) => {
+export const encryptDirectMessage = async ({ content, recipients }) => {
   const aesKey = await window.crypto.subtle.generateKey(
     { name: AES_ALGORITHM, length: 256 },
     true,
@@ -218,10 +255,7 @@ export const encryptDirectMessage = async ({ content, senderId, recipientId, sen
     textEncoder.encode(content)
   );
 
-  const encryptedKeys = await wrapAesKeyForRecipients(rawAesKey, [
-    { userId: senderId, publicKey: senderPublicKey },
-    { userId: recipientId, publicKey: recipientPublicKey },
-  ]);
+  const encryptedKeys = await wrapAesKeyForRecipients(rawAesKey, recipients);
 
   return {
     ciphertext: toBase64(ciphertext),
@@ -260,19 +294,17 @@ export const encryptGroupMessage = async ({ content, recipients }) => {
   };
 };
 
-export const decryptDirectMessage = async (message, currentUserId) => {
-  if (!message?.encryptedContent?.ciphertext || !currentUserId) {
-    return message?.content || "";
-  }
-
+const decryptWrappedContentKeyForUser = async (message, currentUserId) => {
   const storedPrivateKey = localStorage.getItem(getPrivateKeyStorageKey(currentUserId));
   if (!storedPrivateKey) {
     throw new Error("Missing local encryption private key");
   }
 
-  const encryptedKeyEntry = (message.encryptedContent.encryptedKeys || []).find((entry) => {
+  const currentDeviceId = getCurrentDeviceId();
+  const encryptedKeyEntry = (message?.encryptedContent?.encryptedKeys || []).find((entry) => {
     const entryUserId = entry?.userId?._id || entry?.userId;
-    return entryUserId?.toString() === currentUserId.toString();
+    return entryUserId?.toString() === currentUserId.toString() &&
+      (!entry?.deviceId || entry.deviceId === currentDeviceId);
   });
 
   if (!encryptedKeyEntry?.key) {
@@ -280,11 +312,19 @@ export const decryptDirectMessage = async (message, currentUserId) => {
   }
 
   const privateKey = await importPrivateKey(JSON.parse(storedPrivateKey));
-  const rawAesKey = await window.crypto.subtle.decrypt(
+  return window.crypto.subtle.decrypt(
     { name: "RSA-OAEP" },
     privateKey,
     fromBase64(encryptedKeyEntry.key)
   );
+};
+
+export const decryptDirectMessage = async (message, currentUserId) => {
+  if (!message?.encryptedContent?.ciphertext || !currentUserId) {
+    return message?.content || "";
+  }
+
+  const rawAesKey = await decryptWrappedContentKeyForUser(message, currentUserId);
 
   const aesKey = await importAesKey(rawAesKey, ["decrypt"]);
   const plaintext = await window.crypto.subtle.decrypt(
@@ -387,9 +427,11 @@ const decryptWrappedKeyForUser = async (encryptedKeys, currentUserId) => {
     throw new Error("Missing local encryption private key");
   }
 
+  const currentDeviceId = getCurrentDeviceId();
   const encryptedKeyEntry = (encryptedKeys || []).find((entry) => {
     const entryUserId = entry?.userId?._id || entry?.userId;
-    return entryUserId?.toString() === currentUserId.toString();
+    return entryUserId?.toString() === currentUserId.toString() &&
+      (!entry?.deviceId || entry.deviceId === currentDeviceId);
   });
 
   if (!encryptedKeyEntry?.key) {
@@ -454,3 +496,83 @@ export const getDecryptedAttachmentData = async (message, currentUserId) => {
   decryptedAttachmentCache.set(cacheKey, attachmentData);
   return attachmentData;
 };
+
+export const buildHistorySyncUpdate = async ({
+  message,
+  currentUserId,
+  targetUserId,
+  targetDeviceId,
+  targetPublicKey,
+}) => {
+  const syncUpdate = {
+    messageId: message?._id,
+  };
+
+  if (message?.encryptedContent?.ciphertext) {
+    const rawMessageKey = await decryptWrappedContentKeyForUser(message, currentUserId);
+    const wrappedMessageKey = await window.crypto.subtle.encrypt(
+      { name: "RSA-OAEP" },
+      await importPublicKey(targetPublicKey),
+      rawMessageKey
+    );
+
+    syncUpdate.encryptedContentKey = {
+      userId: targetUserId,
+      deviceId: targetDeviceId,
+      key: toBase64(wrappedMessageKey),
+    };
+  }
+
+  if (message?.encryptedFile?.iv) {
+    const rawAttachmentKey = await decryptWrappedKeyForUser(message.encryptedFile.encryptedKeys, currentUserId);
+    const wrappedAttachmentKey = await window.crypto.subtle.encrypt(
+      { name: "RSA-OAEP" },
+      await importPublicKey(targetPublicKey),
+      rawAttachmentKey
+    );
+
+    syncUpdate.encryptedFileKey = {
+      userId: targetUserId,
+      deviceId: targetDeviceId,
+      key: toBase64(wrappedAttachmentKey),
+    };
+  }
+
+  if (!syncUpdate.encryptedContentKey && !syncUpdate.encryptedFileKey) {
+    return null;
+  }
+
+  return syncUpdate;
+};
+
+export const buildDeviceRecipients = (users = []) => (
+  users.flatMap((user) => {
+    const userId = user?._id || user?.userId || user?.id;
+    if (!userId) return [];
+
+    if (Array.isArray(user.encryptionDevices) && user.encryptionDevices.length > 0) {
+      return user.encryptionDevices
+        .filter((device) => device?.publicKey && device?.deviceId)
+        .map((device) => ({
+          userId,
+          deviceId: device.deviceId,
+          publicKey: device.publicKey,
+        }));
+    }
+
+    if (user.encryptionPublicKey) {
+      return [{
+        userId,
+        deviceId: `legacy-${userId}`,
+        publicKey: user.encryptionPublicKey,
+      }];
+    }
+
+    return [];
+  })
+);
+
+export const needsHistorySync = (userId) => localStorage.getItem(getHistorySyncNeededStorageKey(userId)) === "true";
+export const markHistorySyncComplete = (userId) => localStorage.removeItem(getHistorySyncNeededStorageKey(userId));
+
+export { getCurrentDeviceId, getCurrentDeviceLabel };

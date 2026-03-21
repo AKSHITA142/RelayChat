@@ -1,4 +1,5 @@
 import { io } from "socket.io-client";
+import { getCurrentDeviceId } from "./e2ee";
 
 const socket = io("http://localhost:5002", {
   autoConnect: false,
@@ -12,7 +13,7 @@ socket.on("connect", () => {
 export const connectSocket = () => {
   const token = localStorage.getItem("token");
   if (token) {
-    socket.auth = { token };
+    socket.auth = { token, deviceId: getCurrentDeviceId() };
     socket.connect();
   }
 };

@@ -39,6 +39,10 @@ const messageSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "User"
           },
+          deviceId: {
+            type: String,
+            required: false
+          },
           key: {
             type: String,
             required: true
@@ -80,6 +84,10 @@ const messageSchema = new mongoose.Schema(
           userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User"
+          },
+          deviceId: {
+            type: String,
+            required: false
           },
           key: {
             type: String,

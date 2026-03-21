@@ -141,6 +141,9 @@ exports.uploadFile = async (req, res) => {
       } : undefined,
     });
 
+    const Chat = require("../models/Chat");
+    await Chat.findByIdAndUpdate(chatId, { lastMessage: message._id });
+
     const populatedMessage = await Message.findById(message._id)
       .populate("sender", "_id name")
       .populate("encryptedContent.encryptedKeys.userId", "_id")
