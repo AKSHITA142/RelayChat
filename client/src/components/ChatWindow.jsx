@@ -31,7 +31,8 @@ import {
   Phone,
   Plus,
   Video as VideoIcon,
-  Palette
+  Palette,
+  Trash2
 } from "lucide-react";
 import Message from "./Message";
 import VoiceRecorder from "./VoiceRecorder";
@@ -40,7 +41,7 @@ import { useChatTheme, THEMES } from "../hooks/useChatTheme";
 import socket from "../services/socket";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
-import { encryptAttachmentFile, encryptDirectMessage, encryptGroupMessage, ensureIdentityKeyPair, hydrateDecryptedMessage } from "../services/e2ee";
+import { buildDeviceRecipients, encryptAttachmentFile, encryptDirectMessage, encryptGroupMessage, hydrateDecryptedMessage } from "../services/e2ee";
 
 const getEntityId = (value) => {
   if (!value) return null;
@@ -126,8 +127,8 @@ export default function ChatWindow({
   const [searchResults, setSearchResults] = useState([]);
   const [showDeleted, setShowDeleted] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
-  const [recipientEncryptionKey, setRecipientEncryptionKey] = useState(null);
-  const [groupEncryptionKeys, setGroupEncryptionKeys] = useState({});
+  const [recipientEncryptionUser, setRecipientEncryptionUser] = useState(null);
+  const [groupEncryptionUsers, setGroupEncryptionUsers] = useState({});
 
   // Per-chat theme
   const [savedThemeName, setSavedThemeName] = useChatTheme(selectedChat?._id);
@@ -248,6 +249,18 @@ export default function ChatWindow({
       setIsRenaming(false);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleClearChat = async () => {
+    try {
+      if (window.confirm("Are you sure you want to clear this chat? This will remove all messages from your view.")) {
+        await api.delete(`/message/clear/${selectedChat._id}`);
+        setMessages([]);
+        setShowMenu(false);
+      }
+    } catch (err) {
+      console.error("Error clearing chat:", err);
     }
   };
 
@@ -396,12 +409,12 @@ export default function ChatWindow({
 
   useEffect(() => {
     if (selectedChat?.isGroup || !selectedChat?._id) {
-      setRecipientEncryptionKey(null);
+      setRecipientEncryptionUser(null);
       return;
     }
 
     if (!selectedDirectRecipientId) {
-      setRecipientEncryptionKey(null);
+      setRecipientEncryptionUser(null);
       return;
     }
 
@@ -411,12 +424,12 @@ export default function ChatWindow({
       try {
         const latestRecipient = await api.get(`/user/${selectedDirectRecipientId}/key`);
         if (!cancelled) {
-          setRecipientEncryptionKey(latestRecipient.data?.user?.encryptionPublicKey || null);
+          setRecipientEncryptionUser(latestRecipient.data?.user || null);
         }
       } catch (error) {
         if (!cancelled) {
           console.error("Failed to preload recipient encryption key:", error);
-          setRecipientEncryptionKey(null);
+          setRecipientEncryptionUser(null);
         }
       }
     };
@@ -430,7 +443,7 @@ export default function ChatWindow({
 
   useEffect(() => {
     if (!selectedChat?._id || !selectedChat?.isGroup) {
-      setGroupEncryptionKeys({});
+      setGroupEncryptionUsers({});
       return;
     }
 
@@ -440,7 +453,7 @@ export default function ChatWindow({
       .filter(Boolean);
 
     if (participantIds.length === 0) {
-      setGroupEncryptionKeys({});
+      setGroupEncryptionUsers({});
       return;
     }
 
@@ -451,17 +464,17 @@ export default function ChatWindow({
         const keyEntries = await Promise.all(
           participantIds.map(async (participantId) => {
             const response = await api.get(`/user/${participantId}/key`);
-            return [participantId, response.data?.user?.encryptionPublicKey || null];
+            return [participantId, response.data?.user || null];
           })
         );
 
         if (!cancelled) {
-          setGroupEncryptionKeys(Object.fromEntries(keyEntries.filter(([, key]) => key)));
+          setGroupEncryptionUsers(Object.fromEntries(keyEntries.filter(([, user]) => user)));
         }
       } catch (error) {
         if (!cancelled) {
           console.error("Failed to preload group encryption keys:", error);
-          setGroupEncryptionKeys({});
+          setGroupEncryptionUsers({});
         }
       }
     };
@@ -617,9 +630,12 @@ export default function ChatWindow({
         );
 
         if (!selectedChat?.isGroup && recipient) {
-          const recipientPublicKey = recipientEncryptionKey;
+          const currentUser = getLoggedInUser();
+          const recipientDevices = buildDeviceRecipients([recipientEncryptionUser || recipient]);
+          const senderRecipients = buildDeviceRecipients([currentUser || { _id: myUserId }]);
+          const recipients = [...senderRecipients, ...recipientDevices];
 
-          if (!recipientPublicKey) {
+          if (recipientDevices.length === 0) {
             throw new Error("Recipient encryption key is not registered yet");
           }
 
@@ -638,13 +654,9 @@ export default function ChatWindow({
             }
           ]);
 
-          const { publicKey: senderPublicKey } = await ensureIdentityKeyPair(myUserId);
           const encryptedPayload = await encryptDirectMessage({
             content: messageText,
-            senderId: myUserId,
-            recipientId: getEntityId(recipient),
-            senderPublicKey,
-            recipientPublicKey,
+            recipients,
           });
 
           socket.emit("send-message", {
@@ -653,14 +665,13 @@ export default function ChatWindow({
             clientTempId,
           });
         } else if (selectedChat?.isGroup) {
-          const participantIds = (selectedChat?.participants || [])
-            .map((participant) => getEntityId(participant))
-            .filter(Boolean);
-          const recipients = participantIds.map((participantId) => ({
-            userId: participantId,
-            publicKey: groupEncryptionKeys[participantId],
-          }));
-          const missingParticipantKey = recipients.find((recipientEntry) => !recipientEntry.publicKey);
+          const participantUsers = (selectedChat?.participants || [])
+            .map((participant) => {
+              const participantId = getEntityId(participant);
+              return groupEncryptionUsers[participantId] || participant;
+            });
+          const recipients = buildDeviceRecipients(participantUsers);
+          const missingParticipantKey = participantUsers.find((participant) => buildDeviceRecipients([participant]).length === 0);
 
           if (missingParticipantKey) {
             socket.emit("send-message", {
@@ -717,13 +728,12 @@ export default function ChatWindow({
       const formData = new FormData();
       formData.append("chatId", selectedChat._id);
 
-      if (!selectedChat?.isGroup && selectedDirectRecipientId && recipientEncryptionKey) {
-        const { publicKey: senderPublicKey } = await ensureIdentityKeyPair(myUserId);
+      if (!selectedChat?.isGroup && selectedDirectRecipientId && recipientEncryptionUser) {
         const { encryptedFile, metadata } = await encryptAttachmentFile({
           file: selectedFile,
           recipients: [
-            { userId: myUserId, publicKey: senderPublicKey },
-            { userId: selectedDirectRecipientId, publicKey: recipientEncryptionKey },
+            ...buildDeviceRecipients([getLoggedInUser()]),
+            ...buildDeviceRecipients([recipientEncryptionUser || { _id: selectedDirectRecipientId }]),
           ],
         });
 
@@ -733,22 +743,21 @@ export default function ChatWindow({
         if (text.trim()) {
           const encryptedPayload = await encryptDirectMessage({
             content: text,
-            senderId: myUserId,
-            recipientId: selectedDirectRecipientId,
-            senderPublicKey,
-            recipientPublicKey: recipientEncryptionKey,
+            recipients: [
+              ...buildDeviceRecipients([getLoggedInUser()]),
+              ...buildDeviceRecipients([recipientEncryptionUser || { _id: selectedDirectRecipientId }]),
+            ],
           });
           formData.append("encryptedPayload", JSON.stringify(encryptedPayload));
         }
       } else if (selectedChat?.isGroup) {
-        const participantIds = (selectedChat?.participants || [])
-          .map((participant) => getEntityId(participant))
-          .filter(Boolean);
-        const recipients = participantIds.map((participantId) => ({
-          userId: participantId,
-          publicKey: groupEncryptionKeys[participantId],
-        }));
-        const missingParticipantKey = recipients.find((recipientEntry) => !recipientEntry.publicKey);
+        const participantUsers = (selectedChat?.participants || [])
+          .map((participant) => {
+            const participantId = getEntityId(participant);
+            return groupEncryptionUsers[participantId] || participant;
+          });
+        const recipients = buildDeviceRecipients(participantUsers);
+        const missingParticipantKey = participantUsers.find((participant) => buildDeviceRecipients([participant]).length === 0);
 
         if (!missingParticipantKey) {
           const { encryptedFile, metadata } = await encryptAttachmentFile({
@@ -1025,6 +1034,13 @@ export default function ChatWindow({
                   className={`w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm transition-all ${showDeleted ? 'text-whatsapp-green bg-whatsapp-green/5' : 'text-slate-300 hover:bg-white/5 hover:text-whatsapp-green'}`}
                 >
                   <Cpu size={16} /> {showDeleted ? "Hide Retracted" : "Reveal Hidden Messages"}
+                </button>
+                <div className="h-px bg-white/5 my-1" />
+                <button 
+                  onClick={handleClearChat}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-rose-500/10 hover:text-rose-400 transition-all"
+                >
+                  <Trash2 size={16} /> Clear Chat
                 </button>
                 <div className="h-px bg-white/5 my-1" />
                 <button 
