@@ -116,6 +116,7 @@ exports.uploadFile = async (req, res) => {
         encryptedKeys: Array.isArray(parsedEncryptedPayload.encryptedKeys)
           ? parsedEncryptedPayload.encryptedKeys.map((entry) => ({
               userId: entry.userId,
+              deviceId: entry.deviceId,
               key: entry.key,
             }))
           : []
@@ -133,6 +134,7 @@ exports.uploadFile = async (req, res) => {
         encryptedKeys: Array.isArray(parsedEncryptedFileMetadata.encryptedKeys)
           ? parsedEncryptedFileMetadata.encryptedKeys.map((entry) => ({
               userId: entry.userId,
+              deviceId: entry.deviceId,
               key: entry.key,
             }))
           : []
@@ -204,5 +206,86 @@ exports.reactToMessage = async (req, res) => {
   }
 };
 
+exports.syncDeviceHistoryKeys = async (req, res) => {
+  try {
+    const { updates } = req.body;
 
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ message: "No history sync updates provided" });
+    }
 
+    const processedMessageIds = [];
+
+    for (const update of updates) {
+      if (!update?.messageId) continue;
+
+      const message = await Message.findById(update.messageId).populate("chat", "participants");
+      if (!message || !message.chat?.participants?.some((participantId) => participantId.toString() === req.user.id.toString())) {
+        continue;
+      }
+
+      if (update.encryptedContentKey?.key) {
+        const exists = (message.encryptedContent?.encryptedKeys || []).some((entry) =>
+          entry.userId?.toString() === update.encryptedContentKey.userId?.toString() &&
+          entry.deviceId === update.encryptedContentKey.deviceId
+        );
+
+        if (!exists) {
+          if (!message.encryptedContent) {
+            message.encryptedContent = { encryptedKeys: [] };
+          }
+          message.encryptedContent.encryptedKeys.push({
+            userId: update.encryptedContentKey.userId,
+            deviceId: update.encryptedContentKey.deviceId,
+            key: update.encryptedContentKey.key,
+          });
+        }
+      }
+
+      if (update.encryptedFileKey?.key) {
+        const exists = (message.encryptedFile?.encryptedKeys || []).some((entry) =>
+          entry.userId?.toString() === update.encryptedFileKey.userId?.toString() &&
+          entry.deviceId === update.encryptedFileKey.deviceId
+        );
+
+        if (!exists) {
+          if (!message.encryptedFile) {
+            message.encryptedFile = { encryptedKeys: [] };
+          }
+          message.encryptedFile.encryptedKeys.push({
+            userId: update.encryptedFileKey.userId,
+            deviceId: update.encryptedFileKey.deviceId,
+            key: update.encryptedFileKey.key,
+          });
+        }
+      }
+
+      await message.save();
+      processedMessageIds.push(message._id.toString());
+    }
+
+    res.status(200).json({
+      message: "History sync keys saved",
+      processedMessageIds,
+    });
+  } catch (error) {
+    console.error("Error syncing device history keys:", error);
+    res.status(500).json({ message: "Error syncing device history keys", error: error.message });
+  }
+};
+
+exports.clearChat = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.user.id;
+
+    await Message.updateMany(
+      { chat: chatId, deletedFor: { $ne: userId } },
+      { $addToSet: { deletedFor: userId } }
+    );
+
+    res.status(200).json({ message: "Chat cleared successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error clearing chat", error: error.message });
+  }
+};
