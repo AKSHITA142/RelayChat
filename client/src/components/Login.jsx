@@ -20,6 +20,7 @@ export default function Login({ onLogin, onSignup }) {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [canResendAt, setCanResendAt] = useState(0);
   
   // Registration Flow state (for new phone users)
   const [isRegistering, setIsRegistering] = useState(false);
@@ -64,12 +65,19 @@ export default function Login({ onLogin, onSignup }) {
       await api.post("/auth/send-otp", { phone });
       setOtpSent(true);
       setError("Success: OTP Sent Successfully!");
+      setCanResendAt(Date.now() + 45 * 1000);
     } catch (err) {
       console.error("OTP send error:", err);
       setError(err.response?.data?.message || "Failed to send OTP.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResendOtp = async () => {
+    if (loading) return;
+    if (Date.now() < canResendAt) return;
+    await handleSendOtp();
   };
 
   const handleVerifyOtp = async () => {
@@ -239,29 +247,42 @@ export default function Login({ onLogin, onSignup }) {
                     className="relative"
                   >
                     <Send className="absolute left-3 top-3 text-slate-500" size={20} />
-                    <input
-                      type="text"
-                      placeholder="6-digit OTP"
-                      value={otp}
-                      onChange={e => setOtp(e.target.value)}
-                      maxLength={6}
-                      className="w-full pl-11 pr-4 py-3 bg-whatsapp-bg-dark border border-white/10 rounded-xl focus:border-whatsapp-green focus:ring-1 focus:ring-whatsapp-green outline-none transition-all"
-                    />
-                  </motion.div>
-                )}
+                  <input
+                    type="text"
+                    placeholder="6-digit OTP"
+                    value={otp}
+                    onChange={e => setOtp(e.target.value)}
+                    maxLength={6}
+                    className="w-full pl-11 pr-4 py-3 bg-whatsapp-bg-dark border border-white/10 rounded-xl focus:border-whatsapp-green focus:ring-1 focus:ring-whatsapp-green outline-none transition-all"
+                  />
+                </motion.div>
+              )}
 
-                <button 
-                  onClick={!otpSent ? handleSendOtp : handleVerifyOtp} 
-                  disabled={loading}
-                  className="interactive-btn w-full bg-whatsapp-green text-whatsapp-bg-dark font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-400 disabled:opacity-50"
+              <button 
+                onClick={!otpSent ? handleSendOtp : handleVerifyOtp} 
+                disabled={loading}
+                className="interactive-btn w-full bg-whatsapp-green text-whatsapp-bg-dark font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-400 disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="animate-spin" /> : !otpSent ? "Send Security Code" : "Verify & Log In"}
+              </button>
+
+              {otpSent && (
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={loading || Date.now() < canResendAt}
+                  className="w-full py-2 bg-white/5 text-slate-200 font-semibold rounded-lg text-sm interactive-btn flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? <Loader2 className="animate-spin" /> : !otpSent ? "Send Security Code" : "Verify & Log In"}
+                  {Date.now() < canResendAt
+                    ? `Resend in ${Math.ceil((canResendAt - Date.now()) / 1000)}s`
+                    : "Resend OTP"}
                 </button>
+              )}
 
-                <div 
-                  className="text-center mt-6 cursor-pointer text-slate-400 hover:text-whatsapp-green text-sm transition-colors"
-                  onClick={() => { setLoginMethod("email"); setError(""); }}
-                >
+              <div 
+                className="text-center mt-6 cursor-pointer text-slate-400 hover:text-whatsapp-green text-sm transition-colors"
+                onClick={() => { setLoginMethod("email"); setError(""); }}
+              >
                   Prefer password login?
                 </div>
               </motion.div>

@@ -4,30 +4,6 @@ const jwt = require("jsonwebtoken");
 const redisClient = require("../config/redis");
 const { sendSms } = require("../utils/sms");
 
-const buildEncryptionDevices = (user) => {
-  if (Array.isArray(user?.encryptionDevices) && user.encryptionDevices.length > 0) {
-    return user.encryptionDevices.map((device) => ({
-      deviceId: device.deviceId,
-      publicKey: device.publicKey,
-      label: device.label || "Browser",
-      lastSeenAt: device.lastSeenAt,
-    }));
-  }
-
-  if (user?.encryptionPublicKey) {
-    return [
-      {
-        deviceId: `legacy-${user._id}`,
-        publicKey: user.encryptionPublicKey,
-        label: "Legacy Device",
-        lastSeenAt: user.updatedAt || user.createdAt || null,
-      }
-    ];
-  }
-
-  return [];
-};
-
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -63,7 +39,7 @@ exports.login = async (req, res) => {
         role: user.role,
         contacts: user.contacts,
         encryptionPublicKey: user.encryptionPublicKey,
-        encryptionDevices: buildEncryptionDevices(user)
+        encryptionDevices: user.encryptionDevices || []
       }
     });
 
@@ -179,7 +155,7 @@ exports.verifyOtp = async (req, res) => {
         role: user.role,
         contacts: user.contacts,
         encryptionPublicKey: user.encryptionPublicKey,
-        encryptionDevices: buildEncryptionDevices(user)
+        encryptionDevices: user.encryptionDevices || []
       }
     });
 
