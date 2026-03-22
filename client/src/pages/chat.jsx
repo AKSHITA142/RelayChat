@@ -48,6 +48,11 @@ export default function Chat() {
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [activeVideoCall, setActiveVideoCall] = useState(null);
 
+  // Backup Restore Fallback States
+  const [restorePin, setRestorePin] = useState("");
+  const [restoringPin, setRestoringPin] = useState(false);
+  const [restoreError, setRestoreError] = useState("");
+
   useEffect(() => {
     connectSocket();
     const currentUser = getLoggedInUser();
@@ -260,6 +265,31 @@ export default function Chat() {
     return !localStorage.getItem(requestedStorageKey);
   };
 
+  const handlePINRestore = async () => {
+    if (!restorePin || restorePin.length < 4) return setRestoreError("PIN too short");
+    setRestoringPin(true);
+    setRestoreError("");
+    try {
+      const { restorePrivateKeyFromCloud } = await import("../services/e2ee");
+      const currentUser = e2eeUser || getLoggedInUser();
+      
+      // Attempt restore
+      await restorePrivateKeyFromCloud(api, currentUser._id, restorePin);
+      
+      const currentDeviceId = getCurrentDeviceId();
+      localStorage.removeItem(`relaychat-history-sync-needed-${currentUser._id}-${currentDeviceId}`);
+      
+      await ensureE2EERegistration(api, currentUser);
+      
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      setRestoreError("Invalid PIN or corrupted backup");
+    } finally {
+      setRestoringPin(false);
+    }
+  };
+
   const renderHistorySyncGate = () => {
     const currentUser = e2eeUser || getLoggedInUser();
     if (!currentUser?._id) return null;
@@ -279,30 +309,59 @@ export default function Chat() {
     const canRequest = hasOtherTrustedDevice && !hasRequested;
 
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-whatsapp-bg-dark">
-        <div className="flex flex-col items-center gap-4 rounded-3xl border border-sky-400/20 bg-slate-900/90 px-8 py-10 shadow-2xl backdrop-blur">
-          <div className="h-14 w-14 rounded-2xl bg-sky-500/10 border border-sky-400/20 flex items-center justify-center">
-            <span className="text-sky-400 text-lg font-black">RC</span>
+      <div className="flex h-screen w-full items-center justify-center auto-grid bg-whatsapp-bg-dark">
+        <div className="flex flex-col items-center gap-6 rounded-3xl border border-sky-400/20 bg-slate-900/90 px-8 py-10 shadow-2xl backdrop-blur max-w-md w-full">
+          <div className="h-16 w-16 rounded-2xl bg-sky-500/10 border border-sky-400/20 flex items-center justify-center">
+            <span className="text-sky-400 text-2xl font-black">RC</span>
           </div>
           <div className="text-center space-y-2">
-            <p className="text-lg font-semibold text-white">New device needs approval</p>
+            <p className="text-xl font-bold text-white">Device Approval Needed</p>
             <p className="text-sm text-slate-400">
-              Ask a trusted device to share encrypted history so you can read past messages.
+              Please approve this device from a logged-in trusted session to sync your encrypted history.
             </p>
           </div>
           {canRequest ? (
             <button
               onClick={requestHistorySync}
               disabled={historySyncRequesting}
-              className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-400"
+              className="w-full interactive-btn rounded-xl bg-sky-500 py-3 text-sm font-bold text-white transition hover:bg-sky-400"
             >
-              {historySyncRequesting ? "Requesting..." : "Request History Sync"}
+              {historySyncRequesting ? "Requesting..." : "Send Request to Trusted Device"}
             </button>
           ) : (
-            <p className="text-xs text-slate-500">
+            <p className="text-sm text-sky-400 font-semibold animate-pulse">
               Waiting for approval from a trusted device...
             </p>
           )}
+
+          <div className="w-full h-px bg-white/10 my-2" />
+          
+          <div className="w-full text-center space-y-3">
+            <p className="text-sm text-slate-300 font-medium">Remembered your Cloud PIN?</p>
+            {restoreError && <p className="text-xs text-rose-400 font-medium">{restoreError}</p>}
+            <div className="flex gap-2">
+              <input
+                type="password"
+                placeholder="4-Digit PIN"
+                value={restorePin}
+                onChange={(e) => setRestorePin(e.target.value)}
+                className="w-3/5 px-4 py-2 bg-black/30 border border-white/10 rounded-xl text-center tracking-widest outline-none focus:border-emerald-400 transition-colors placeholder:text-slate-600"
+              />
+              <button
+                onClick={handlePINRestore}
+                disabled={restoringPin || !restorePin}
+                className="w-2/5 rounded-xl bg-emerald-500 font-bold text-white transition hover:bg-emerald-400 disabled:opacity-50 text-sm"
+              >
+                {restoringPin ? "..." : "Restore"}
+              </button>
+            </div>
+            <button 
+              onClick={() => { localStorage.clear(); window.location.reload(); }}
+              className="mt-4 text-xs text-slate-500 hover:text-white transition-colors underline"
+            >
+              Cancel and Logout
+            </button>
+          </div>
         </div>
       </div>
     );

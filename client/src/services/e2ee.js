@@ -575,4 +575,95 @@ export const buildDeviceRecipients = (users = []) => (
 export const needsHistorySync = (userId) => localStorage.getItem(getHistorySyncNeededStorageKey(userId)) === "true";
 export const markHistorySyncComplete = (userId) => localStorage.removeItem(getHistorySyncNeededStorageKey(userId));
 
+const deriveKeyFromPin = async (pin, saltStr) => {
+  const enc = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey(
+    "raw",
+    enc.encode(pin),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits", "deriveKey"]
+  );
+
+  const salt = saltStr ? new Uint8Array(fromBase64(saltStr)) : window.crypto.getRandomValues(new Uint8Array(16));
+
+  const key = await window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+
+  return { key, salt: saltStr ? saltStr : toBase64(salt.buffer) };
+};
+
+export const backupPrivateKeyToCloud = async (apiClient, userId, pin) => {
+  const storedPrivateKey = localStorage.getItem(getPrivateKeyStorageKey(userId));
+  if (!storedPrivateKey) throw new Error("No local private key to backup");
+
+  const { key, salt } = await deriveKeyFromPin(pin);
+  const iv = window.crypto.getRandomValues(new Uint8Array(AES_IV_LENGTH));
+  
+  const enc = new TextEncoder();
+  const encryptedFileBuffer = await window.crypto.subtle.encrypt(
+    { name: AES_ALGORITHM, iv },
+    key,
+    enc.encode(storedPrivateKey)
+  );
+
+  await apiClient.post("/user/backup", {
+    encryptedKey: toBase64(encryptedFileBuffer),
+    salt,
+    iv: toBase64(iv.buffer)
+  });
+};
+
+export const restorePrivateKeyFromCloud = async (apiClient, userId, pin) => {
+  const response = await apiClient.get("/user/backup");
+  const { encryptedKey, salt, iv } = response.data;
+  
+  const { key } = await deriveKeyFromPin(pin, salt);
+  
+  try {
+    const decryptedBuffer = await window.crypto.subtle.decrypt(
+      { name: AES_ALGORITHM, iv: new Uint8Array(fromBase64(iv)) },
+      key,
+      fromBase64(encryptedKey)
+    );
+    const dec = new TextDecoder();
+    const privateKeyStr = dec.decode(decryptedBuffer);
+    
+    // Verify valid JSON
+    const privateKeyJwk = JSON.parse(privateKeyStr);
+    
+    // Reconstruct the public key JWK from the private key components
+    const publicKeyJwk = {
+      kty: privateKeyJwk.kty || "RSA",
+      n: privateKeyJwk.n,
+      e: privateKeyJwk.e,
+      alg: privateKeyJwk.alg || "RSA-OAEP-256",
+      ext: true,
+      key_ops: ["encrypt"]
+    };
+    
+    localStorage.setItem(getPrivateKeyStorageKey(userId), privateKeyStr);
+    localStorage.setItem(getPublicKeyStorageKey(userId), JSON.stringify(publicKeyJwk));
+    
+    // Also, if there are old history sync requests, clear them so it doesn't block the UI
+    const currentDeviceId = getCurrentDeviceId();
+    localStorage.removeItem(getHistorySyncNeededStorageKey(userId, currentDeviceId));
+    
+    // Make sure we also have a device id if we need to fake one or keep the existing
+    return true;
+  } catch (err) {
+    throw new Error("Invalid password or corrupted backup");
+  }
+};
+
 export { getCurrentDeviceId, getCurrentDeviceLabel };

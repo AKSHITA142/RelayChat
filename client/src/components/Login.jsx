@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 // Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
 void motion;
 
-import { Phone, Mail, Lock, User, ArrowLeft, Send, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Phone, Mail, Lock, User, ArrowLeft, Send, CheckCircle, AlertCircle, Loader2, Smartphone } from "lucide-react";
 import api from "../services/api";
 import { connectSocket } from "../services/socket";
 import { ensureE2EERegistration } from "../services/e2ee";
@@ -29,17 +29,92 @@ export default function Login({ onLogin, onSignup }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Restore Backup state
+  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
+  const [restoreAuthData, setRestoreAuthData] = useState(null);
+  const [restorePin, setRestorePin] = useState("");
+  const [restoreError, setRestoreError] = useState("");
+
   const handleLoginSuccess = async (res) => {
     localStorage.setItem("token", res.data.token);
     localStorage.setItem("user", JSON.stringify(res.data.user));
+    
+    const userId = res.data.user._id;
+    const hasLocalKey = !!localStorage.getItem(`relaychat-e2ee-private-key-${userId}`);
+
+    if (!hasLocalKey) {
+      try {
+        const backupRes = await api.get("/user/backup");
+        if (backupRes.status === 200 && backupRes.data?.encryptedKey) {
+          setRestoreAuthData(res.data);
+          setShowRestorePrompt(true);
+          return;
+        }
+      } catch (err) {
+        // No backup found or error, continue to normal flow (creates new key)
+      }
+    }
+
     try {
       await ensureE2EERegistration(api, res.data.user);
+      connectSocket();
+      onLogin();
     } catch (keyError) {
       console.error("Failed to initialize E2EE keys:", keyError);
       window.alert(keyError.message || "Your encryption keys could not be restored on this device");
+      connectSocket();
+      onLogin();
     }
-    connectSocket();
-    onLogin();
+  };
+
+  const handleRestoreBackup = async () => {
+    if (!restorePin) return setRestoreError("Please enter your Backup PIN");
+    setLoading(true);
+    setRestoreError("");
+    try {
+      const { restorePrivateKeyFromCloud } = await import("../services/e2ee");
+      await restorePrivateKeyFromCloud(api, restoreAuthData.user._id, restorePin);
+      
+      await ensureE2EERegistration(api, restoreAuthData.user);
+      
+      const deviceId = localStorage.getItem("relaychat-e2ee-device-id");
+      if (deviceId) {
+        localStorage.removeItem(`relaychat-history-sync-needed-${restoreAuthData.user._id}-${deviceId}`);
+      }
+      
+      setShowRestorePrompt(false);
+      connectSocket();
+      onLogin();
+    } catch (err) {
+      console.error(err);
+      setRestoreError(err.message || "Failed to restore backup or incorrect PIN");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkipRestore = () => {
+    localStorage.clear();
+    window.location.reload();
+  };
+
+  const handleDeviceVerification = async () => {
+    setLoading(true);
+    setRestoreError("");
+    try {
+      await ensureE2EERegistration(api, restoreAuthData.user);
+      setShowRestorePrompt(false);
+      connectSocket();
+      onLogin();
+    } catch (keyError) {
+      console.error("Failed to initialize E2EE keys:", keyError);
+      window.alert(keyError.message || "Your encryption keys could not be generated");
+      setShowRestorePrompt(false);
+      connectSocket();
+      onLogin();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEmailLogin = async () => {
@@ -133,6 +208,92 @@ export default function Login({ onLogin, onSignup }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-whatsapp-bg-dark to-slate-900">
+      
+      {showRestorePrompt ? (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-3xl flex flex-col items-center space-y-8"
+        >
+          <div className="text-center space-y-2">
+            <h2 className="text-3xl font-bold text-white">Restore Your Account</h2>
+            <p className="text-slate-400 text-sm">
+              You're logging in from a new device. Choose how you want to restore your encrypted messages.
+            </p>
+          </div>
+
+          {restoreError && (
+            <div className="w-full max-w-md bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg text-sm font-medium text-center">
+              {restoreError}
+            </div>
+          )}
+
+          <div className="w-full flex flex-col md:flex-row gap-6">
+            {/* Option 1: Cloud Backup */}
+            <div className="flex-1 glass-card p-6 flex flex-col items-center text-center space-y-5 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-whatsapp-green/5 rounded-full blur-2xl group-hover:bg-whatsapp-green/10 transition-colors" />
+              <div className="w-14 h-14 bg-whatsapp-green/10 rounded-full flex items-center justify-center text-whatsapp-green">
+                <Lock size={28} />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white mb-2">Cloud Backup</h3>
+                <p className="text-slate-400 text-xs">
+                  Restore instantly using the 4-digit PIN you created on your previous device.
+                </p>
+              </div>
+              <div className="w-full space-y-3 mt-auto pt-2">
+                <div className="relative">
+                  <Lock className="absolute left-3 top-2.5 text-slate-500" size={16} />
+                  <input
+                    type="password"
+                    placeholder="Enter Backup PIN"
+                    value={restorePin}
+                    onChange={e => setRestorePin(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-black/20 border border-white/5 rounded-xl focus:border-whatsapp-green focus:ring-1 focus:ring-whatsapp-green outline-none text-sm transition-all text-center tracking-widest"
+                  />
+                </div>
+                <button 
+                  onClick={handleRestoreBackup} 
+                  disabled={loading || restorePin.length < 4}
+                  className="interactive-btn w-full bg-whatsapp-green text-whatsapp-bg-dark font-bold py-2.5 rounded-xl hover:bg-emerald-400 disabled:opacity-50 text-sm"
+                >
+                  {loading && restorePin ? <Loader2 className="animate-spin mx-auto" size={18} /> : "Restore with PIN"}
+                </button>
+              </div>
+            </div>
+
+            {/* Option 2: Device Approval */}
+            <div className="flex-1 glass-card p-6 flex flex-col items-center text-center space-y-5 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/5 rounded-full blur-2xl group-hover:bg-sky-500/10 transition-colors" />
+              <div className="w-14 h-14 bg-sky-500/10 rounded-full flex items-center justify-center text-sky-400">
+                <Smartphone size={28} />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white mb-2">Device Approval</h3>
+                <p className="text-slate-400 text-xs">
+                  Forgot your PIN? Log in anyway and request sync approval from another trusted device.
+                </p>
+              </div>
+              <div className="w-full mt-auto pt-2">
+                <button 
+                  onClick={handleDeviceVerification}
+                  disabled={loading && !restorePin}
+                  className="interactive-btn w-full bg-sky-500 text-white font-bold py-2.5 rounded-xl hover:bg-sky-400 disabled:opacity-50 text-sm"
+                >
+                  {loading && !restorePin ? <Loader2 className="animate-spin mx-auto" size={18} /> : "Ask Trusted Device"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            onClick={handleSkipRestore}
+            className="text-slate-500 text-sm hover:text-white transition-colors"
+          >
+            Cancel and log back out
+          </button>
+        </motion.div>
+      ) : (
       <motion.div 
         variants={containerVariants}
         initial="hidden"
@@ -345,8 +506,7 @@ export default function Login({ onLogin, onSignup }) {
           </motion.p>
         )}
       </motion.div>
+      )}
     </div>
   );
 }
-
-
