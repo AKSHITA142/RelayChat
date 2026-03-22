@@ -217,7 +217,7 @@ exports.completeRegistration = async (req, res) => {
         role: user.role,
         contacts: user.contacts,
         encryptionPublicKey: user.encryptionPublicKey,
-        encryptionDevices: buildEncryptionDevices(user)
+        encryptionDevices: user.encryptionDevices || []
       }
     });
 

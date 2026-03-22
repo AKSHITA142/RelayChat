@@ -20,6 +20,14 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
     },
+    encryptedBackupKey: {
+      type: String,
+      default: null,
+    },
+    backupSalt: {
+      type: String,
+      default: null,
+    },
     encryptionPublicKey: {
       type: mongoose.Schema.Types.Mixed,
       default: null,

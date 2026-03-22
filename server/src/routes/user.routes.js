@@ -1,6 +1,6 @@
 const express = require("express");
 const authMiddleware = require("../middleware/auth.middleware");
-const { getProfile, searchUsers, checkPhoneNumber, saveContact, getUserEncryptionKey, upsertEncryptionKey } = require("../controllers/user.controller");
+const { getProfile, searchUsers, checkPhoneNumber, saveContact, getUserEncryptionKey, upsertEncryptionKey, saveBackupKey, getBackupKey } = require("../controllers/user.controller");
 
 
 const router = express.Router();
@@ -11,5 +11,7 @@ router.get("/", authMiddleware, searchUsers);
 router.post("/check-number", authMiddleware, checkPhoneNumber);
 router.post("/save-contact", authMiddleware, saveContact);
 router.post("/encryption-key", authMiddleware, upsertEncryptionKey);
+router.post("/backup", authMiddleware, saveBackupKey);
+router.get("/backup", authMiddleware, getBackupKey);
 
 module.exports = router;

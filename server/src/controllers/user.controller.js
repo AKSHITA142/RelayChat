@@ -197,4 +197,51 @@ const upsertEncryptionKey = async (req, res) => {
   }
 };
 
-module.exports = { getProfile, searchUsers, checkPhoneNumber, saveContact, getUserEncryptionKey, upsertEncryptionKey };
+const saveBackupKey = async (req, res) => {
+  try {
+    const { encryptedKey, salt, iv } = req.body;
+    if (!encryptedKey || !salt || !iv) {
+      return res.status(400).json({ message: "Missing backup data" });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.encryptedBackupKey = JSON.stringify({ encryptedKey, iv });
+    user.backupSalt = salt;
+    await user.save();
+
+    res.status(200).json({ message: "Backup saved successfully" });
+  } catch (error) {
+    console.error("Error saving backup key:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getBackupKey = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.encryptedBackupKey || !user.backupSalt) {
+      return res.status(404).json({ message: "No backup found" });
+    }
+
+    const { encryptedKey, iv } = JSON.parse(user.encryptedBackupKey);
+
+    res.status(200).json({
+      encryptedKey,
+      iv,
+      salt: user.backupSalt
+    });
+  } catch (error) {
+    console.error("Error fetching backup key:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+module.exports = { getProfile, searchUsers, checkPhoneNumber, saveContact, getUserEncryptionKey, upsertEncryptionKey, saveBackupKey, getBackupKey };
