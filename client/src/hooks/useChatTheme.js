@@ -16,6 +16,7 @@ export const THEMES = {
     inputBorder:  "rgba(18,241,255,0.3)",
     sendBtn:      "linear-gradient(135deg, #12f1ff 0%, #00a6ff 100%)",
   },
+
   void: {
     primary:      "#b6a0ff",
     background:   "#060608",
