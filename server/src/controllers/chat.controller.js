@@ -22,7 +22,7 @@ exports.createChat = async (req, res) => {
 
     if (chat) {
       const populatedChat = await Chat.findById(chat._id)
-        .populate("participants", "name email phoneNumber encryptionPublicKey")
+        .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")
         .populate("lastMessage");
 
       return res.status(200).json(populatedChat);
@@ -35,7 +35,7 @@ exports.createChat = async (req, res) => {
     });
 
     const populatedChat = await Chat.findById(chat._id)
-      .populate("participants", "name email phoneNumber encryptionPublicKey")
+      .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")
       .populate("lastMessage");
 
     res.status(201).json(populatedChat);
@@ -52,7 +52,7 @@ exports.getMyChats = async (req, res) => {
 
   
   const chats = await Chat.find({ participants: userId })
-    .populate("participants", "name email phoneNumber encryptionPublicKey")
+    .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")
     .populate("lastMessage")
     .sort({ updatedAt: -1 })
     .lean();
@@ -82,7 +82,7 @@ exports.createGroup = async (req, res) => {
   });
 
   const fullGroupChat = await Chat.findOne({ _id: chat._id })
-    .populate("participants", "name email phoneNumber encryptionPublicKey");
+    .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol");
 
   
   const io = getIO();
@@ -119,7 +119,7 @@ exports.addToGroup = async (req, res) => {
     await chat.save();
 
     const fullGroupChat = await Chat.findById(chatId)
-      .populate("participants", "name email phoneNumber encryptionPublicKey")
+      .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")
       .populate("lastMessage");
 
     
@@ -168,7 +168,7 @@ exports.removeFromGroup = async (req, res) => {
     await chat.save();
 
     const fullGroupChat = await Chat.findById(chatId)
-      .populate("participants", "name email phoneNumber encryptionPublicKey");
+      .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol");
 
     const io = getIO();
     if (io) {
@@ -216,7 +216,7 @@ exports.startChatByPhone = async (req, res) => {
         chat_id: chat._id,
         receiver_id: targetUser._id,
         chat: await Chat.findById(chat._id)
-          .populate("participants", "name email phoneNumber encryptionPublicKey")
+          .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")
           .populate("lastMessage")
       });
     }
@@ -227,7 +227,7 @@ exports.startChatByPhone = async (req, res) => {
     });
 
     const populatedChat = await Chat.findById(chat._id)
-      .populate("participants", "name email phoneNumber encryptionPublicKey")
+      .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")
       .populate("lastMessage");
 
     res.status(201).json({

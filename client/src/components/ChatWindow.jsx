@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import Message from "./Message";
 import VoiceRecorder from "./VoiceRecorder";
+import ContactInfoPanel from "./ContactInfoPanel";
 import ThemeSelector from "./ThemeSelector";
 import { useChatTheme, THEMES } from "../hooks/useChatTheme";
 import socket from "../services/socket";
@@ -127,13 +128,20 @@ export default function ChatWindow({
   const [searchResults, setSearchResults] = useState([]);
   const [showDeleted, setShowDeleted] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
+  const [showContactInfo, setShowContactInfo] = useState(false);
   const [recipientEncryptionUser, setRecipientEncryptionUser] = useState(null);
   const [groupEncryptionUsers, setGroupEncryptionUsers] = useState({});
 
   // Per-chat theme
   const [savedThemeName, setSavedThemeName] = useChatTheme(selectedChat?._id);
   const [activeThemeName, setActiveThemeName] = useState(savedThemeName);
-  const theme = THEMES[activeThemeName] || THEMES.neon;
+
+  // Sync state if savedThemeName changes externally (e.g. from dashboard global setting)
+  useEffect(() => {
+    setActiveThemeName(savedThemeName);
+  }, [savedThemeName]);
+
+  const theme = THEMES[activeThemeName] || THEMES.stealth_dark;
 
   // Message info modal
   const [showMessageInfo, setShowMessageInfo] = useState(false);
@@ -746,8 +754,10 @@ export default function ChatWindow({
           ],
         });
 
-        formData.append("file", encryptedFile);
         formData.append("encryptedFileMetadata", JSON.stringify(metadata));
+        formData.append("fileName", selectedFile.name);
+        formData.append("fileType", selectedFile.type);
+        formData.append("file", encryptedFile);
 
         if (text.trim()) {
           const encryptedPayload = await encryptDirectMessage({
@@ -774,8 +784,10 @@ export default function ChatWindow({
             recipients,
           });
 
-          formData.append("file", encryptedFile);
           formData.append("encryptedFileMetadata", JSON.stringify(metadata));
+          formData.append("fileName", selectedFile.name);
+          formData.append("fileType", selectedFile.type);
+          formData.append("file", encryptedFile);
 
           if (text.trim()) {
             const encryptedPayload = await encryptGroupMessage({
@@ -839,6 +851,19 @@ export default function ChatWindow({
       className="flex-1 flex flex-col h-full relative overflow-hidden"
       style={{ background: theme.background, transition: "background 0.4s ease, color 0.3s ease" }}
     >
+      {/* Contact Info Slide-in Panel */}
+      {showContactInfo && !selectedChat?.isGroup && (
+        <ContactInfoPanel
+          user={otherUser}
+          displayName={displayName}
+          onClose={() => setShowContactInfo(false)}
+          onVideoCall={() => { setShowContactInfo(false); setActiveVideoCall?.({ chatId: selectedChat._id, recipientId: otherUser?._id, isVideo: true }); }}
+          onVoiceCall={() => { setShowContactInfo(false); setActiveVideoCall?.({ chatId: selectedChat._id, recipientId: otherUser?._id, isVideo: false }); }}
+          onSearch={() => { setShowContactInfo(false); setShowSearch(true); }}
+          onClearChat={() => { setShowContactInfo(false); }}
+        />
+      )}
+
       {/* Modern Ethereal Ambient Background */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         {/* Static Theme Glows (Disabled for Minimal Themes) */}
@@ -884,11 +909,19 @@ export default function ChatWindow({
       >
         <div className="flex items-center gap-4">
           <div className="relative">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold bg-[#12f1ff]/10 text-[#12f1ff]`}>
-              {selectedChat.isGroup ? <Users size={20} /> : (displayName?.[0]?.toUpperCase() || "?")}
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold bg-[$theme.primary]/10 text-[$theme.primary]`}>
+              {selectedChat.isGroup ? <Users size={20} /> : (
+                otherUser?.avatar ? (
+                  <img 
+                    src={`http://localhost:5002${otherUser.avatar}`} 
+                    alt={displayName} 
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (displayName?.[0]?.toUpperCase() || "?")
+              )}
             </div>
             {!selectedChat.isGroup && isOnline && (
-              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[#12f1ff] border-2 border-[#10131a] rounded-full shadow-lg" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[$theme.primary] border-2 border-[#10131a] rounded-full shadow-lg" />
             )}
           </div>
           <div>
@@ -900,21 +933,25 @@ export default function ChatWindow({
                     value={tempGroupName}
                     onChange={(e) => setTempGroupName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleRenameChat()}
-                    className="bg-black/20 border border-[#12f1ff]/30 rounded-lg px-2 py-1 text-sm text-white outline-none focus:border-[#12f1ff]"
+                    className="bg-black/20 border border-[$theme.primary]/30 rounded-lg px-2 py-1 text-sm text-white outline-none focus:border-[$theme.primary]"
                     autoFocus
                   />
-                  <button onClick={handleRenameChat} className="p-1 text-[#12f1ff] hover:bg-[#12f1ff]/10 rounded-lg"><Check size={16} /></button>
+                  <button onClick={handleRenameChat} className="p-1 text-[$theme.primary] hover:bg-[$theme.primary]/10 rounded-lg"><Check size={16} /></button>
                   <button onClick={() => setIsRenaming(false)} className="p-1 text-rose-400 hover:bg-rose-500/10 rounded-lg"><X size={16} /></button>
                 </div>
               ) : (
                 <>
-                  <h3 className="text-sm font-bold text-white tracking-wide">{displayName}</h3>
+                  <h3
+                    className="text-sm font-bold text-white tracking-wide cursor-pointer hover:text-[#c59aff] transition-colors"
+                    onClick={() => !selectedChat?.isGroup && setShowContactInfo(p => !p)}
+                    title={!selectedChat?.isGroup ? "View contact info" : undefined}
+                  >{displayName}</h3>
                   <button 
                     onClick={() => {
                       setIsRenaming(true);
                       setTempGroupName(displayName);
                     }}
-                    className="p-1 text-slate-500 hover:text-[#12f1ff] transition-colors"
+                    className="p-1 text-slate-500 hover:text-[$theme.primary] transition-colors"
                   >
                     <Edit2 size={14} />
                   </button>
@@ -927,7 +964,7 @@ export default function ChatWindow({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
                     onClick={() => setShowAddContact(true)} 
-                    className="flex items-center gap-1.5 px-2 py-0.5 bg-[#12f1ff]/10 text-[#12f1ff] text-[10px] font-black uppercase rounded-full hover:bg-[#12f1ff] hover:text-[#0b0e14] transition-all"
+                    className="flex items-center gap-1.5 px-2 py-0.5 bg-[$theme.primary]/10 text-[$theme.primary] text-[10px] font-black uppercase rounded-full hover:bg-[$theme.primary] hover:text-[#0b0e14] transition-all"
                   >
                     <UserPlus size={10} /> Add Contact
                   </motion.button>
@@ -935,10 +972,10 @@ export default function ChatWindow({
               </AnimatePresence>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`text-[10px] font-bold uppercase tracking-widest ${isTyping || isOnline ? 'text-[#12f1ff]' : 'text-slate-500'}`}>
+              <span className={`text-[10px] font-bold uppercase tracking-widest ${isTyping || isOnline ? 'text-[$theme.primary]' : 'text-slate-500'}`}>
                 {isTyping ? (
                   <span className="flex items-center gap-1">
-                    <Circle className="animate-pulse fill-[#12f1ff]" size={4} />
+                    <Circle className="animate-pulse fill-[$theme.primary]" size={4} />
                     Refining thoughts...
                   </span>
                 ) : selectedChat?.isGroup ? (
@@ -997,7 +1034,7 @@ export default function ChatWindow({
           
           <button 
             onClick={() => setShowMenu(!showMenu)}
-            className={`p-2 rounded-lg transition-all ${showMenu ? 'bg-[#12f1ff] text-[#0b0e14]' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+            className={`p-2 rounded-lg transition-all ${showMenu ? 'bg-[$theme.primary] text-[#0b0e14]' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
           >
             <MoreHorizontal size={20} />
           </button>
@@ -1012,19 +1049,19 @@ export default function ChatWindow({
               >
                 <button 
                   onClick={() => { setShowSearch(true); setShowMenu(false); }}
-                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[#12f1ff] transition-all"
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[$theme.primary] transition-all"
                 >
                   <SearchIcon size={16} /> Search Messages
                 </button>
                 <button 
                   onClick={() => { setShowParticipants(true); setShowMenu(false); }}
-                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[#12f1ff] transition-all"
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[$theme.primary] transition-all"
                 >
                   <Users size={16} /> View Participants
                 </button>
                 <button 
                   onClick={() => { setIsRenaming(true); setTempGroupName(displayName); setShowMenu(false); }}
-                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[#12f1ff] transition-all"
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[$theme.primary] transition-all"
                 >
                   <Edit2 size={16} /> Rename {selectedChat.isGroup ? "Group" : "Chat"}
                 </button>
@@ -1043,7 +1080,7 @@ export default function ChatWindow({
                           setTimeout(() => setAdminNotice(""), 3000);
                         }
                       }}
-                      className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[#12f1ff] transition-all"
+                      className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[$theme.primary] transition-all"
                     >
                       <UserPlus size={16} /> Add Member
                     </button>
@@ -1068,7 +1105,7 @@ export default function ChatWindow({
                 {!selectedChat?.isGroup && !savedContact && (
                   <button 
                     onClick={() => { setShowAddContact(true); setShowMenu(false); }}
-                    className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[#12f1ff] transition-all"
+                    className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[$theme.primary] transition-all"
                   >
                     <UserPlus size={16} /> Add to Contacts
                   </button>
@@ -1076,7 +1113,7 @@ export default function ChatWindow({
                 <div className="h-px bg-white/5 my-1" />
                 <button 
                   onClick={() => { setShowDeleted(!showDeleted); setShowMenu(false); }}
-                  className={`w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm transition-all ${showDeleted ? 'text-[#12f1ff] bg-[#12f1ff]/5' : 'text-slate-300 hover:bg-white/5 hover:text-[#12f1ff]'}`}
+                  className={`w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm transition-all ${showDeleted ? 'text-[$theme.primary] bg-[$theme.primary]/5' : 'text-slate-300 hover:bg-white/5 hover:text-[$theme.primary]'}`}
                 >
                   <Cpu size={16} /> {showDeleted ? "Hide Retracted" : "Reveal Hidden Messages"}
                 </button>
@@ -1086,28 +1123,6 @@ export default function ChatWindow({
                   className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-rose-500/10 hover:text-rose-400 transition-all"
                 >
                   <Trash2 size={16} /> Clear Chat
-                </button>
-                <div className="h-px bg-white/5 my-1" />
-                <button 
-                  onClick={() => { 
-                    setIsCreatingGroup(true); 
-                    setIsAddingContact(false);
-                    setShowMenu(false); 
-                  }}
-                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[#12f1ff] transition-all"
-                >
-                  <Users size={16} /> New Group
-                </button>
-                <div className="h-px bg-white/5 my-1" />
-                <button 
-                  onClick={() => { 
-                    setIsAddingContact(true);
-                    setIsCreatingGroup(false);
-                    setShowMenu(false);
-                  }}
-                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm text-slate-300 hover:bg-white/5 hover:text-[#12f1ff] transition-all"
-                >
-                  <UserPlus size={16} /> Add Contact by Phone
                 </button>
               </motion.div>
             )}
@@ -1313,7 +1328,7 @@ export default function ChatWindow({
                 value={searchQuery}
                 onPaste={handlePaste}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-black/20 border border-[#45484f]/15 rounded-xl text-sm text-white outline-none focus:border-[#12f1ff]"
+                className="w-full pl-10 pr-4 py-2 bg-black/20 border border-[#45484f]/15 rounded-xl text-sm text-white outline-none focus:border-[$theme.primary]"
                 autoFocus
               />
             </div>
@@ -1353,21 +1368,21 @@ export default function ChatWindow({
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-20 left-6 right-6 p-4 glass-card border-[#12f1ff]/30 flex flex-col md:flex-row items-center gap-4 z-50"
+            className="absolute top-20 left-6 right-6 p-4 glass-card border-[$theme.primary]/30 flex flex-col md:flex-row items-center gap-4 z-50"
           >
             <div className="flex-1 w-full relative">
-              <UserCheck className="absolute left-3 top-2.5 text-[#12f1ff]" size={18} />
+              <UserCheck className="absolute left-3 top-2.5 text-[$theme.primary]" size={18} />
               <input 
                 type="text" 
                 placeholder="Saving contact as..." 
                 value={newContactName}
                 onChange={(e) => setNewContactName(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-black/40 border border-[#45484f]/15 rounded-xl text-sm outline-none focus:border-[#12f1ff]"
+                className="w-full pl-10 pr-4 py-2 bg-black/40 border border-[#45484f]/15 rounded-xl text-sm outline-none focus:border-[$theme.primary]"
                 autoFocus
               />
             </div>
             <div className="flex gap-2 w-full md:w-auto">
-              <button onClick={handleAddContact} className="flex-1 md:flex-none px-6 py-2 bg-[#12f1ff] text-[#0b0e14] font-bold text-xs uppercase rounded-xl">Save</button>
+              <button onClick={handleAddContact} className="flex-1 md:flex-none px-6 py-2 bg-[$theme.primary] text-[#0b0e14] font-bold text-xs uppercase rounded-xl">Save</button>
               <button onClick={() => setShowAddContact(false)} className="px-3 py-2 bg-white/5 text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"><X size={18} /></button>
             </div>
           </motion.div>
@@ -1399,7 +1414,7 @@ export default function ChatWindow({
             <div className="glass-card w-full max-w-md p-6 flex flex-col max-h-[80vh]">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <UserPlus size={20} className="text-[#12f1ff]" />
+                  <UserPlus size={20} className="text-[$theme.primary]" />
                   Expand Your Circle
                 </h3>
                 <button onClick={() => setShowAddMember(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-500 transition-all">
@@ -1408,7 +1423,7 @@ export default function ChatWindow({
               </div>
               <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
                 <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-[#12f1ff] uppercase tracking-wider px-1">Quick Add by Phone</p>
+                  <p className="text-[10px] font-bold text-[$theme.primary] uppercase tracking-wider px-1">Quick Add by Phone</p>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <Phone size={14} className="absolute left-3 top-3 text-slate-500" />
@@ -1417,13 +1432,13 @@ export default function ChatWindow({
                         placeholder="Phone (+91...)"
                         value={phoneToAdd}
                         onChange={(e) => setPhoneToAdd(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-black/20 border border-[#45484f]/15 rounded-xl text-sm outline-none focus:border-[#12f1ff] transition-all"
+                        className="w-full pl-9 pr-4 py-2.5 bg-black/20 border border-[#45484f]/15 rounded-xl text-sm outline-none focus:border-[$theme.primary] transition-all"
                       />
                     </div>
                     <button 
                       onClick={handleAddMemberByPhone}
                       disabled={isAddingByPhone || !phoneToAdd.trim()}
-                      className="px-4 py-2 bg-[#12f1ff] text-[#0b0e14] font-bold rounded-xl text-xs hover:brightness-110 disabled:opacity-50 transition-all"
+                      className="px-4 py-2 bg-[$theme.primary] text-[#0b0e14] font-bold rounded-xl text-xs hover:brightness-110 disabled:opacity-50 transition-all"
                     >
                       {isAddingByPhone ? <Loader2 size={16} className="animate-spin" /> : "Add"}
                     </button>
@@ -1440,10 +1455,12 @@ export default function ChatWindow({
                     .map(user => {
                       const isAlreadyIn = Array.isArray(selectedChat.participants) && selectedChat.participants.some(p => (p?._id || p).toString() === (user._id || user).toString());
                       return (
-                        <div key={user._id || user} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-[#45484f]/15 hover:border-[#12f1ff]/30 transition-all">
+                        <div key={user._id || user} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-[#45484f]/15 hover:border-[$theme.primary]/30 transition-all">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[#12f1ff]/10 flex items-center justify-center text-[10px] font-bold text-[#12f1ff] uppercase tracking-tighter">
-                              {user.name?.[0] || user.phoneNumber?.slice(-2) || "?"}
+                            <div className="w-8 h-8 rounded-full bg-[$theme.primary]/10 flex items-center justify-center text-[10px] font-bold text-[$theme.primary] uppercase tracking-tighter overflow-hidden">
+                              {user.avatar ? (
+                                <img src={`http://localhost:5002${user.avatar}`} className="w-full h-full object-cover" alt={user.name || "User"} />
+                              ) : (user.name?.[0] || user.phoneNumber?.slice(-2) || "?")}
                             </div>
                             <div>
                               <p className="text-sm font-bold text-white">{user.name || user.phoneNumber}</p>
@@ -1451,13 +1468,13 @@ export default function ChatWindow({
                             </div>
                           </div>
                           {isAlreadyIn ? (
-                            <div className="p-1.5 text-[#12f1ff]/40">
+                            <div className="p-1.5 text-[$theme.primary]/40">
                               <Check size={16} />
                             </div>
                           ) : (
                             <button 
                               onClick={() => handleAddMemberToGroup(user._id || user)}
-                              className="p-2 bg-[#12f1ff]/10 text-[#12f1ff] rounded-lg hover:bg-[#12f1ff] hover:text-[#0b0e14] transition-all"
+                              className="p-2 bg-[$theme.primary]/10 text-[$theme.primary] rounded-lg hover:bg-[$theme.primary] hover:text-[#0b0e14] transition-all"
                             >
                               <Plus size={16} />
                             </button>
@@ -1473,19 +1490,19 @@ export default function ChatWindow({
                   {contacts.filter(c => c.userId?.toString() !== myUserId?.toString()).map(contact => {
                     const isAlreadyIn = Array.isArray(selectedChat.participants) && selectedChat.participants.some(p => (p?._id || p).toString() === contact.userId?.toString());
                     return (
-                      <div key={contact.userId} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-[#45484f]/15 hover:border-[#12f1ff]/30 transition-all">
+                      <div key={contact.userId} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-[#45484f]/15 hover:border-[$theme.primary]/30 transition-all">
                         <div>
                           <p className="text-sm font-bold text-white">{contact.savedName}</p>
                           <p className="text-[10px] text-slate-500 uppercase tracking-widest leading-none mt-1">{isAlreadyIn ? "In Group" : "Connect"}</p>
                         </div>
                         {isAlreadyIn ? (
-                          <div className="p-1.5 text-[#12f1ff]/40">
+                          <div className="p-1.5 text-[$theme.primary]/40">
                             <Check size={16} />
                           </div>
                         ) : (
                           <button 
                             onClick={() => handleAddMemberToGroup(contact.userId)}
-                            className="p-2 bg-[#12f1ff]/10 text-[#12f1ff] rounded-lg hover:bg-[#12f1ff] hover:text-[#0b0e14] transition-all"
+                            className="p-2 bg-[$theme.primary]/10 text-[$theme.primary] rounded-lg hover:bg-[$theme.primary] hover:text-[#0b0e14] transition-all"
                           >
                             <Plus size={16} />
                           </button>
@@ -1550,7 +1567,7 @@ export default function ChatWindow({
             <div className="glass-card w-full max-w-md p-6 flex flex-col max-h-[80vh]">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Info size={20} className="text-[#12f1ff]" />
+                  <Info size={20} className="text-[$theme.primary]" />
                   Chat Participants
                 </h3>
                 <button onClick={() => setShowParticipants(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-500 transition-all">
@@ -1565,20 +1582,22 @@ export default function ChatWindow({
                   return (
                     <div key={p._id || p} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-[#45484f]/15 transition-all">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[#12f1ff]/10 flex items-center justify-center font-bold text-[#12f1ff]">
-                          {(p.name?.[0] || "?").toUpperCase()}
+                        <div className="w-10 h-10 rounded-full bg-[$theme.primary]/10 flex items-center justify-center font-bold text-[$theme.primary] overflow-hidden">
+                          {p.avatar ? (
+                            <img src={`http://localhost:5002${p.avatar}`} className="w-full h-full object-cover" alt={p.name || "Member"} />
+                          ) : (p.name?.[0] || "?").toUpperCase()}
                         </div>
                           <div>
                             <p className="text-sm font-bold text-white flex items-center gap-2">
                               {p.name || "Member"}
                               {(p._id || p).toString() === myUserId?.toString() && <span className="text-[10px] text-slate-500 font-normal opacity-70">(You)</span>}
-                              {isAdmin && <span className="text-[10px] text-[#12f1ff] font-semibold bg-[#12f1ff]/10 px-1.5 py-0.5 rounded border border-[#12f1ff]/20">(Admin)</span>}
+                              {isAdmin && <span className="text-[10px] text-[$theme.primary] font-semibold bg-[$theme.primary]/10 px-1.5 py-0.5 rounded border border-[$theme.primary]/20">(Admin)</span>}
                             </p>
                             <p className="text-[10px] text-slate-500 uppercase tracking-widest leading-none mt-0.5">{p.phoneNumber || "Participant"}</p>
                           </div>
                       </div>
                       {isAdmin && (
-                        <div className="flex items-center gap-1.5 px-3 py-1 bg-[#12f1ff]/10 text-[#12f1ff] text-[10px] font-black uppercase rounded-lg border border-[#12f1ff]/20">
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-[$theme.primary]/10 text-[$theme.primary] text-[10px] font-black uppercase rounded-lg border border-[$theme.primary]/20">
                           <Shield size={10} />
                           Admin
                         </div>
@@ -1611,7 +1630,7 @@ export default function ChatWindow({
             >
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Info size={20} className="text-[#12f1ff]" />
+                  <Info size={20} className="text-[$theme.primary]" />
                   Message Info
                 </h3>
                 <button onClick={closeMessageInfo} className="p-2 hover:bg-white/5 rounded-full text-slate-500 transition-all">
@@ -1660,7 +1679,7 @@ export default function ChatWindow({
                           return (
                             <div key={participantId} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-[#45484f]/15 hover:bg-white/8 transition-all">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-[#12f1ff]/10 flex items-center justify-center font-bold text-[#12f1ff] text-xs">
+                                <div className="w-8 h-8 rounded-full bg-[$theme.primary]/10 flex items-center justify-center font-bold text-[$theme.primary] text-xs">
                                   {(participant.name?.[0] || "?").toUpperCase()}
                                 </div>
                                 <div>
@@ -1706,7 +1725,7 @@ export default function ChatWindow({
                           return (
                             <div key={participantId} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-[#45484f]/15 hover:bg-white/8 transition-all">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-[#12f1ff]/10 flex items-center justify-center font-bold text-[#12f1ff] text-xs">
+                                <div className="w-8 h-8 rounded-full bg-[$theme.primary]/10 flex items-center justify-center font-bold text-[$theme.primary] text-xs">
                                   {(participant.name?.[0] || "?").toUpperCase()}
                                 </div>
                                 <div>

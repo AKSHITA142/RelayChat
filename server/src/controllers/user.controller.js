@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const { getIO } = require("../socket");
 
 const buildEncryptionDevices = (user) => {
   if (Array.isArray(user?.encryptionDevices) && user.encryptionDevices.length > 0) {
@@ -39,6 +40,47 @@ const getProfile = async (req, res) => {
     res.status(500).json({
       message: "Server error"
     });
+  }
+};
+
+const updateProfile = async (req, res) => {
+  try {
+    const { name, status, signalVisibility, vaultProtocol, globalTheme } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const prevVisibility = user.signalVisibility;
+    
+    if (name !== undefined) user.name = name;
+    if (status !== undefined) user.status = status;
+    if (signalVisibility !== undefined) user.signalVisibility = signalVisibility;
+    if (vaultProtocol !== undefined) user.vaultProtocol = vaultProtocol;
+    if (globalTheme !== undefined) user.globalTheme = globalTheme;
+
+    await user.save();
+
+    // Broadcast visibility changes immediately via Socket
+    const io = getIO();
+    if (io) {
+      if (prevVisibility === false && user.signalVisibility === true && user.isOnline) {
+        // User became visible while online
+        io.emit("user-online", { userId: user._id });
+      } else if (prevVisibility === true && user.signalVisibility === false) {
+        // User turned off visibility
+        io.emit("user-offline", { userId: user._id, lastSeen: user.lastSeen });
+      }
+    }
+
+    res.status(200).json({
+      message: "Profile updated successfully",
+      user: {
+        ...user.toObject(),
+        encryptionDevices: buildEncryptionDevices(user),
+      }
+    });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -244,4 +286,67 @@ const getBackupKey = async (req, res) => {
   }
 };
 
-module.exports = { getProfile, searchUsers, checkPhoneNumber, saveContact, getUserEncryptionKey, upsertEncryptionKey, saveBackupKey, getBackupKey };
+const updateAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Store the relative path to the uploaded file
+    user.avatar = `/uploads/${req.file.filename}`;
+    await user.save();
+
+    // Broadcast avatar update via Socket
+    const io = getIO();
+    if (io) {
+      io.emit("user-avatar-updated", { 
+        userId: user._id, 
+        avatar: user.avatar 
+      });
+    }
+
+    res.status(200).json({
+      message: "Avatar updated successfully",
+      user: {
+        ...user.toObject(),
+        encryptionDevices: buildEncryptionDevices(user),
+      }
+    });
+  } catch (error) {
+    console.error("Update avatar error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const verifyMobileForKeyReset = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "Identity not found." });
+
+    if (user.phoneNumber !== phoneNumber) {
+      return res.status(403).json({ message: "Verification failed: Phone number mismatch." });
+    }
+
+    res.status(200).json({ message: "Mobile verified. Access granted for terminal reset." });
+  } catch (error) {
+    res.status(500).json({ message: "System error: Verification failed.", error: error.message });
+  }
+};
+
+module.exports = { 
+  getProfile, 
+  updateProfile, 
+  updateAvatar, 
+  searchUsers, 
+  checkPhoneNumber, 
+  saveContact, 
+  getUserEncryptionKey, 
+  upsertEncryptionKey, 
+  saveBackupKey, 
+  getBackupKey,
+  verifyMobileForKeyReset
+};

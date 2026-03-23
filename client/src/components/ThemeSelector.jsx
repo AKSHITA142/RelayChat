@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Check, X } from "lucide-react";
 import { THEMES, THEME_NAMES } from "../hooks/useChatTheme";
 
-const SWATCH_ORDER = ["neon", "void", "plasma", "matrix", "minimal_dark", "minimal_light"];
+const SWATCH_ORDER = ["stealth_dark", "void", "minimal_dark", "minimal_light"];
 void motion; // ensure framer-motion is treated as used by the linter (used in JSX via <motion.* />)
 export default function ThemeSelector({ currentTheme, onSelect, onClose }) {
   return (

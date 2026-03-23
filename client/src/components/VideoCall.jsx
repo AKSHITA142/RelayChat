@@ -82,18 +82,42 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     onClose();
   }, [to, cleanup, clearRingTimer, onClose]);
 
-  const getMedia = useCallback(async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        width: { ideal: 640, max: 1280 },
-        height: { ideal: 360, max: 720 },
-        frameRate: { ideal: 20, max: 24 },
-      },
-      audio: { echoCancellation: true, noiseSuppression: true },
-    });
-    lsRef.current = stream;
-    if (localRef.current) localRef.current.srcObject = stream;
-    return stream;
+  const getMedia = useCallback(async (withVideo = true) => {
+    try {
+      log(`Requesting ${withVideo ? "camera and microphone" : "microphone only"}...`);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: withVideo ? {
+          width: { ideal: 640, max: 1280 },
+          height: { ideal: 360, max: 720 },
+          frameRate: { ideal: 20, max: 24 },
+        } : false,
+        audio: { 
+          echoCancellation: true, 
+          noiseSuppression: true,
+          autoGainControl: true,
+          googEchoCancellation: true, // Legacy flag for some Chromium browsers
+          googAutoGainControl: true,
+          googNoiseSuppression: true,
+        },
+      });
+      
+      // If we are replacing an old stream, stop old tracks first
+      if (lsRef.current) {
+        lsRef.current.getTracks().forEach(t => t.stop());
+      }
+
+      lsRef.current = stream;
+      if (localRef.current) localRef.current.srcObject = stream;
+      setVidOff(!withVideo);
+      return stream;
+    } catch (e) {
+      log("Media request failed", e);
+      if (withVideo) {
+        log("Falling back to audio-only...");
+        return getMedia(false);
+      }
+      throw e;
+    }
   }, []);
 
   const drainIce = useCallback(async () => {
@@ -108,27 +132,44 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   const buildPC = useCallback(() => {
     const pc = new RTCPeerConnection(PC_CONFIG);
 
+    // Ensure we always have transceivers for both audio and video
+    pc.addTransceiver("audio", { direction: "sendrecv" });
+    pc.addTransceiver("video", { direction: "sendrecv" });
+
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) socket.emit("ice-candidate", { to, candidate });
     };
 
     pc.oniceconnectionstatechange = () => {
-      log("ICE ->", pc.iceConnectionState);
+      log("ICE State ->", pc.iceConnectionState);
       if (pc.iceConnectionState === "failed") {
         cleanup();
         onClose();
       }
     };
 
-    pc.ontrack = ({ track }) => {
-      stopRinger();
+    pc.onnegotiationneeded = async () => {
+      try {
+        if (pc.signalingState !== "stable") return;
+        log("Re-negotiating...");
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit("call-re-offer", { to, offer });
+      } catch (err) {
+        log("Negotiation Error", err);
+      }
+    };
 
-      if (!remoteStream.current.getTracks().find((existing) => existing.id === track.id)) {
+    pc.ontrack = ({ track }) => {
+      log("Track arrived:", track.kind);
+      stopRinger();
+      if (!remoteStream.current.getTracks().find((t) => t.id === track.id)) {
         remoteStream.current.addTrack(track);
       }
-      if (remoteRef.current && remoteRef.current.srcObject !== remoteStream.current) {
+      if (remoteRef.current) {
+        remoteRef.current.srcObject = null;
         remoteRef.current.srcObject = remoteStream.current;
-        remoteRef.current.play().catch(() => {});
+        remoteRef.current.play().catch(e => log("Remote play error", e));
       }
       setStatus("connected");
     };
@@ -138,32 +179,67 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   }, [to, cleanup, onClose]);
 
   const startCall = useCallback(async () => {
-    log("startCall");
-    const stream = await getMedia();
-    const pc = buildPC();
-    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    socket.emit("call-user", { to, offer, fromName });
+    log("startCall initiated");
+    try {
+      const stream = await getMedia();
+      const pc = buildPC();
+      
+      stream.getTracks().forEach((track) => {
+        const sender = pc.getSenders().find(s => s.track?.kind === track.kind || (s.track === null && pc.getTransceivers().find(t => t.sender === s && t.receiver.track.kind === track.kind)));
+        if (sender) sender.replaceTrack(track);
+        else pc.addTrack(track, stream);
+      });
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit("call-user", { to, offer, fromName });
+      log("Offer sent");
+    } catch (err) {
+      log("startCall Error", err);
+      setStatus("Error: " + (err.message || "Call failed"));
+    }
   }, [to, fromName, getMedia, buildPC]);
 
   const acceptCall = useCallback(async () => {
-    log("acceptCall");
+    log("acceptCall initiated");
     stopRinger();
     clearRingTimer();
     setStatus("connecting");
 
-    const stream = await getMedia();
-    const pc = buildPC();
-    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+    try {
+      const stream = await getMedia();
+      const pc = buildPC();
 
-    await pc.setRemoteDescription(new RTCSessionDescription(initialOffer));
-    await drainIce();
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    socket.emit("answer-call", { to, answer });
-    setStatus("connected");
+      stream.getTracks().forEach((track) => {
+        const sender = pc.getSenders().find(s => s.track?.kind === track.kind || (s.track === null && pc.getTransceivers().find(t => t.sender === s && t.receiver.track.kind === track.kind)));
+        if (sender) sender.replaceTrack(track);
+        else pc.addTrack(track, stream);
+      });
+
+      log("Setting remote desc...");
+      await pc.setRemoteDescription(new RTCSessionDescription(initialOffer));
+      await drainIce();
+      
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit("answer-call", { to, answer });
+      log("Answer sent");
+    } catch (err) {
+      log("acceptCall Error", err);
+      setStatus("Error: " + (err.message || "Accept failed"));
+    }
   }, [to, initialOffer, getMedia, buildPC, drainIce, clearRingTimer]);
+
+  // Ensure remote stream is attached whenever it's available and status changes to connected
+  useEffect(() => {
+    if (status === "connected" && remoteRef.current && remoteStream.current) {
+      if (remoteRef.current.srcObject !== remoteStream.current) {
+        log("Force-syncing remote video element...");
+        remoteRef.current.srcObject = remoteStream.current;
+        remoteRef.current.play().catch(e => log("Remote play error in useEffect", e));
+      }
+    }
+  }, [status]);
 
   useEffect(() => {
     if (!isIncoming) {
@@ -174,28 +250,62 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
 
     socket.off("call-accepted");
     socket.on("call-accepted", async ({ answer }) => {
+      log("Call accepted, received answer");
       stopRinger();
       broadcastStop();
       clearRingTimer();
       const pc = pcRef.current;
       if (!pc) return;
-      await pc.setRemoteDescription(new RTCSessionDescription(answer));
-      await drainIce();
-      setStatus("connected");
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        await drainIce();
+      } catch (err) {
+        log("Error setting answer", err);
+      }
+    });
+
+    socket.off("call-re-offer");
+    socket.on("call-re-offer", async ({ offer }) => {
+      const pc = pcRef.current;
+      if (!pc) return;
+      try {
+        log("Received re-offer");
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit("call-re-answer", { to, answer });
+      } catch (err) {
+        log("Re-offer error", err);
+      }
+    });
+
+    socket.off("call-re-answer");
+    socket.on("call-re-answer", async ({ answer }) => {
+      const pc = pcRef.current;
+      if (!pc) return;
+      try {
+        log("Received re-answer");
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      } catch (err) {
+        log("Re-answer error", err);
+      }
     });
 
     socket.off("ice-candidate");
     socket.on("ice-candidate", async ({ candidate }) => {
       const pc = pcRef.current;
       if (pc?.remoteDescription) {
+        log("Adding ICE candidate...");
         await pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(log);
       } else {
+        log("Queuing ICE candidate...");
         iceQueue.current.push(candidate);
       }
     });
 
     socket.off("call-ended");
     socket.on("call-ended", async () => {
+      log("Call ended by remote");
       stopRinger();
       broadcastStop();
       clearRingTimer();
@@ -209,6 +319,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
       socket.off("call-ended");
       stopRinger();
       clearRingTimer();
+      cleanup();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -221,11 +332,36 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     }
   };
 
-  const toggleVideo = () => {
+  const toggleVideo = async () => {
     const track = lsRef.current?.getVideoTracks()[0];
     if (track) {
       track.enabled = !track.enabled;
-      setVidOff((current) => !current);
+      setVidOff(!track.enabled);
+    } else if (vidOff) {
+      try {
+        log("Attempting to re-acquire camera...");
+        const stream = await getMedia(true);
+        const pc = pcRef.current;
+        if (pc) {
+          const videoTrack = stream.getVideoTracks()[0];
+          if (!videoTrack) return;
+          
+          // Find the transceiver reserved for video during buildPC
+          const sender = pc.getSenders().find(s => 
+            s.track?.kind === "video" || 
+            pc.getTransceivers().find(t => t.sender === s && t.receiver.track.kind === "video")
+          );
+
+          if (sender) {
+            log("Injecting new video track into existing channel");
+            await sender.replaceTrack(videoTrack).catch(log);
+          } else {
+            pc.addTrack(videoTrack, stream);
+          }
+        }
+      } catch (err) {
+        log("Failed to upgrade to video", err);
+      }
     }
   };
 

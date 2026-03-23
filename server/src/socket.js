@@ -91,6 +91,10 @@ function initSocket(server) {
         }
       });
 
+      socket.on("logout", () => {
+        socket.disconnect();
+      });
+
       socket.on("close-chat", (chatId) => {
         const roomId = chatId?.toString?.();
         if (socket.data.activeChatId === roomId) {
@@ -195,21 +199,26 @@ function initSocket(server) {
       });
 
       // MARK CURRENT USER ONLINE
-      await User.findByIdAndUpdate(socket.userId, {
-        isOnline: true,
-        lastSeen: null,
-      });
+      const user = await User.findById(socket.userId);
+      if (user) {
+        user.isOnline = true;
+        user.lastSeen = null;
+        await user.save();
+        
+        //  SEND EXISTING ONLINE USERS (only those who are online AND visible)
+        const onlineUsers = await User.find({
+          isOnline: true,
+          signalVisibility: true,
+          _id: { $ne: socket.userId },
+        }).select("_id");
 
-      //  SEND EXISTING ONLINE USERS
-      const onlineUsers = await User.find({
-        isOnline: true,
-        _id: { $ne: socket.userId },
-      }).select("_id");
+        socket.emit("online-users", onlineUsers.map(u => ({ _id: u._id })));
 
-      socket.emit("online-users", onlineUsers.map(u => ({ _id: u._id })));
-
-      // BROADCAST USER ONLINE
-      socket.broadcast.emit("user-online", { userId: socket.userId });
+        // BROADCAST USER ONLINE (only if user is visible)
+        if (user.signalVisibility) {
+          socket.broadcast.emit("user-online", { userId: socket.userId });
+        }
+      }
 
       // SEND MESSAGE
       socket.on("send-message", async ({ chatId, content, encryptedPayload, clientTempId }) => {
@@ -388,27 +397,54 @@ function initSocket(server) {
       });
       
       // --- VIDEO CALL SIGNALING ---
-      socket.on("call-user", ({ to, offer, fromName }) => {
+      socket.on("call-user", ({ to, offer, fromName } = {}) => {
+        if (!to) return;
         io.to(to.toString()).emit("incoming-call", { from: socket.userId, fromName, offer });
       });
 
-      socket.on("answer-call", ({ to, answer }) => {
+      socket.on("answer-call", ({ to, answer } = {}) => {
+        if (!to) return;
         io.to(to.toString()).emit("call-accepted", { answer });
       });
 
-      socket.on("ice-candidate", ({ to, candidate }) => {
+      socket.on("ice-candidate", ({ to, candidate } = {}) => {
+        if (!to) return;
         io.to(to.toString()).emit("ice-candidate", { candidate });
       });
 
-      socket.on("end-call", ({ to }) => {
+      socket.on("call-re-offer", ({ to, offer } = {}) => {
+        if (!to) return;
+        io.to(to.toString()).emit("call-re-offer", { from: socket.userId, offer });
+      });
+
+      socket.on("call-re-answer", ({ to, answer } = {}) => {
+        if (!to) return;
+        io.to(to.toString()).emit("call-re-answer", { answer });
+      });
+
+      socket.on("end-call", ({ to } = {}) => {
+        if (!to) return;
         io.to(to.toString()).emit("call-ended");
       });
+
 
       // DISCONNECT
       socket.on("disconnect", async () => {
         try {
-          await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen: new Date() });
-          socket.broadcast.emit("user-offline", { userId: socket.userId, lastSeen: new Date() });
+          const user = await User.findById(socket.userId);
+          if (user) {
+            user.isOnline = false;
+            user.lastSeen = new Date();
+            await user.save();
+            
+            // Only broadcast offline if they were visible
+            if (user.signalVisibility) {
+              socket.broadcast.emit("user-offline", { 
+                userId: socket.userId, 
+                lastSeen: user.lastSeen 
+              });
+            }
+          }
           console.log(" Disconnected:", socket.userId);
         } catch (err) {
           console.error("Disconnect sync error:", err);

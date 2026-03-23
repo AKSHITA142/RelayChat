@@ -12,6 +12,26 @@ const userSchema = new mongoose.Schema(
       sparse: true,
       lowercase: true
     },
+    status: {
+      type: String,
+      default: "Hey there! I'm using RelayChat."
+    },
+    avatar: {
+      type: String,
+      default: ""
+    },
+    signalVisibility: {
+      type: Boolean,
+      default: true
+    },
+    vaultProtocol: {
+      type: Boolean,
+      default: false
+    },
+    globalTheme: {
+      type: String,
+      default: "neon"
+    },
     phoneNumber: {
       type: String,
       unique: true,

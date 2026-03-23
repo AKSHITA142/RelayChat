@@ -9,13 +9,15 @@ import api from "../services/api";
 import { connectSocket } from "../services/socket";
 import { ensureE2EERegistration } from "../services/e2ee";
 import { isTokenValid } from "../utils/auth";
+import socket from "../services/socket";
+import { getCurrentDeviceId, getCurrentDeviceLabel } from "../services/e2ee";
 
 // Stitch Ethereal UI
 import { Button } from "./stitch/Button";
 import { Input } from "./stitch/Input";
 import { Card } from "./stitch/Card";
 
-export default function Login({ onLogin, onSignup, canResume = false, sessionExpired = false }) {
+export default function Login({ onLogin, onSignup, canResume = false, sessionExpired = false, onAction }) {
   const [loginMethod, setLoginMethod] = useState("phone"); // Default to Phone OTP
   
   // Email state
@@ -40,11 +42,25 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   const [restoreAuthData, setRestoreAuthData] = useState(null);
   const [restorePin, setRestorePin] = useState("");
   const [restoreError, setRestoreError] = useState("");
+  const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("Initializing device...");
 
   // Surface an immediate prompt when the stored token is missing/invalid
   useEffect(() => {
     if (sessionExpired) {
-      setError("Your session expired. Please verify again to continue.");
+      const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+      setIsWaitingForApproval(false);
+      setOtpSent(false);
+      setIsRegistering(false);
+      if (storedUser) {
+        // Skip phone entry — jump directly to PIN/Device verification
+        setRestoreAuthData({ user: storedUser });
+        setShowRestorePrompt(true);
+        setError("Session expired. Please verify your identity to continue.");
+      } else {
+        setShowRestorePrompt(false);
+        setError("Your session expired. Please verify again to continue.");
+      }
     }
   }, [sessionExpired]);
 
@@ -52,33 +68,10 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
     localStorage.setItem("token", res.data.token);
     localStorage.setItem("user", JSON.stringify(res.data.user));
     localStorage.setItem("session-active", "true");
-    
-    const userId = res.data.user._id;
-    const hasLocalKey = !!localStorage.getItem(`relaychat-e2ee-private-key-${userId}`);
 
-    if (!hasLocalKey) {
-      try {
-        const backupRes = await api.get("/user/backup");
-        if (backupRes.status === 200 && backupRes.data?.encryptedKey) {
-          setRestoreAuthData(res.data);
-          setShowRestorePrompt(true);
-          return;
-        }
-      } catch (err) {
-        // No backup found or error, continue to normal flow (creates new key)
-      }
-    }
-
-    try {
-      await ensureE2EERegistration(api, res.data.user);
-      connectSocket();
-      onLogin();
-    } catch (keyError) {
-      console.error("Failed to initialize E2EE keys:", keyError);
-      window.alert(keyError.message || "Your encryption keys could not be restored on this device");
-      connectSocket();
-      onLogin();
-    }
+    // Always show PIN/Device verification as the mandatory second step
+    setRestoreAuthData(res.data);
+    setShowRestorePrompt(true);
   };
 
   const handleRestoreBackup = async () => {
@@ -116,16 +109,53 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
     setLoading(true);
     setRestoreError("");
     try {
-      await ensureE2EERegistration(api, restoreAuthData.user);
-      setShowRestorePrompt(false);
+      const { ensureIdentityKeyPair } = await import("../services/e2ee");
+      const userId = restoreAuthData.user._id;
+      const deviceId = getCurrentDeviceId();
+
+      // Generate a fresh key pair for this device (no existing key needed)
+      const { publicKey } = await ensureIdentityKeyPair(userId);
+
+      // Register the new device key on the server
+      await api.post("/user/encryption-key", {
+        publicKey,
+        deviceId,
+        deviceLabel: getCurrentDeviceLabel(),
+      });
+
+      const otherDevices = (restoreAuthData.user.encryptionDevices || [])
+        .filter(d => d.deviceId !== deviceId);
+
+      setIsWaitingForApproval(true);
       connectSocket();
-      onLogin();
+
+      if (otherDevices.length > 0) {
+        socket.emit("request-history-sync", {
+          requesterDeviceId: deviceId,
+          requesterLabel: getCurrentDeviceLabel(),
+        }, (result) => {
+          if (result?.ok) {
+            setSyncStatus("Approval request sent! Please check your other trusted device.");
+          } else {
+            setSyncStatus("No other devices online. You can log in without history sync.");
+            setTimeout(() => { setShowRestorePrompt(false); onLogin(); }, 5000);
+          }
+        });
+
+        socket.on("history-sync-complete", (data) => {
+          if (data.requesterDeviceId === deviceId) {
+            setSyncStatus("Approved! Syncing your encrypted keys...");
+            setTimeout(() => { setShowRestorePrompt(false); onLogin(); window.location.reload(); }, 2500);
+          }
+        });
+      } else {
+        // No other devices — just let them in
+        setSyncStatus("No trusted devices found. Logging in without history sync.");
+        setTimeout(() => { setShowRestorePrompt(false); connectSocket(); onLogin(); }, 3000);
+      }
     } catch (keyError) {
-      console.error("Failed to initialize E2EE keys:", keyError);
-      window.alert(keyError.message || "Your encryption keys could not be generated");
-      setShowRestorePrompt(false);
-      connectSocket();
-      onLogin();
+      console.error("Device verification error:", keyError);
+      setRestoreError(keyError.message || "Could not register this device. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -148,6 +178,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
 
   const handleSendOtp = async () => {
     if (!phone) return setError("Please enter a phone number");
+    onAction?.();
     setLoading(true);
     setError("");
     try {
@@ -273,60 +304,98 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
           )}
 
           <div className="w-full flex flex-col md:flex-row gap-6">
-            {/* Option 1: Cloud Backup */}
-            <Card className="flex-1 flex flex-col items-center text-center space-y-5 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-[#c59aff]/5 rounded-full blur-2xl group-hover:bg-[#c59aff]/10 transition-colors" />
-              <div className="w-14 h-14 bg-[#c59aff]/10 rounded-full flex items-center justify-center text-[#c59aff]">
-                <Lock size={28} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-[#ecedf6] mb-2 font-space">Cloud Backup</h3>
-                <p className="text-[#a9abb3] text-xs">
-                  Restore instantly using the 4-digit PIN you created on your previous device.
-                </p>
-              </div>
-              <div className="w-full space-y-3 mt-auto pt-2">
-                <Input
-                  icon={Lock}
-                  type="password"
-                  placeholder="Enter Backup PIN"
-                  value={restorePin}
-                  onChange={e => setRestorePin(e.target.value)}
-                  className="text-center tracking-widest"
-                />
-                <Button 
-                  onClick={handleRestoreBackup} 
-                  disabled={loading || restorePin.length < 4}
-                  className="w-full font-bold py-2.5"
+            <AnimatePresence mode="wait">
+              {isWaitingForApproval ? (
+                <motion.div 
+                  key="waiting"
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="w-full"
                 >
-                  {loading && restorePin ? <Loader2 className="animate-spin" size={18} /> : "Restore with PIN"}
-                </Button>
-              </div>
-            </Card>
+                  <Card className="w-full flex flex-col items-center text-center space-y-6 py-10 relative overflow-hidden bg-gradient-to-b from-[#0b0e14] to-[#14181f]">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#00eefc] to-transparent animate-pulse" />
+                    <div className="w-20 h-20 bg-[#00eefc]/5 rounded-full flex items-center justify-center relative">
+                      <div className="absolute inset-0 rounded-full border-2 border-[#00eefc]/20 border-t-[#00eefc] animate-spin" />
+                      <Smartphone size={36} className="text-[#00eefc]" />
+                    </div>
+                
+                    <div className="space-y-3 max-w-sm">
+                      <h3 className="text-xl font-bold text-[#ecedf6] font-space tracking-wide">Waiting for Approval</h3>
+                      <p className="text-[#a9abb3] text-sm leading-relaxed px-4">
+                        {syncStatus}
+                      </p>
+                    </div>
 
-            {/* Option 2: Device Approval */}
-            <Card className="flex-1 flex flex-col items-center text-center space-y-5 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-[#00eefc]/5 rounded-full blur-2xl group-hover:bg-[#00eefc]/10 transition-colors" />
-              <div className="w-14 h-14 bg-[#00eefc]/10 rounded-full flex items-center justify-center text-[#00eefc]">
-                <Smartphone size={28} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-[#ecedf6] mb-2 font-space">Device Approval</h3>
-                <p className="text-[#a9abb3] text-xs">
-                  Forgot your PIN? Log in anyway and request sync approval from another trusted device.
-                </p>
-              </div>
-              <div className="w-full mt-auto pt-2">
-                <Button 
-                  onClick={handleDeviceVerification}
-                  disabled={loading && !restorePin}
-                  variant="secondary"
-                  className="w-full font-bold py-2.5"
-                >
-                  {loading && !restorePin ? <Loader2 className="animate-spin" size={18} /> : "Ask Trusted Device"}
-                </Button>
-              </div>
-            </Card>
+                    <div className="w-full max-w-xs pt-4">
+                      <Button 
+                        variant="secondary"
+                        onClick={() => { setShowRestorePrompt(false); onLogin(); }}
+                        className="w-full text-xs font-semibold"
+                      >
+                        Log in anyway (No history sync)
+                      </Button>
+                    </div>
+                  </Card>
+                </motion.div>
+              ) : (
+                <>
+                  {/* Option 1: Cloud Backup */}
+                  <Card className="flex-1 flex flex-col items-center text-center space-y-5 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#c59aff]/5 rounded-full blur-2xl group-hover:bg-[#c59aff]/10 transition-colors" />
+                    <div className="w-14 h-14 bg-[#c59aff]/10 rounded-full flex items-center justify-center text-[#c59aff]">
+                      <Lock size={28} />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-[#ecedf6] mb-2 font-space">Cloud Backup</h3>
+                      <p className="text-[#a9abb3] text-xs">
+                        Restore instantly using the 4-digit PIN you created on your previous device.
+                      </p>
+                    </div>
+                    <div className="w-full space-y-3 mt-auto pt-2">
+                      <Input
+                        icon={Lock}
+                        type="password"
+                        placeholder="Enter Backup PIN"
+                        value={restorePin}
+                        onChange={e => setRestorePin(e.target.value)}
+                        className="text-center tracking-widest"
+                      />
+                      <Button 
+                        onClick={handleRestoreBackup} 
+                        disabled={loading || restorePin.length < 4}
+                        className="w-full font-bold py-2.5"
+                      >
+                        {loading && restorePin ? <Loader2 className="animate-spin" size={18} /> : "Restore with PIN"}
+                      </Button>
+                    </div>
+                  </Card>
+
+                  {/* Option 2: Device Approval */}
+                  <Card className="flex-1 flex flex-col items-center text-center space-y-5 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#00eefc]/5 rounded-full blur-2xl group-hover:bg-[#00eefc]/10 transition-colors" />
+                    <div className="w-14 h-14 bg-[#00eefc]/10 rounded-full flex items-center justify-center text-[#00eefc]">
+                      <Smartphone size={28} />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-[#ecedf6] mb-2 font-space">Device Approval</h3>
+                      <p className="text-[#a9abb3] text-xs">
+                        Forgot your PIN? Log in anyway and request sync approval from another trusted device.
+                      </p>
+                    </div>
+                    <div className="w-full mt-auto pt-2">
+                      <Button 
+                        onClick={handleDeviceVerification}
+                        disabled={loading && !restorePin}
+                        variant="secondary"
+                        className="w-full font-bold py-2.5"
+                      >
+                        {loading && !restorePin ? <Loader2 className="animate-spin" size={18} /> : "Ask Trusted Device"}
+                      </Button>
+                    </div>
+                  </Card>
+                </>
+              )}
+            </AnimatePresence>
           </div>
 
           <button 

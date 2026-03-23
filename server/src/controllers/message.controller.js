@@ -98,12 +98,18 @@ exports.uploadFile = async (req, res) => {
 
     const { chatId, content, encryptedPayload, encryptedFileMetadata } = req.body;
     const fileUrl = `/uploads/${req.file.filename}`;
-    const parsedEncryptedPayload = encryptedPayload ? JSON.parse(encryptedPayload) : null;
-    const parsedEncryptedFileMetadata = encryptedFileMetadata ? JSON.parse(encryptedFileMetadata) : null;
-    const isEncryptedAttachment = Boolean(parsedEncryptedFileMetadata);
-    const fileType = isEncryptedAttachment ? undefined : req.file.mimetype;
-    const fileName = isEncryptedAttachment ? undefined : (req.body.fileName || req.file.originalname);
+    const parseJSON = (str) => {
+      if (!str || str === "undefined" || str === "null") return null;
+      try { return JSON.parse(str); } catch (e) { return null; }
+    };
 
+    const parsedEncryptedPayload = parseJSON(encryptedPayload);
+    const parsedEncryptedFileMetadata = parseJSON(encryptedFileMetadata);
+    const isEncryptedAttachment = Boolean(parsedEncryptedFileMetadata);
+    const fileType = req.body.fileType || req.file.mimetype;
+    const fileName = req.body.fileName || req.file.originalname;
+
+    console.log("--- UPLOAD INITIATED ---", chatId, req.file?.originalname);
     const message = await Message.create({
       sender: req.user.id,
       chat: chatId,

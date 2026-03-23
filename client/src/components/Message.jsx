@@ -302,8 +302,8 @@ export default function Message({
                   isMe ? "bg-black/10 border-black/10 hover:bg-black/20" : "bg-white/5 border-[#45484f]/30 hover:bg-white/10"
                 }`}
               >
-                <div className={`p-2 rounded-lg ${isMe ? "bg-[#0b0e14]/10" : "bg-[#12f1ff]/20"}`}>
-                  <FileText className={isMe ? "text-[#0b0e14]" : "text-[#12f1ff]"} size={20} />
+                <div className="p-2 rounded-lg" style={{ backgroundColor: `${primary}33` }}>
+                  <FileText style={{ color: primary }} size={20} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold truncate">{effectiveFileName}</p>
@@ -375,7 +375,9 @@ export default function Message({
             setMenuIsUpwards(rect.bottom + 200 > window.innerHeight);
             setShowMenu(true);
           }}
-          className={`absolute top-2 -right-8 p-1 opacity-60 hover:opacity-100 transition-opacity hover:text-[#12f1ff] ${isMe ? "text-slate-400" : "text-slate-500"}`}
+          style={{ color: isMe ? '#94a3b8' : '#64748b' }}
+          whileHover={{ color: primary, opacity: 1 }}
+          className="absolute top-2 -right-8 p-1 opacity-60 transition-opacity"
         >
           <MoreVertical size={16} />
         </button>
@@ -415,9 +417,10 @@ export default function Message({
               {msg.deletedFor?.includes(myId) ? (
                 <button
                   onClick={handleRestoreForMe}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-[#12f1ff] hover:bg-[#12f1ff]/10 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors"
+                  style={{ color: primary }}
                 >
-                  <Clock size={16} className="text-[#12f1ff]" />
+                  <Clock size={16} />
                   Bring it back
                 </button>
               ) : (

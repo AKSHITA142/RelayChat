@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Plus, Users, X, Check, Loader2, MessageSquare, Phone, LogOut, Cloud, Lock } from "lucide-react";
+import { Search, Plus, Users, X, Check, Loader2, MessageSquare, Phone, LogOut, User } from "lucide-react";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
 import { hydrateChatPreview } from "../services/e2ee";
+import { useChatTheme, THEMES } from "../hooks/useChatTheme";
 
 void motion;
 export default function Sidebar({ 
@@ -16,50 +17,26 @@ export default function Sidebar({
   isAddingContact,
   setIsAddingContact,
   isCreatingGroup,
-  setIsCreatingGroup
+  setIsCreatingGroup,
+  setIsShowingSettings
 }) {
+  const [themeName] = useChatTheme();
+  const theme = THEMES[themeName] || THEMES.neon;
   const myUserId = getLoggedInUser()?._id;
   const [search, setSearch] = useState("");
   
-  // Contact Discovery State (lifted partially)
+  // States
   const [contactPhone, setContactPhone] = useState("");
   const [contactLoading, setContactLoading] = useState(false);
   const [contactError, setContactError] = useState("");
-
-  // Group Creation State (lifted partially)
   const [groupName, setGroupName] = useState("");
   const [selectedGroupUsers, setSelectedGroupUsers] = useState([]);
-
-  // Backup State
-  const [isSettingBackupPin, setIsSettingBackupPin] = useState(false);
-  const [backupPin, setBackupPin] = useState("");
-  const [backupStatus, setBackupStatus] = useState("");
 
   const handleLogout = () => {
     localStorage.removeItem("session-active");
     window.location.reload();
   };
 
-  const handleBackupKey = async () => {
-    if (!backupPin || backupPin.length < 4) {
-      setBackupStatus("PIN must be at least 4 digits");
-      return;
-    }
-    setContactLoading(true);
-    setBackupStatus("");
-    try {
-      const { backupPrivateKeyToCloud } = await import("../services/e2ee");
-      await backupPrivateKeyToCloud(api, myUserId, backupPin);
-      setBackupStatus("Success: Backup saved securely!");
-      setBackupPin("");
-      setTimeout(() => { setIsSettingBackupPin(false); setBackupStatus(""); }, 2000);
-    } catch (err) {
-      console.error("Backup error:", err);
-      setBackupStatus(err.message || "Failed to save backup");
-    } finally {
-      setContactLoading(false);
-    }
-  };
 
   useEffect(() => {
     api.get("/chat/my-chats")
@@ -73,26 +50,19 @@ export default function Sidebar({
   }, [setChats, myUserId]);
 
   const handleStartChat = async () => {
-    if (!contactPhone.trim()) {
-      return setContactError("Please enter a phone number");
-    }
-    
+    if (!contactPhone.trim()) return setContactError("Please enter a phone number");
     setContactLoading(true);
-    setContactError("");
-
     try {
       const res = await api.post("/chat/start", { phone: contactPhone });
       const newChat = res.data.chat;
-
-      if (!chats.find(c => c._id === newChat._id)) {
-        setChats(prev => [newChat, ...prev]);
-      }
-      
+      setChats(prev => {
+        if (prev.some(c => (c._id || c.id)?.toString() === (newChat._id || newChat.id)?.toString())) return prev;
+        return [newChat, ...prev];
+      });
       setSelectedChat(newChat);
       setIsAddingContact(false);
       setContactPhone("");
     } catch (err) {
-      console.error("Error starting chat:", err);
       setContactError(err.response?.data?.message || "User not found");
     } finally {
       setContactLoading(false);
@@ -102,20 +72,19 @@ export default function Sidebar({
   const handleCreateGroup = async () => {
     if (!groupName.trim() || selectedGroupUsers.length === 0) return;
     setContactLoading(true);
-    setContactError("");
     try {
-      const res = await api.post("/chat/create-group", {
-        name: groupName.trim(),
-        users: selectedGroupUsers
-      });
+      const res = await api.post("/chat/create-group", { name: groupName.trim(), users: selectedGroupUsers });
       const newGroup = res.data;
-      setChats(prev => [newGroup, ...prev]);
+      setChats(prev => {
+        if (prev.some(c => (c._id || c.id)?.toString() === (newGroup._id || newGroup.id)?.toString())) return prev;
+        return [newGroup, ...prev];
+      });
       setSelectedChat(newGroup);
       setIsCreatingGroup(false);
       setGroupName("");
       setSelectedGroupUsers([]);
+      setContactError("");
     } catch (err) {
-      console.error("Error creating group:", err);
       setContactError("Failed to create group.");
     } finally {
       setContactLoading(false);
@@ -126,7 +95,7 @@ export default function Sidebar({
     chats
       .filter(c => !c.isGroup)
       .map(c => {
-        const u = c.participants.find(p => (p._id?.toString() || p.toString()) !== myUserId?.toString());
+        const u = c.participants.find(p => p && (p._id?.toString() || p.toString()) !== myUserId?.toString());
         return u ? [u._id, u] : null;
       })
       .filter(Boolean)
@@ -135,46 +104,37 @@ export default function Sidebar({
   const filteredChats = chats.filter(chat => {
     if (!search.trim()) return true;
     const query = search.toLowerCase();
-
-    if (chat.isGroup) {
-      return chat.groupName?.toLowerCase().includes(query);
-    }
-
-    const otherUser = chat.participants.find(
-      u => (u._id?.toString() || u.toString()) !== myUserId?.toString()
-    );
+    if (chat.isGroup) return chat.groupName?.toLowerCase().includes(query);
+    const otherUser = chat.participants.find(u => u && (u._id?.toString() || u.toString()) !== myUserId?.toString());
     if (!otherUser) return false;
-
-    const savedContact = contacts.find(c => c.userId?.toString() === otherUser?._id?.toString());
+    const savedContact = contacts.find(c => c && c.userId?.toString() === otherUser?._id?.toString());
     const nameToSearch = savedContact ? savedContact.savedName : otherUser.phoneNumber;
-    
     return nameToSearch?.toLowerCase().includes(query);
   });
 
   return (
-    <div className="w-[380px] h-full flex flex-col bg-[#10131a] border-r border-[#45484f]/15">
+    <div className="w-[380px] h-full flex flex-col bg-[#10131a] border-r border-[#45484f]/15" style={{ background: theme.background }}>
       {/* Header */}
       <div className="p-4 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <MessageSquare className="text-[#12f1ff]" size={24} />
+            <MessageSquare style={{ color: theme.primary }} size={24} />
             Messages
           </h2>
           <div className="flex gap-2">
             <motion.button 
-              whileHover={{ scale: 1.1 }}
+              whileHover={{ scale: 1.1, backgroundColor: `${theme.primary}1a`, color: theme.primary }}
               whileTap={{ scale: 0.9 }}
               onClick={() => {
-                setIsSettingBackupPin(!isSettingBackupPin);
+                setIsShowingSettings(true);
                 setIsCreatingGroup(false);
                 setIsAddingContact(false);
                 setContactError("");
-                setBackupStatus("");
               }}
-              className={`p-2 rounded-full transition-colors ${isSettingBackupPin ? 'bg-[#12f1ff] text-[#0b0e14]' : 'bg-white/5 text-slate-400 hover:text-white'}`}
-              title="Cloud Backup"
+              className="p-2 rounded-full transition-colors bg-white/5 text-slate-400"
+              title="Identity & Settings"
             >
-              {isSettingBackupPin ? <X size={20} /> : <Cloud size={20} />}
+              <User size={20} />
             </motion.button>
             <motion.button 
               whileHover={{ scale: 1.1 }}
@@ -182,10 +142,10 @@ export default function Sidebar({
               onClick={() => {
                 setIsAddingContact(!isAddingContact);
                 setIsCreatingGroup(false);
-                setIsSettingBackupPin(false);
                 setContactError("");
               }}
-              className={`p-2 rounded-full transition-colors ${isAddingContact ? 'bg-[#12f1ff] text-[#0b0e14]' : 'bg-white/5 text-slate-400 hover:text-white'}`}
+              className={`p-2 rounded-full transition-colors ${isAddingContact ? 'text-[#0b0e14]' : 'bg-white/5 text-slate-400 hover:text-white'}`}
+              style={{ backgroundColor: isAddingContact ? theme.primary : undefined }}
             >
               {isAddingContact ? <X size={20} /> : <Plus size={20} />}
             </motion.button>
@@ -195,12 +155,12 @@ export default function Sidebar({
               onClick={() => {
                 setIsCreatingGroup(!isCreatingGroup);
                 setIsAddingContact(false);
-                setIsSettingBackupPin(false);
                 setGroupName("");
                 setSelectedGroupUsers([]);
                 setContactError("");
               }}
-              className={`p-2 rounded-full transition-colors ${isCreatingGroup ? 'bg-[#12f1ff] text-[#0b0e14]' : 'bg-white/5 text-slate-400 hover:text-white'}`}
+              className={`p-2 rounded-full transition-colors ${isCreatingGroup ? 'text-[#0b0e14]' : 'bg-white/5 text-slate-400 hover:text-white'}`}
+              style={{ backgroundColor: isCreatingGroup ? theme.primary : undefined }}
             >
               {isCreatingGroup ? <X size={20} /> : <Users size={20} />}
             </motion.button>
@@ -221,130 +181,94 @@ export default function Sidebar({
           <Search className="absolute left-3 top-2.5 text-slate-500" size={18} />
           <input
             type="text"
-            name="searchChats"
-            autoComplete="off"
             placeholder="Search conversations..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-[#0b0e14] border border-[#45484f]/15 rounded-xl text-sm focus:border-[#12f1ff] focus:ring-1 focus:ring-[#12f1ff] outline-none transition-all placeholder:text-slate-600"
+            style={{ borderColor: `${theme.primary}1a` }}
+            className="w-full pl-10 pr-4 py-2 bg-[#0b0e14] border rounded-xl text-sm focus:ring-1 outline-none transition-all placeholder:text-slate-600 text-white"
           />
         </div>
       </div>
 
-      {/* Modals / Action Panels */}
+      {/* Modals */}
       <AnimatePresence mode="wait">
-        {isAddingContact && (
+        {(isAddingContact || isCreatingGroup) && (
           <motion.div 
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             className="px-4 overflow-hidden"
           >
-            <div className="p-4 bg-[#0b0e14] border border-[#12f1ff]/20 rounded-2xl mb-4 space-y-3">
-              <p className="text-xs font-bold text-[#12f1ff] uppercase tracking-wider">Start Private Chat</p>
-              <div className="relative">
-                <Phone className="absolute left-3 top-2.5 text-slate-500" size={16} />
-                <input
-                  type="text"
-                  name="contactPhone"
-                  autoComplete="off"
-                  placeholder="Phone (+91...)"
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-black/20 border border-[#45484f]/15 rounded-lg text-sm outline-none focus:border-[#12f1ff] transition-all"
-                />
-              </div>
-              {contactError && <p className="text-rose-400 text-[10px] font-medium animate-pulse">{contactError}</p>}
-              <button
-                onClick={handleStartChat}
-                disabled={contactLoading}
-                className="w-full py-2 bg-[#12f1ff] text-[#0b0e14] font-bold rounded-lg text-sm interactive-btn flex items-center justify-center gap-2"
-              >
-                {contactLoading ? <Loader2 className="animate-spin" size={16} /> : "Initialize Chat"}
-              </button>
-            </div>
-          </motion.div>
-        )}
+            <div className="p-4 bg-[#0b0e14] border rounded-2xl mb-4 space-y-3" style={{ borderColor: `${theme.primary}33` }}>
+              {isAddingContact && (
+                <>
+                  <p className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.primary }}>Start Private Chat</p>
+                  <input
+                    type="text"
+                    placeholder="Phone (+91...)"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    className="w-full px-4 py-2 bg-black/20 border border-white/10 rounded-lg text-sm outline-none text-white"
+                  />
+                  <button onClick={handleStartChat} disabled={contactLoading} className="w-full py-2 font-bold rounded-lg text-sm" style={{ backgroundColor: theme.primary }}>
+                    {contactLoading ? "Initializing..." : "Initialize Chat"}
+                  </button>
+                </>
+              )}
+              {isCreatingGroup && (
+                <>
+                  <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.primary }}>New Group Collective</p>
+                  <input
+                    type="text"
+                    placeholder="Collective Name"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    className="w-full px-4 py-2 bg-black/20 border border-white/10 rounded-lg text-sm outline-none text-white mb-2 focus:border-[#c59aff]/30 transition-all font-inter"
+                  />
+                  
+                  {/* Participant Selection */}
+                  <div className="max-h-40 overflow-y-auto space-y-1 mb-4 custom-scrollbar pr-1">
+                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1 px-1">Select Members ({selectedGroupUsers.length})</p>
+                    {pastChatUsers.map(user => {
+                      const isSelected = selectedGroupUsers.includes(user._id);
+                      const saved = contacts.find(c => c && c.userId?.toString() === user._id?.toString());
+                      const name = saved ? saved.savedName : (user.name || user.phoneNumber || "User");
+                      
+                      return (
+                        <motion.div 
+                          whileTap={{ scale: 0.98 }}
+                          key={user._id}
+                          onClick={() => {
+                            if (isSelected) setSelectedGroupUsers(prev => prev.filter(id => id !== user._id));
+                            else setSelectedGroupUsers(prev => [...prev, user._id]);
+                          }}
+                          className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all border ${isSelected ? 'bg-white/10 border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.2)]' : 'hover:bg-white/5 border-transparent'}`}
+                        >
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-emerald-500 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'border-white/20'}`}>
+                            {isSelected && <Check size={12} className="text-white" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className={`text-xs font-medium truncate block ${isSelected ? 'text-white' : 'text-white/60'}`}>{name}</span>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                    {pastChatUsers.length === 0 && (
+                      <p className="text-[10px] text-slate-600 italic px-2">No contacts found to form a collective.</p>
+                    )}
+                  </div>
 
-        {isCreatingGroup && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="px-4 overflow-hidden"
-          >
-            <div className="p-4 bg-[#0b0e14] border border-[#12f1ff]/20 rounded-2xl mb-4 space-y-3">
-              <p className="text-xs font-bold text-[#12f1ff] uppercase tracking-wider">New Group Collective</p>
-              <input
-                type="text"
-                name="groupName"
-                autoComplete="off"
-                placeholder="Name your group"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                className="w-full px-4 py-2 bg-black/20 border border-[#45484f]/15 rounded-lg text-sm outline-none focus:border-[#12f1ff] transition-all"
-              />
-              <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                {pastChatUsers.map(user => {
-                  const savedContact = contacts.find(c => c.userId?.toString() === user._id?.toString());
-                  const displayName = savedContact ? savedContact.savedName : (user.phoneNumber || user.name || "Unknown");
-                  const isSelected = selectedGroupUsers.includes(user._id);
-
-                  return (
-                    <div 
-                      key={user._id} 
-                      onClick={() => setSelectedGroupUsers(p => isSelected ? p.filter(id => id !== user._id) : [...p, user._id])}
-                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-[#12f1ff]/10' : 'hover:bg-white/5'}`}
-                    >
-                      <span className={`text-sm ${isSelected ? 'text-[#12f1ff]' : 'text-slate-300'}`}>{displayName}</span>
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isSelected ? 'bg-[#12f1ff] border-[#12f1ff]' : 'border-slate-600'}`}>
-                        {isSelected && <Check size={12} className="text-[#0b0e14]" />}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <button
-                onClick={handleCreateGroup}
-                disabled={contactLoading || !groupName.trim() || selectedGroupUsers.length === 0}
-                className="w-full py-2 bg-[#12f1ff] text-[#0b0e14] font-bold rounded-lg text-sm interactive-btn disabled:opacity-50"
-              >
-                {contactLoading ? "Creating..." : "Launch Group"}
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {isSettingBackupPin && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="px-4 overflow-hidden"
-          >
-            <div className="p-4 bg-[#0b0e14] border border-[#12f1ff]/20 rounded-2xl mb-4 space-y-3">
-              <p className="text-xs font-bold text-[#12f1ff] uppercase tracking-wider">Cloud Key Backup</p>
-              <p className="text-xs text-slate-400 leading-tight">Create a Backup PIN to save your encryption key securely in the cloud.</p>
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 text-slate-500" size={16} />
-                <input
-                  type="password"
-                  name="backupPin"
-                  autoComplete="new-password"
-                  placeholder="Create a Backup PIN"
-                  value={backupPin}
-                  onChange={(e) => setBackupPin(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-black/20 border border-[#45484f]/15 rounded-lg text-sm outline-none focus:border-[#12f1ff] transition-all"
-                />
-              </div>
-              {backupStatus && <p className={`text-[10px] font-medium leading-tight ${backupStatus.startsWith("Success") ? "text-[#12f1ff]" : "text-rose-400 animate-pulse"}`}>{backupStatus}</p>}
-              <button
-                onClick={handleBackupKey}
-                disabled={contactLoading || !backupPin}
-                className="w-full py-2 bg-[#12f1ff] text-[#0b0e14] font-bold rounded-lg text-sm interactive-btn disabled:opacity-50"
-              >
-                {contactLoading ? "Saving..." : "Save Backup"}
-              </button>
+                  <button 
+                    onClick={handleCreateGroup} 
+                    disabled={contactLoading || !groupName.trim() || selectedGroupUsers.length === 0} 
+                    className="w-full py-2.5 font-bold rounded-xl text-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-lg shadow-black/20" 
+                    style={{ backgroundColor: theme.primary, color: '#0b0e14' }}
+                  >
+                    {contactLoading ? "Synchronizing Collective..." : "Initialize Group"}
+                  </button>
+                </>
+              )}
+              {contactError && <p className="text-rose-400 text-[10px]">{contactError}</p>}
             </div>
           </motion.div>
         )}
@@ -353,66 +277,60 @@ export default function Sidebar({
       {/* Chat List */}
       <div className="flex-1 overflow-y-auto px-2 space-y-1 custom-scrollbar">
         {filteredChats.map((chat, index) => {
-          const otherUser = (chat.participants || []).find(u => u && (u._id?.toString() || u.toString()) !== myUserId?.toString());
           const isSelected = selectedChat?._id === chat._id;
-          const isOnline = !chat.isGroup && otherUser && onlineUsers.includes(otherUser._id || otherUser);
-
-          let displayName = chat.isGroup ? (chat.groupName || "Unnamed Group") : "Unknown";
+          let displayName = chat.isGroup ? (chat.groupName || "Unnamed Group") : "Unknown User";
+          const otherUser = chat.participants?.find(u => u && (u._id?.toString() || u.toString()) !== myUserId?.toString());
           if (!chat.isGroup && otherUser) {
-            const savedContact = contacts.find(c => c && c.userId?.toString() === (otherUser._id || otherUser).toString());
-            displayName = savedContact ? savedContact.savedName : (otherUser.phoneNumber || otherUser.name || "Unknown User");
+            const saved = contacts.find(c => c && c.userId?.toString() === otherUser?._id?.toString());
+            displayName = saved ? saved.savedName : (otherUser.phoneNumber || "User");
           }
-          displayName = displayName || "Unknown";
-
-          const handleSelectChat = () => {
-            setSelectedChat(chat);
-            setChats(prev => prev.map(c => c._id === chat._id ? { ...c, unreadCount: 0 } : c));
-          };
 
           return (
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.03 }}
+            <div
               key={chat._id}
-              onClick={handleSelectChat}
-              className={`group p-3 mb-1 cursor-pointer transition-all duration-300 ${
-                isSelected 
-                  ? 'bg-gradient-to-r from-white/10 to-transparent border-l-[3px] border-[#12f1ff]' 
-                  : 'hover:bg-white/5 border-l-[3px] border-transparent'
-              }`}
+              onClick={() => { setSelectedChat(chat); setChats(prev => prev.map(c => c._id === chat._id ? { ...c, unreadCount: 0 } : c)); }}
+              className={`group p-3 mb-1 cursor-pointer transition-all duration-300 border-l-[3px] ${isSelected ? 'bg-white/10' : 'hover:bg-white/5 border-transparent'}`}
+              style={{ borderLeftColor: isSelected ? theme.primary : 'transparent' }}
             >
               <div className="flex items-center gap-3">
-                <div className="relative flex-shrink-0">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${isSelected ? 'bg-[#12f1ff] text-[#0b0e14] shadow-[0_0_15px_rgba(18,241,255,0.4)]' : 'bg-white/10 text-white/80'}`}>
-                    {chat.isGroup ? <Users size={20} /> : (displayName?.[0]?.toUpperCase() || "?")}
-                  </div>
-                  {!chat.isGroup && isOnline && (
-                    <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-[#10131a] rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-emerald-400 animate-pulse'}`} />
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${isSelected ? 'shadow-[0_0_15px]' : 'bg-white/10 text-white/80'}`} 
+                     style={{ backgroundColor: isSelected ? theme.primary : undefined, 
+                              color: isSelected ? '#0b0e14' : undefined,
+                              boxShadow: isSelected ? `0 0 15px ${theme.primary}66` : undefined }}>
+                  {chat.isGroup ? <Users size={20} /> : (
+                    otherUser?.avatar ? (
+                      <img 
+                        src={`http://localhost:5002${otherUser.avatar}`} 
+                        alt={displayName} 
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : displayName?.[0]?.toUpperCase() || "?"
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-1">
-                    <h4 className={`text-sm font-bold truncate ${isSelected ? 'text-white' : 'text-slate-200'}`}>{displayName}</h4>
-                    <div className="flex items-center gap-2">
-                      {chat.unreadCount > 0 && (
-                        <span className="min-w-[18px] px-2 py-0.5 text-[10px] font-bold text-white bg-[#12f1ff] rounded-full text-center shadow-sm">
-                          {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
-                        </span>
-                      )}
-                      <span className={`text-[10px] font-medium ${isSelected ? 'text-[#12f1ff]' : 'text-slate-500'}`}>
-                        {chat.updatedAt ? new Date(chat.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
-                      </span>
-                    </div>
+                    <h4 className="text-sm font-bold truncate text-white">{displayName}</h4>
+                    {chat.unreadCount > 0 && <span className="min-w-[18px] px-2 py-0.5 text-[10px] font-bold text-white bg-emerald-500 rounded-full">{chat.unreadCount}</span>}
                   </div>
-                  <p className={`text-xs truncate ${isSelected ? 'text-white/70 font-medium' : 'text-slate-500'}`}>
-                    {chat.lastMessage?.content
-                      || chat.lastMessage?.fileName
-                      || (chat.lastMessage?.fileUrl ? "Attachment" : "No dialogue yet")}
+                  <p className="text-xs truncate text-slate-500">
+                    {(() => {
+                      const msg = chat.lastMessage;
+                      if (!msg) return "Conversation start";
+                      if (msg.isDeleted) return "Message retracted";
+                      
+                      // Check for media/files
+                      if (msg.fileUrl || msg.fileType || msg.fileName) {
+                        const isImage = msg.fileType?.startsWith("image/") || (msg.fileName && /\.(jpg|jpeg|png|gif|webp)$/i.test(msg.fileName));
+                        if (isImage) return "Image";
+                        return msg.fileName || "File Attachment";
+                      }
+                      
+                      return msg.content || "Conversation start";
+                    })()}
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
           );
         })}
       </div>
