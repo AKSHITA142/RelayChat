@@ -7,6 +7,11 @@ import { User, Mail, Lock, Phone, ArrowLeft, CheckCircle, AlertCircle, Loader2 }
 import api from "../services/api";
 import { ensureE2EERegistration } from "../services/e2ee";
 
+// Stitch Ethereal UI
+import { Button } from "./stitch/Button";
+import { Input } from "./stitch/Input";
+import { Card } from "./stitch/Card";
+
 export default function Register({ onRegister, onBackToLogin }) {
   const [step, setStep] = useState(1); // 1: Details, 2: OTP
   const [name, setName] = useState("");
@@ -72,148 +77,142 @@ export default function Register({ onRegister, onBackToLogin }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-whatsapp-bg-dark to-slate-900">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#0b0e14] relative overflow-hidden">
+      {/* Ambient glowing orbs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] max-w-[600px] max-h-[600px] bg-[#c59aff]/20 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] max-w-[600px] max-h-[600px] bg-[#00eefc]/20 blur-[120px] rounded-full pointer-events-none" />
+
       <motion.div 
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="glass-card w-full max-w-md p-8 flex flex-col items-center"
+        className="w-full max-w-md"
       >
-        <div className="mb-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-2">
-            {step === 1 ? "Start Your Journey" : "Almost Done"}
-          </h2>
-          <p className="text-slate-400 text-sm font-medium px-4">
-            {step === 1 
-              ? "Join the next generation of secure messaging. It only takes a minute." 
-              : `We've sent a special code to ${phone}. Enter it below.`}
-          </p>
-        </div>
+        <Card className="flex flex-col items-center shadow-[0_20px_60px_-15px_rgba(197,154,255,0.05)]">
+          <div className="mb-8 text-center pt-2">
+            <h2 className="text-3xl font-bold text-[#ecedf6] mb-2 font-space tracking-tight">
+              {step === 1 ? "Start Your Journey" : "Almost Done"}
+            </h2>
+            <p className="text-[#a9abb3] text-sm font-medium px-4 font-inter">
+              {step === 1 
+                ? "Join the next generation of secure messaging. It only takes a minute." 
+                : `We've sent a special code to ${phone}. Enter it below.`}
+            </p>
+          </div>
 
-        <AnimatePresence mode="wait">
-          {error && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className={`w-full flex items-center gap-3 p-3 rounded-xl mb-6 text-sm font-medium ${
-                error.startsWith("Success") 
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
-                  : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-              }`}
-            >
-              {error.startsWith("Success") ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-              {error.replace("Success: ", "")}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="w-full space-y-4">
           <AnimatePresence mode="wait">
-            {step === 1 ? (
+            {error && (
               <motion.div 
-                key="step1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-4"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl mb-6 text-sm font-medium font-inter ${
+                  error.startsWith("Success") 
+                    ? "bg-[#006970]/40 text-[#00eefc] border border-[#00eefc]/20" 
+                    : "bg-[#a70138]/40 text-[#ffb2b9] border border-[#ff6e84]/20"
+                }`}
               >
-                <div className="relative">
-                  <User className="absolute left-3 top-3 text-slate-500" size={20} />
-                  <input 
+                {error.startsWith("Success") ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                {error.replace("Success: ", "")}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="w-full space-y-4">
+            <AnimatePresence mode="wait">
+              {step === 1 ? (
+                <motion.div 
+                  key="step1"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-4"
+                >
+                  <Input
+                    icon={User}
                     placeholder="Full Name" 
                     value={name} 
                     onChange={e => setName(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-whatsapp-bg-dark border border-white/10 rounded-xl focus:border-whatsapp-green focus:ring-1 focus:ring-whatsapp-green outline-none transition-all"
                   />
-                </div>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 text-slate-500" size={20} />
-                  <input 
+                  <Input
+                    icon={Mail}
                     placeholder="Email Address" 
                     value={email} 
                     onChange={e => setEmail(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-whatsapp-bg-dark border border-white/10 rounded-xl focus:border-whatsapp-green focus:ring-1 focus:ring-whatsapp-green outline-none transition-all"
                   />
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 text-slate-500" size={20} />
-                  <input
+                  <Input
+                    icon={Lock}
                     type="password"
                     placeholder="Create Password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-whatsapp-bg-dark border border-white/10 rounded-xl focus:border-whatsapp-green focus:ring-1 focus:ring-whatsapp-green outline-none transition-all"
                   />
-                </div>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3 text-slate-500" size={20} />
-                  <input 
+                  <Input
+                    icon={Phone}
                     placeholder="Phone Number (+91...)" 
                     value={phone} 
                     onChange={e => setPhone(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-whatsapp-bg-dark border border-white/10 rounded-xl focus:border-whatsapp-green focus:ring-1 focus:ring-whatsapp-green outline-none transition-all"
                   />
-                </div>
 
-                <button 
-                  onClick={handleStartRegistration} 
-                  disabled={loading}
-                  className="interactive-btn w-full bg-whatsapp-green text-whatsapp-bg-dark font-bold py-3 mt-4 rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-400 disabled:opacity-50"
+                  <div className="pt-4">
+                    <Button 
+                      onClick={handleStartRegistration} 
+                      disabled={loading}
+                      className="w-full"
+                    >
+                      {loading ? <Loader2 className="animate-spin text-[#420082]" /> : "Verify & Continue"}
+                    </Button>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="step2"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-4"
                 >
-                  {loading ? <Loader2 className="animate-spin text-whatsapp-bg-dark" /> : "Verify & Continue"}
-                </button>
-              </motion.div>
-            ) : (
-              <motion.div 
-                key="step2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-4"
-              >
-                <div className="relative">
-                  <CheckCircle className="absolute left-3 top-3 text-slate-500" size={20} />
-                  <input
+                  <Input
+                    icon={CheckCircle}
                     type="text"
                     placeholder="6-digit OTP"
                     value={otp}
                     onChange={e => setOtp(e.target.value)}
                     maxLength={6}
-                    className="w-full pl-11 pr-4 py-3 bg-whatsapp-bg-dark border border-white/10 rounded-xl focus:border-whatsapp-green focus:ring-1 focus:ring-whatsapp-green outline-none transition-all"
+                    className="text-center tracking-widest text-lg"
                   />
-                </div>
-                <button 
-                  onClick={handleCompleteRegistration} 
-                  disabled={loading}
-                  className="interactive-btn w-full bg-whatsapp-green text-whatsapp-bg-dark font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-400 disabled:opacity-50"
-                >
-                  {loading ? <Loader2 className="animate-spin text-whatsapp-bg-dark" /> : "Verify Identity"}
-                </button>
-                <button 
-                  className="w-full flex items-center justify-center gap-2 text-slate-500 text-sm font-medium hover:text-white transition-colors"
-                  onClick={() => setStep(1)}
-                >
-                  <ArrowLeft size={16} />
-                  Change Details
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+                  <div className="pt-4">
+                    <Button 
+                      onClick={handleCompleteRegistration} 
+                      disabled={loading}
+                      className="w-full"
+                    >
+                      {loading ? <Loader2 className="animate-spin text-[#420082]" /> : "Verify Identity"}
+                    </Button>
+                  </div>
+                  <button 
+                    className="w-full flex items-center justify-center gap-2 text-[#a9abb3] text-sm font-medium hover:text-[#ecedf6] transition-colors mt-4 font-inter"
+                    onClick={() => setStep(1)}
+                  >
+                    <ArrowLeft size={16} />
+                    Change Details
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
-        <motion.p className="mt-8 text-slate-500 text-sm">
-          Already a member?{" "}
-          <span 
-            onClick={onBackToLogin}
-            className="text-whatsapp-green font-bold cursor-pointer hover:underline"
-          >
-            Login here
-          </span>
-        </motion.p>
+          <motion.p className="mt-8 mb-2 text-[#a9abb3] text-sm font-inter">
+            Already a member?{" "}
+            <span 
+              onClick={onBackToLogin}
+              className="text-[#00eefc] font-bold cursor-pointer hover:underline"
+            >
+              Login here
+            </span>
+          </motion.p>
+        </Card>
       </motion.div>
     </div>
   );
 }
-
-

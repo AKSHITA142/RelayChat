@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Check, X } from "lucide-react";
 import { THEMES, THEME_NAMES } from "../hooks/useChatTheme";
 
-const SWATCH_ORDER = ["blue", "green", "purple", "dark"];
+const SWATCH_ORDER = ["neon", "void", "plasma", "matrix", "minimal_dark", "minimal_light"];
 void motion; // ensure framer-motion is treated as used by the linter (used in JSX via <motion.* />)
 export default function ThemeSelector({ currentTheme, onSelect, onClose }) {
   return (
@@ -24,17 +24,16 @@ export default function ThemeSelector({ currentTheme, onSelect, onClose }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -12, scale: 0.94 }}
         transition={{ type: "spring", damping: 22, stiffness: 320 }}
-        className="absolute top-14 right-14 z-[90] bg-white/10 backdrop-blur-2xl border border-white/20 rounded-2xl shadow-2xl p-4 w-56"
-        style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.35)" }}
+        className="absolute top-14 right-14 z-[90] bg-[#1c2028]/95 backdrop-blur-3xl border border-[#45484f]/30 rounded-2xl shadow-2xl p-4 w-56"
+        style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}
       >
-        {/* Header */}
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-black uppercase tracking-widest text-slate-800/80">
+          <p className="text-xs font-black uppercase tracking-widest text-[#12f1ff]">
             Chat Theme
           </p>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg hover:bg-black/5 text-slate-400 hover:text-slate-800 transition-all"
+            className="p-1 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all"
           >
             <X size={14} />
           </button>
@@ -78,7 +77,7 @@ export default function ThemeSelector({ currentTheme, onSelect, onClose }) {
                   </div>
                 </div>
 
-                <span className="text-[10px] font-bold text-slate-800/70 uppercase tracking-wider">
+                <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider">
                   {THEME_NAMES[key]}
                 </span>
 

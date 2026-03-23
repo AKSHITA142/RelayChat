@@ -132,7 +132,7 @@ export default function VoiceRecorder({ onSend, onCancel }) {
               initial={{ height: 4 }}
               animate={{ height: Math.max(4, val * 32) }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className="w-[3px] bg-whatsapp-green rounded-full opacity-80"
+              className="w-[3px] bg-[#12f1ff] rounded-full opacity-80"
             />
           ))}
         </div>
@@ -142,7 +142,7 @@ export default function VoiceRecorder({ onSend, onCancel }) {
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={stopRecording}
-        className="p-3 bg-whatsapp-green text-whatsapp-bg-dark rounded-full shadow-lg shadow-whatsapp-green/20 transition-all"
+        className="p-3 bg-[#12f1ff] text-[#0b0e14] rounded-full shadow-lg shadow-[#12f1ff]/20 transition-all"
       >
         <Send size={20} />
       </motion.button>

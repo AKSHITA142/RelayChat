@@ -104,15 +104,35 @@ export default function Chat() {
     };
   }, []);
 
-  // Update sidebar lastMessage for BOTH users
+  // Update sidebar lastMessage and unread badge
   useEffect(() => {
     const handler = async (msg) => {
-      const hydratedMessage = await hydrateDecryptedMessage(msg, getLoggedInUser()?._id);
+      const currentUserId = getLoggedInUser()?._id?.toString();
+      const msgChatId = (msg.chat?._id || msg.chat)?.toString();
+      if (!msgChatId) return;
+
+      const hydratedMessage = await hydrateDecryptedMessage(msg, currentUserId);
+      const isIncoming = msg.sender && (msg.sender._id || msg.sender)?.toString() !== currentUserId;
+      const isActiveChat = selectedChat?._id?.toString() === msgChatId;
+
+      // If we're already viewing the chat, immediately mark seen/open
+      if (isActiveChat && isIncoming) {
+        socket.emit("open-chat", msgChatId);
+        socket.emit("mark-seen", { chatId: msgChatId });
+      }
+
       setChats(prev => {
-        const msgChatId = (msg.chat?._id || msg.chat)?.toString();
         const chatIdx = prev.findIndex(c => c._id?.toString() === msgChatId);
-        if (chatIdx === -1) return prev; 
-        const updatedChat = { ...prev[chatIdx], lastMessage: hydratedMessage };
+        if (chatIdx === -1) return prev;
+
+        const currentUnread = prev[chatIdx].unreadCount || 0;
+        const nextUnread = isActiveChat ? 0 : (isIncoming ? currentUnread + 1 : currentUnread);
+
+        const updatedChat = { 
+          ...prev[chatIdx], 
+          lastMessage: hydratedMessage,
+          unreadCount: nextUnread
+        };
         const rest = prev.filter((_, i) => i !== chatIdx);
         return [updatedChat, ...rest];
       });
@@ -120,7 +140,7 @@ export default function Chat() {
 
     socket.on("new-message", handler);
     return () => socket.off("new-message", handler);
-  }, []);
+  }, [selectedChat]);
 
   // Listen for newly created chats (like groups)
   useEffect(() => {

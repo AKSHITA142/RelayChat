@@ -252,9 +252,9 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
                 <motion.div
                   animate={{ scale: [1, 1.15, 1] }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
-                  className="w-24 h-24 rounded-full bg-whatsapp-green/10 flex items-center justify-center border border-whatsapp-green/30"
+                  className="w-24 h-24 rounded-full bg-[#12f1ff]/10 flex items-center justify-center border border-[#12f1ff]/30"
                 >
-                  <User size={48} className="text-whatsapp-green" />
+                  <User size={48} className="text-[#12f1ff]" />
                 </motion.div>
                 <div className="text-center">
                   <h3 className="text-xl font-bold text-white">{fromName || "User"}</h3>
@@ -270,7 +270,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
             <motion.div
               drag
               dragConstraints={{ left: 20, top: 20, right: 300, bottom: 200 }}
-              className="absolute top-4 right-4 md:top-6 md:right-6 w-28 md:w-48 aspect-video bg-whatsapp-bg-dark rounded-2xl overflow-hidden border-2 border-white/10 shadow-xl z-20 cursor-grab"
+              className="absolute top-4 right-4 md:top-6 md:right-6 w-28 md:w-48 aspect-video bg-[#0b0e14] rounded-2xl overflow-hidden border-2 border-white/10 shadow-xl z-20 cursor-grab"
             >
               <video
                 ref={localRef}
@@ -281,7 +281,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
                 className="w-full h-full object-cover"
               />
               {vidOff && (
-                <div className="absolute inset-0 bg-whatsapp-bg-dark flex items-center justify-center">
+                <div className="absolute inset-0 bg-[#0b0e14] flex items-center justify-center">
                   <VideoOff size={24} className="text-slate-500" />
                 </div>
               )}
@@ -296,7 +296,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={acceptCall}
-                className="w-14 h-14 rounded-full bg-whatsapp-green text-whatsapp-bg-dark flex items-center justify-center shadow-lg"
+                className="w-14 h-14 rounded-full bg-[#12f1ff] text-[#0b0e14] flex items-center justify-center shadow-lg"
               >
                 <Phone size={24} />
               </motion.button>

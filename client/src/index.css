@@ -1,10 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    @apply bg-whatsapp-bg-dark text-white font-sans antialiased;
+    @apply bg-[#0b0e14] text-white font-sans antialiased;
   }
 
   ::-webkit-scrollbar {
@@ -26,7 +28,7 @@
 
 @layer components {
   .glass-card {
-    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl shadow-xl;
+    @apply bg-white/5 backdrop-blur-md border border-[#45484f]/30 rounded-2xl shadow-xl;
   }
 
   .interactive-btn {

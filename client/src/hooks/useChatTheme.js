@@ -4,69 +4,99 @@
  * Default:     "blue"
  */
 export const THEMES = {
-  blue: {
-    primary:      "#4A90E2",
-    background:   "#EAF3FF",
-    headerBg:     "#c8def7",
-    footerBg:     "#d8ebff",
-    bubbleOwn:    "#4A90E2",
-    bubbleOther:  "#d0e8ff",
+  neon: {
+    primary:      "#12f1ff",
+    background:   "#090b10",
+    headerBg:     "rgba(9,11,16,0.85)",
+    footerBg:     "rgba(9,11,16,0.85)",
+    bubbleOwn:    "linear-gradient(135deg, rgba(18,241,255,0.15), rgba(0,166,255,0.05))",
+    bubbleOther:  "rgba(255,255,255,0.03)",
     textOwn:      "#ffffff",
-    textOther:    "#1a2a4a",
-    inputBorder:  "#4A90E2",
-    sendBtn:      "#4A90E2",
+    textOther:    "#ffffff",
+    inputBorder:  "rgba(18,241,255,0.3)",
+    sendBtn:      "linear-gradient(135deg, #12f1ff 0%, #00a6ff 100%)",
   },
-  green: {
-    primary:      "#2ECC71",
-    background:   "#EAFBF1",
-    headerBg:     "#b8efd3",
-    footerBg:     "#d0f5e4",
-    bubbleOwn:    "#2ECC71",
-    bubbleOther:  "#c4f0d8",
+  void: {
+    primary:      "#b6a0ff",
+    background:   "#060608",
+    headerBg:     "rgba(6,6,8,0.85)",
+    footerBg:     "rgba(6,6,8,0.85)",
+    bubbleOwn:    "linear-gradient(135deg, rgba(197,154,255,0.15), rgba(139,92,246,0.05))",
+    bubbleOther:  "rgba(255,255,255,0.03)",
     textOwn:      "#ffffff",
-    textOther:    "#0d2b1a",
-    inputBorder:  "#2ECC71",
-    sendBtn:      "#2ECC71",
+    textOther:    "#ffffff",
+    inputBorder:  "rgba(182,160,255,0.3)",
+    sendBtn:      "linear-gradient(135deg, #c59aff 0%, #8b5cf6 100%)",
   },
-  purple: {
-    primary:      "#9B59B6",
-    background:   "#F3E8FF",
-    headerBg:     "#dbbef7",
-    footerBg:     "#e8d4fc",
-    bubbleOwn:    "#9B59B6",
-    bubbleOther:  "#e2ccf5",
+  plasma: {
+    primary:      "#ff2a6d",
+    background:   "#0a0508",
+    headerBg:     "rgba(10,5,8,0.85)",
+    footerBg:     "rgba(10,5,8,0.85)",
+    bubbleOwn:    "linear-gradient(135deg, rgba(255,42,109,0.15), rgba(255,101,47,0.05))",
+    bubbleOther:  "rgba(255,255,255,0.03)",
     textOwn:      "#ffffff",
-    textOther:    "#2a0d40",
-    inputBorder:  "#9B59B6",
-    sendBtn:      "#9B59B6",
+    textOther:    "#ffffff",
+    inputBorder:  "rgba(255,42,109,0.3)",
+    sendBtn:      "linear-gradient(135deg, #ff2a6d 0%, #ff652f 100%)",
   },
-  dark: {
-    primary:      "#5B7FDE",
-    background:   "#121212",
-    headerBg:     "#1a1f2e",
-    footerBg:     "#161b28",
-    bubbleOwn:    "#2a3a5c",
-    bubbleOther:  "#1e2a3a",
-    textOwn:      "#e8eaf6",
-    textOther:    "#b0bec5",
-    inputBorder:  "#5B7FDE",
-    sendBtn:      "#5B7FDE",
+  matrix: {
+    primary:      "#00ff41",
+    background:   "#040805",
+    headerBg:     "rgba(4,8,5,0.85)",
+    footerBg:     "rgba(4,8,5,0.85)",
+    bubbleOwn:    "linear-gradient(135deg, rgba(0,255,65,0.15), rgba(0,143,17,0.05))",
+    bubbleOther:  "rgba(255,255,255,0.03)",
+    textOwn:      "#ffffff",
+    textOther:    "#ffffff",
+    inputBorder:  "rgba(0,255,65,0.3)",
+    sendBtn:      "linear-gradient(135deg, #00ff41 0%, #008f11 100%)",
   },
+  minimal_dark: {
+    primary:      "#ffffff",
+    background:   "#000000",
+    headerBg:     "rgba(0,0,0,0.85)",
+    footerBg:     "rgba(0,0,0,0.85)",
+    bubbleOwn:    "#d1d5db", // light grey
+    bubbleOther:  "#1f2937", // dark grey
+    textOwn:      "#000000",
+    textOther:    "#ffffff",
+    inputBorder:  "#333333",
+    sendBtn:      "#ffffff",
+    pattern:      "radial-gradient(rgba(255,255,255,0.06) 1.5px, transparent 1.5px)",
+    patternSize:  "16px 16px",
+  },
+  minimal_light: {
+    primary:      "#000000",
+    background:   "linear-gradient(to right, #9ca3af 0%, #e2e8f0 100%)", // dark grey to light grey left-to-right
+    headerBg:     "rgba(209,213,219,0.85)",
+    footerBg:     "rgba(203,213,225,0.85)",
+    bubbleOwn:    "#000000", // pitch black
+    bubbleOther:  "#ffffff", // pure white
+    textOwn:      "#ffffff",
+    textOther:    "#000000",
+    inputBorder:  "#cccccc",
+    sendBtn:      "#000000",
+    pattern:      "radial-gradient(rgba(255,255,255,0.6) 1.5px, transparent 1.5px)", // visible white dots
+    patternSize:  "16px 16px",
+  }
 };
 
 export const THEME_NAMES = {
-  blue:   "Blue",
-  green:  "Green",
-  purple: "Purple",
-  dark:   "Dark",
+  neon:           "Neon Cyan",
+  void:           "Deep Void",
+  plasma:         "Plasma",
+  matrix:         "Oasis",
+  minimal_dark:   "Minimal Dark",
+  minimal_light:  "Minimal Light",
 };
 
 export function useChatTheme(chatId) {
   const key = chatId ? `chat-theme-${chatId}` : null;
 
   const getTheme = () => {
-    if (!key) return "blue";
-    return localStorage.getItem(key) || "blue";
+    if (!key) return "neon";
+    return localStorage.getItem(key) || "neon";
   };
 
   const setTheme = (themeName) => {

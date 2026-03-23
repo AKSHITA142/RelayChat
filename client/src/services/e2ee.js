@@ -301,22 +301,37 @@ const decryptWrappedContentKeyForUser = async (message, currentUserId) => {
   }
 
   const currentDeviceId = getCurrentDeviceId();
-  const encryptedKeyEntry = (message?.encryptedContent?.encryptedKeys || []).find((entry) => {
+  const allUserEntries = (message?.encryptedContent?.encryptedKeys || []).filter((entry) => {
     const entryUserId = entry?.userId?._id || entry?.userId;
-    return entryUserId?.toString() === currentUserId.toString() &&
-      (!entry?.deviceId || entry.deviceId === currentDeviceId);
+    return entryUserId?.toString() === currentUserId.toString();
   });
 
-  if (!encryptedKeyEntry?.key) {
+  if (allUserEntries.length === 0) {
     throw new Error("No encrypted message key available for this user");
   }
 
   const privateKey = await importPrivateKey(JSON.parse(storedPrivateKey));
-  return window.crypto.subtle.decrypt(
-    { name: "RSA-OAEP" },
-    privateKey,
-    fromBase64(encryptedKeyEntry.key)
-  );
+  
+  // First try the exact device match
+  const exactMatch = allUserEntries.find(entry => !entry?.deviceId || entry.deviceId === currentDeviceId);
+  if (exactMatch) {
+    try {
+      return await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, fromBase64(exactMatch.key));
+    } catch (err) {
+      // Fallback
+    }
+  }
+
+  // Fallback: try all keys (for cloud backup restores where deviceId changed)
+  for (const entry of allUserEntries) {
+    try {
+      return await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, fromBase64(entry.key));
+    } catch (err) {
+      continue;
+    }
+  }
+
+  throw new Error("Failed to decrypt message key with the current private key");
 };
 
 export const decryptDirectMessage = async (message, currentUserId) => {
@@ -428,22 +443,37 @@ const decryptWrappedKeyForUser = async (encryptedKeys, currentUserId) => {
   }
 
   const currentDeviceId = getCurrentDeviceId();
-  const encryptedKeyEntry = (encryptedKeys || []).find((entry) => {
+  const allUserEntries = (encryptedKeys || []).filter((entry) => {
     const entryUserId = entry?.userId?._id || entry?.userId;
-    return entryUserId?.toString() === currentUserId.toString() &&
-      (!entry?.deviceId || entry.deviceId === currentDeviceId);
+    return entryUserId?.toString() === currentUserId.toString();
   });
 
-  if (!encryptedKeyEntry?.key) {
+  if (allUserEntries.length === 0) {
     throw new Error("No encrypted attachment key available for this user");
   }
 
   const privateKey = await importPrivateKey(JSON.parse(storedPrivateKey));
-  return window.crypto.subtle.decrypt(
-    { name: "RSA-OAEP" },
-    privateKey,
-    fromBase64(encryptedKeyEntry.key)
-  );
+
+  // First try the exact device match
+  const exactMatch = allUserEntries.find(entry => !entry?.deviceId || entry.deviceId === currentDeviceId);
+  if (exactMatch) {
+    try {
+      return await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, fromBase64(exactMatch.key));
+    } catch (err) {
+      // Fallback
+    }
+  }
+
+  // Fallback: Try all keys
+  for (const entry of allUserEntries) {
+    try {
+      return await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, fromBase64(entry.key));
+    } catch (err) {
+      continue;
+    }
+  }
+
+  throw new Error("Failed to decrypt attachment key with the current private key");
 };
 
 export const getDecryptedAttachmentData = async (message, currentUserId) => {

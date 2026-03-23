@@ -36,7 +36,7 @@ export default function Sidebar({
   const [backupStatus, setBackupStatus] = useState("");
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem("session-active");
     window.location.reload();
   };
 
@@ -152,12 +152,12 @@ export default function Sidebar({
   });
 
   return (
-    <div className="w-[380px] h-full flex flex-col bg-whatsapp-sidebar-dark border-r border-white/5">
+    <div className="w-[380px] h-full flex flex-col bg-[#10131a] border-r border-[#45484f]/15">
       {/* Header */}
       <div className="p-4 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <MessageSquare className="text-whatsapp-green" size={24} />
+            <MessageSquare className="text-[#12f1ff]" size={24} />
             Messages
           </h2>
           <div className="flex gap-2">
@@ -171,7 +171,7 @@ export default function Sidebar({
                 setContactError("");
                 setBackupStatus("");
               }}
-              className={`p-2 rounded-full transition-colors ${isSettingBackupPin ? 'bg-whatsapp-green text-whatsapp-bg-dark' : 'bg-white/5 text-slate-400 hover:text-white'}`}
+              className={`p-2 rounded-full transition-colors ${isSettingBackupPin ? 'bg-[#12f1ff] text-[#0b0e14]' : 'bg-white/5 text-slate-400 hover:text-white'}`}
               title="Cloud Backup"
             >
               {isSettingBackupPin ? <X size={20} /> : <Cloud size={20} />}
@@ -185,7 +185,7 @@ export default function Sidebar({
                 setIsSettingBackupPin(false);
                 setContactError("");
               }}
-              className={`p-2 rounded-full transition-colors ${isAddingContact ? 'bg-whatsapp-green text-whatsapp-bg-dark' : 'bg-white/5 text-slate-400 hover:text-white'}`}
+              className={`p-2 rounded-full transition-colors ${isAddingContact ? 'bg-[#12f1ff] text-[#0b0e14]' : 'bg-white/5 text-slate-400 hover:text-white'}`}
             >
               {isAddingContact ? <X size={20} /> : <Plus size={20} />}
             </motion.button>
@@ -200,7 +200,7 @@ export default function Sidebar({
                 setSelectedGroupUsers([]);
                 setContactError("");
               }}
-              className={`p-2 rounded-full transition-colors ${isCreatingGroup ? 'bg-whatsapp-green text-whatsapp-bg-dark' : 'bg-white/5 text-slate-400 hover:text-white'}`}
+              className={`p-2 rounded-full transition-colors ${isCreatingGroup ? 'bg-[#12f1ff] text-[#0b0e14]' : 'bg-white/5 text-slate-400 hover:text-white'}`}
             >
               {isCreatingGroup ? <X size={20} /> : <Users size={20} />}
             </motion.button>
@@ -226,7 +226,7 @@ export default function Sidebar({
             placeholder="Search conversations..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-whatsapp-bg-dark border border-white/5 rounded-xl text-sm focus:border-whatsapp-green focus:ring-1 focus:ring-whatsapp-green outline-none transition-all placeholder:text-slate-600"
+            className="w-full pl-10 pr-4 py-2 bg-[#0b0e14] border border-[#45484f]/15 rounded-xl text-sm focus:border-[#12f1ff] focus:ring-1 focus:ring-[#12f1ff] outline-none transition-all placeholder:text-slate-600"
           />
         </div>
       </div>
@@ -240,8 +240,8 @@ export default function Sidebar({
             exit={{ height: 0, opacity: 0 }}
             className="px-4 overflow-hidden"
           >
-            <div className="p-4 bg-whatsapp-bg-dark border border-whatsapp-green/20 rounded-2xl mb-4 space-y-3">
-              <p className="text-xs font-bold text-whatsapp-green uppercase tracking-wider">Start Private Chat</p>
+            <div className="p-4 bg-[#0b0e14] border border-[#12f1ff]/20 rounded-2xl mb-4 space-y-3">
+              <p className="text-xs font-bold text-[#12f1ff] uppercase tracking-wider">Start Private Chat</p>
               <div className="relative">
                 <Phone className="absolute left-3 top-2.5 text-slate-500" size={16} />
                 <input
@@ -251,14 +251,14 @@ export default function Sidebar({
                   placeholder="Phone (+91...)"
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-black/20 border border-white/5 rounded-lg text-sm outline-none focus:border-whatsapp-green transition-all"
+                  className="w-full pl-10 pr-4 py-2 bg-black/20 border border-[#45484f]/15 rounded-lg text-sm outline-none focus:border-[#12f1ff] transition-all"
                 />
               </div>
               {contactError && <p className="text-rose-400 text-[10px] font-medium animate-pulse">{contactError}</p>}
               <button
                 onClick={handleStartChat}
                 disabled={contactLoading}
-                className="w-full py-2 bg-whatsapp-green text-whatsapp-bg-dark font-bold rounded-lg text-sm interactive-btn flex items-center justify-center gap-2"
+                className="w-full py-2 bg-[#12f1ff] text-[#0b0e14] font-bold rounded-lg text-sm interactive-btn flex items-center justify-center gap-2"
               >
                 {contactLoading ? <Loader2 className="animate-spin" size={16} /> : "Initialize Chat"}
               </button>
@@ -273,8 +273,8 @@ export default function Sidebar({
             exit={{ height: 0, opacity: 0 }}
             className="px-4 overflow-hidden"
           >
-            <div className="p-4 bg-whatsapp-bg-dark border border-whatsapp-green/20 rounded-2xl mb-4 space-y-3">
-              <p className="text-xs font-bold text-whatsapp-green uppercase tracking-wider">New Group Collective</p>
+            <div className="p-4 bg-[#0b0e14] border border-[#12f1ff]/20 rounded-2xl mb-4 space-y-3">
+              <p className="text-xs font-bold text-[#12f1ff] uppercase tracking-wider">New Group Collective</p>
               <input
                 type="text"
                 name="groupName"
@@ -282,7 +282,7 @@ export default function Sidebar({
                 placeholder="Name your group"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                className="w-full px-4 py-2 bg-black/20 border border-white/5 rounded-lg text-sm outline-none focus:border-whatsapp-green transition-all"
+                className="w-full px-4 py-2 bg-black/20 border border-[#45484f]/15 rounded-lg text-sm outline-none focus:border-[#12f1ff] transition-all"
               />
               <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
                 {pastChatUsers.map(user => {
@@ -294,11 +294,11 @@ export default function Sidebar({
                     <div 
                       key={user._id} 
                       onClick={() => setSelectedGroupUsers(p => isSelected ? p.filter(id => id !== user._id) : [...p, user._id])}
-                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-whatsapp-green/10' : 'hover:bg-white/5'}`}
+                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-[#12f1ff]/10' : 'hover:bg-white/5'}`}
                     >
-                      <span className={`text-sm ${isSelected ? 'text-whatsapp-green' : 'text-slate-300'}`}>{displayName}</span>
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isSelected ? 'bg-whatsapp-green border-whatsapp-green' : 'border-slate-600'}`}>
-                        {isSelected && <Check size={12} className="text-whatsapp-bg-dark" />}
+                      <span className={`text-sm ${isSelected ? 'text-[#12f1ff]' : 'text-slate-300'}`}>{displayName}</span>
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isSelected ? 'bg-[#12f1ff] border-[#12f1ff]' : 'border-slate-600'}`}>
+                        {isSelected && <Check size={12} className="text-[#0b0e14]" />}
                       </div>
                     </div>
                   );
@@ -307,7 +307,7 @@ export default function Sidebar({
               <button
                 onClick={handleCreateGroup}
                 disabled={contactLoading || !groupName.trim() || selectedGroupUsers.length === 0}
-                className="w-full py-2 bg-whatsapp-green text-whatsapp-bg-dark font-bold rounded-lg text-sm interactive-btn disabled:opacity-50"
+                className="w-full py-2 bg-[#12f1ff] text-[#0b0e14] font-bold rounded-lg text-sm interactive-btn disabled:opacity-50"
               >
                 {contactLoading ? "Creating..." : "Launch Group"}
               </button>
@@ -322,8 +322,8 @@ export default function Sidebar({
             exit={{ height: 0, opacity: 0 }}
             className="px-4 overflow-hidden"
           >
-            <div className="p-4 bg-whatsapp-bg-dark border border-whatsapp-green/20 rounded-2xl mb-4 space-y-3">
-              <p className="text-xs font-bold text-whatsapp-green uppercase tracking-wider">Cloud Key Backup</p>
+            <div className="p-4 bg-[#0b0e14] border border-[#12f1ff]/20 rounded-2xl mb-4 space-y-3">
+              <p className="text-xs font-bold text-[#12f1ff] uppercase tracking-wider">Cloud Key Backup</p>
               <p className="text-xs text-slate-400 leading-tight">Create a Backup PIN to save your encryption key securely in the cloud.</p>
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 text-slate-500" size={16} />
@@ -334,14 +334,14 @@ export default function Sidebar({
                   placeholder="Create a Backup PIN"
                   value={backupPin}
                   onChange={(e) => setBackupPin(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-black/20 border border-white/5 rounded-lg text-sm outline-none focus:border-whatsapp-green transition-all"
+                  className="w-full pl-10 pr-4 py-2 bg-black/20 border border-[#45484f]/15 rounded-lg text-sm outline-none focus:border-[#12f1ff] transition-all"
                 />
               </div>
-              {backupStatus && <p className={`text-[10px] font-medium leading-tight ${backupStatus.startsWith("Success") ? "text-whatsapp-green" : "text-rose-400 animate-pulse"}`}>{backupStatus}</p>}
+              {backupStatus && <p className={`text-[10px] font-medium leading-tight ${backupStatus.startsWith("Success") ? "text-[#12f1ff]" : "text-rose-400 animate-pulse"}`}>{backupStatus}</p>}
               <button
                 onClick={handleBackupKey}
                 disabled={contactLoading || !backupPin}
-                className="w-full py-2 bg-whatsapp-green text-whatsapp-bg-dark font-bold rounded-lg text-sm interactive-btn disabled:opacity-50"
+                className="w-full py-2 bg-[#12f1ff] text-[#0b0e14] font-bold rounded-lg text-sm interactive-btn disabled:opacity-50"
               >
                 {contactLoading ? "Saving..." : "Save Backup"}
               </button>
@@ -364,32 +364,48 @@ export default function Sidebar({
           }
           displayName = displayName || "Unknown";
 
+          const handleSelectChat = () => {
+            setSelectedChat(chat);
+            setChats(prev => prev.map(c => c._id === chat._id ? { ...c, unreadCount: 0 } : c));
+          };
+
           return (
             <motion.div
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.03 }}
               key={chat._id}
-              onClick={() => setSelectedChat(chat)}
-              className={`group p-3 rounded-2xl cursor-pointer transition-all duration-300 ${isSelected ? 'bg-whatsapp-green shadow-lg shadow-whatsapp-green/20' : 'hover:bg-white/5'}`}
+              onClick={handleSelectChat}
+              className={`group p-3 mb-1 cursor-pointer transition-all duration-300 ${
+                isSelected 
+                  ? 'bg-gradient-to-r from-white/10 to-transparent border-l-[3px] border-[#12f1ff]' 
+                  : 'hover:bg-white/5 border-l-[3px] border-transparent'
+              }`}
             >
               <div className="flex items-center gap-3">
                 <div className="relative flex-shrink-0">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${isSelected ? 'bg-whatsapp-bg-dark text-whatsapp-green' : 'bg-whatsapp-green/10 text-whatsapp-green'}`}>
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${isSelected ? 'bg-[#12f1ff] text-[#0b0e14] shadow-[0_0_15px_rgba(18,241,255,0.4)]' : 'bg-white/10 text-white/80'}`}>
                     {chat.isGroup ? <Users size={20} /> : (displayName?.[0]?.toUpperCase() || "?")}
                   </div>
                   {!chat.isGroup && isOnline && (
-                    <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-whatsapp-sidebar-dark rounded-full ${isSelected ? 'bg-whatsapp-bg-dark' : 'bg-whatsapp-green animate-pulse'}`} />
+                    <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-[#10131a] rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-emerald-400 animate-pulse'}`} />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-1">
-                    <h4 className={`text-sm font-bold truncate ${isSelected ? 'text-whatsapp-bg-dark' : 'text-slate-200'}`}>{displayName}</h4>
-                    <span className={`text-[10px] font-medium ${isSelected ? 'text-whatsapp-bg-dark/60' : 'text-slate-500'}`}>
-                      {chat.updatedAt ? new Date(chat.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
-                    </span>
+                    <h4 className={`text-sm font-bold truncate ${isSelected ? 'text-white' : 'text-slate-200'}`}>{displayName}</h4>
+                    <div className="flex items-center gap-2">
+                      {chat.unreadCount > 0 && (
+                        <span className="min-w-[18px] px-2 py-0.5 text-[10px] font-bold text-white bg-[#12f1ff] rounded-full text-center shadow-sm">
+                          {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-medium ${isSelected ? 'text-[#12f1ff]' : 'text-slate-500'}`}>
+                        {chat.updatedAt ? new Date(chat.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                      </span>
+                    </div>
                   </div>
-                  <p className={`text-xs truncate ${isSelected ? 'text-whatsapp-bg-dark/70 font-medium' : 'text-slate-500'}`}>
+                  <p className={`text-xs truncate ${isSelected ? 'text-white/70 font-medium' : 'text-slate-500'}`}>
                     {chat.lastMessage?.content
                       || chat.lastMessage?.fileName
                       || (chat.lastMessage?.fileUrl ? "Attachment" : "No dialogue yet")}
