@@ -48,4 +48,5 @@ function StatusBadge({ className, status = "neutral", label, pulse = false, hide
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { StatusBadge, statusBadgeVariants };

@@ -33,7 +33,7 @@ export default function Chat() {
   const [contacts, setContacts] = useState(() => getLoggedInUser()?.contacts || []);
   const [e2eeUser, setE2eeUser] = useState(() => getLoggedInUser());
   const [pendingHistorySyncApproval, setPendingHistorySyncApproval] = useState(null);
-  const [historySyncRequesting, setHistorySyncRequesting] = useState(false);
+  const [_historySyncRequesting, setHistorySyncRequesting] = useState(false);
   
   // Shared UI States for Side Panels
   const [isAddingContact, setIsAddingContact] = useState(false);
@@ -42,9 +42,9 @@ export default function Chat() {
   const [isShowingSettings, setIsShowingSettings] = useState(false);
 
   // Backup Restore Fallback States
-  const [restorePin, setRestorePin] = useState("");
-  const [restoringPin, setRestoringPin] = useState(false);
-  const [restoreError, setRestoreError] = useState("");
+  const [restorePin, _setRestorePin] = useState("");
+  const [_restoringPin, setRestoringPin] = useState(false);
+  const [_restoreError, setRestoreError] = useState("");
 
   useEffect(() => {
     connectSocket();
@@ -62,7 +62,7 @@ export default function Chat() {
         });
     }
     // Kill any rogue ringer audio
-    document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch {} });
+    document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch { /* ignore cleanup errors */ } });
 
     return () => {
       socket.disconnect();
@@ -258,7 +258,7 @@ export default function Chat() {
     };
   }, []);
 
-  const requestHistorySync = () => {
+  const _requestHistorySync = () => {
     const currentDeviceId = getCurrentDeviceId();
     setHistorySyncRequesting(true);
     socket.emit("request-history-sync", {
@@ -275,7 +275,7 @@ export default function Chat() {
     });
   };
 
-  const handlePINRestore = async () => {
+  const _handlePINRestore = async () => {
     if (!restorePin || restorePin.length < 4) return setRestoreError("PIN too short");
     setRestoringPin(true);
     try {
@@ -312,7 +312,7 @@ export default function Chat() {
           message: m, currentUserId: updatedUser._id, targetUserId: updatedUser._id,
           targetDeviceId: targetDevice.deviceId, targetPublicKey: targetDevice.publicKey
         })));
-        const chunked = [];
+        // chunked batching handled inline below
         for (let i = 0; i < updates.length; i += 50) {
           const chunk = updates.slice(i, i + 50).filter(Boolean);
           if (chunk.length) await api.post("/message/sync-device-history", { updates: chunk });
@@ -325,7 +325,7 @@ export default function Chat() {
     }
   };
 
-  const shouldShowHistorySyncBanner = () => {
+  const _shouldShowHistorySyncBanner = () => {
     const user = e2eeUser || getLoggedInUser();
     if (!user?._id || !needsHistorySync(user._id)) return false;
     const hasOther = (user.encryptionDevices || []).some(d => d.deviceId !== getCurrentDeviceId());
