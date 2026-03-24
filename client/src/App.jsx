@@ -1,5 +1,4 @@
 import  {useState, useEffect}  from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import Auth from "./pages/Auth";
 import Chat from "./pages/chat";
 import { isTokenValid } from "./utils/auth";
@@ -51,35 +50,14 @@ function App() {
     }
   }, [loggedIn, sessionActive, token]);
 
-  return (
-    <AnimatePresence mode="wait">
-      {loggedIn ? (
-        <motion.div
-          key="chat"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-          className="h-screen"
-        >
-          <Chat />
-        </motion.div>
-      ) : (
-        <motion.div
-          key="auth"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <Auth
-            onAuthSuccess={() => setLoggedIn(true)}
-            sessionExpired={sessionExpired}
-            onDismissExpiry={() => setSessionExpired(false)}
-          />
-        </motion.div>
-      )}
-    </AnimatePresence>
+  return loggedIn ? (
+    <Chat />
+  ) : (
+    <Auth
+      onAuthSuccess={() => setLoggedIn(true)}
+      sessionExpired={sessionExpired}
+      onDismissExpiry={() => setSessionExpired(false)}
+    />
   );
 }
 export default App;

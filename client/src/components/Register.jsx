@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
+void motion;
 import { User, Mail, Lock, Phone, ArrowLeft, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import api from "../services/api";
 import { ensureE2EERegistration } from "../services/e2ee";
-import AuthShell from "@/components/auth/AuthShell";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+
+// Stitch Ethereal UI
+import { Button } from "./stitch/Button";
+import { Input } from "./stitch/Input";
+import { Card } from "./stitch/Card";
 
 export default function Register({ onRegister, onBackToLogin }) {
   const [step, setStep] = useState(1); // 1: Details, 2: OTP
@@ -72,120 +76,143 @@ export default function Register({ onRegister, onBackToLogin }) {
     visible: { opacity: 1, scale: 1, transition: { duration: 0.4 } }
   };
 
-  const stepMeta = [
-    { id: 1, label: "Account" },
-    { id: 2, label: "Verify" },
-  ];
-
   return (
-    <AuthShell
-      eyebrow="Create Account"
-      title={step === 1 ? "Start your journey" : "Verify your number"}
-      description={
-        step === 1
-          ? "Create a secure RelayChat identity with email, password, and phone verification."
-          : `We've sent a security code to ${phone}. Enter it below to finish onboarding.`
-      }
-      footer={
-        <motion.p className="text-sm text-muted-foreground">
-          Already a member?{" "}
-          <span onClick={onBackToLogin} className="cursor-pointer font-bold text-secondary hover:underline">
-            Login here
-          </span>
-        </motion.p>
-      }
-    >
-      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full space-y-6">
-        <div className="flex gap-2">
-          {stepMeta.map((item) => {
-            const active = step >= item.id;
-            return (
-              <div
-                key={item.id}
-                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] ${
-                  active ? "border-primary/20 bg-primary/10 text-primary" : "border-border bg-muted/40 text-muted-foreground"
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#0b0e14] relative overflow-hidden">
+      {/* Ambient glowing orbs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] max-w-[600px] max-h-[600px] bg-[#c59aff]/20 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] max-w-[600px] max-h-[600px] bg-[#00eefc]/20 blur-[120px] rounded-full pointer-events-none" />
+
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="w-full max-w-md"
+      >
+        <Card className="flex flex-col items-center shadow-[0_20px_60px_-15px_rgba(197,154,255,0.05)]">
+          <div className="mb-8 text-center pt-2">
+            <h2 className="text-3xl font-bold text-[#ecedf6] mb-2 font-space tracking-tight">
+              {step === 1 ? "Start Your Journey" : "Almost Done"}
+            </h2>
+            <p className="text-[#a9abb3] text-sm font-medium px-4 font-inter">
+              {step === 1 
+                ? "Join the next generation of secure messaging. It only takes a minute." 
+                : `We've sent a special code to ${phone}. Enter it below.`}
+            </p>
+          </div>
+
+          <AnimatePresence mode="wait">
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl mb-6 text-sm font-medium font-inter ${
+                  error.startsWith("Success") 
+                    ? "bg-[#006970]/40 text-[#00eefc] border border-[#00eefc]/20" 
+                    : "bg-[#a70138]/40 text-[#ffb2b9] border border-[#ff6e84]/20"
                 }`}
               >
-                <span>{item.id}</span>
-                <span>{item.label}</span>
-              </div>
-            );
-          })}
-        </div>
+                {error.startsWith("Success") ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                {error.replace("Success: ", "")}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        <AnimatePresence mode="wait">
-          {error ? (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className={`flex w-full items-center gap-3 rounded-xl border p-3 text-sm font-medium ${
-                error.startsWith("Success")
-                  ? "border-secondary/20 bg-secondary/10 text-secondary"
-                  : "border-destructive/20 bg-destructive/10 text-destructive"
-              }`}
+          <div className="w-full space-y-4">
+            <AnimatePresence mode="wait">
+              {step === 1 ? (
+                <motion.div 
+                  key="step1"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-4"
+                >
+                  <Input
+                    icon={User}
+                    placeholder="Full Name" 
+                    value={name} 
+                    onChange={e => setName(e.target.value)}
+                  />
+                  <Input
+                    icon={Mail}
+                    placeholder="Email Address" 
+                    value={email} 
+                    onChange={e => setEmail(e.target.value)}
+                  />
+                  <Input
+                    icon={Lock}
+                    type="password"
+                    placeholder="Create Password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                  />
+                  <Input
+                    icon={Phone}
+                    placeholder="Phone Number (+91...)" 
+                    value={phone} 
+                    onChange={e => setPhone(e.target.value)}
+                  />
+
+                  <div className="pt-4">
+                    <Button 
+                      onClick={handleStartRegistration} 
+                      disabled={loading}
+                      className="w-full"
+                    >
+                      {loading ? <Loader2 className="animate-spin text-[#420082]" /> : "Verify & Continue"}
+                    </Button>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="step2"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-4"
+                >
+                  <Input
+                    icon={CheckCircle}
+                    type="text"
+                    placeholder="6-digit OTP"
+                    value={otp}
+                    onChange={e => setOtp(e.target.value)}
+                    maxLength={6}
+                    className="text-center tracking-widest text-lg"
+                  />
+                  <div className="pt-4">
+                    <Button 
+                      onClick={handleCompleteRegistration} 
+                      disabled={loading}
+                      className="w-full"
+                    >
+                      {loading ? <Loader2 className="animate-spin text-[#420082]" /> : "Verify Identity"}
+                    </Button>
+                  </div>
+                  <button 
+                    className="w-full flex items-center justify-center gap-2 text-[#a9abb3] text-sm font-medium hover:text-[#ecedf6] transition-colors mt-4 font-inter"
+                    onClick={() => setStep(1)}
+                  >
+                    <ArrowLeft size={16} />
+                    Change Details
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <motion.p className="mt-8 mb-2 text-[#a9abb3] text-sm font-inter">
+            Already a member?{" "}
+            <span 
+              onClick={onBackToLogin}
+              className="text-[#00eefc] font-bold cursor-pointer hover:underline"
             >
-              {error.startsWith("Success") ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-              {error.replace("Success: ", "")}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-
-        <AnimatePresence mode="wait">
-          {step === 1 ? (
-            <motion.div
-              key="step1"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
-            >
-              <Input icon={User} placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)} />
-              <Input icon={Mail} placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <Input
-                icon={Lock}
-                type="password"
-                placeholder="Create Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <Input icon={Phone} placeholder="Phone Number (+91...)" value={phone} onChange={(e) => setPhone(e.target.value)} />
-
-              <Button onClick={handleStartRegistration} disabled={loading} className="w-full">
-                {loading ? <Loader2 className="animate-spin" /> : "Verify & Continue"}
-              </Button>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="step2"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
-            >
-              <Input
-                icon={CheckCircle}
-                type="text"
-                placeholder="6-digit OTP"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                maxLength={6}
-                className="text-center text-lg tracking-[0.35em]"
-              />
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Button onClick={handleCompleteRegistration} disabled={loading} className="w-full">
-                  {loading ? <Loader2 className="animate-spin" /> : "Verify Identity"}
-                </Button>
-                <Button variant="outline" onClick={() => setStep(1)} className="w-full">
-                  <ArrowLeft size={16} />
-                  Change Details
-                </Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              Login here
+            </span>
+          </motion.p>
+        </Card>
       </motion.div>
-    </AuthShell>
+    </div>
   );
 }

@@ -370,11 +370,11 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-background/90 p-4 backdrop-blur-3xl"
+      className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-3xl flex items-center justify-center p-4"
     >
       <div className="w-full max-w-5xl flex flex-col items-center gap-4 md:gap-5">
-        <div className="relative aspect-video w-full max-w-4xl overflow-hidden rounded-3xl border border-border/70 bg-card/90 shadow-2xl">
-          <div className="relative h-full w-full bg-background">
+        <div className="relative w-full max-w-4xl aspect-video bg-whatsapp-sidebar-dark rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+          <div className="w-full h-full bg-black relative">
             <video
               ref={remoteRef}
               data-call-video="remote"
@@ -384,17 +384,17 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
             />
 
             {status !== "connected" && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center space-y-4 bg-card/95 backdrop-blur-xl">
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center space-y-4 bg-whatsapp-sidebar-dark">
                 <motion.div
                   animate={{ scale: [1, 1.15, 1] }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
-                  className="flex h-24 w-24 items-center justify-center rounded-full border border-primary/30 bg-primary/10"
+                  className="w-24 h-24 rounded-full bg-[#12f1ff]/10 flex items-center justify-center border border-[#12f1ff]/30"
                 >
-                  <User size={48} className="text-primary" />
+                  <User size={48} className="text-[#12f1ff]" />
                 </motion.div>
                 <div className="text-center">
-                  <h3 className="text-xl font-bold text-foreground">{fromName || "User"}</h3>
-                  <p className="mt-1 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <h3 className="text-xl font-bold text-white">{fromName || "User"}</h3>
+                  <p className="text-slate-400 text-sm mt-1 flex items-center gap-2 justify-center">
                     {status === "calling" && "Calling..."}
                     {status === "incoming" && "Incoming Video Call"}
                     {status === "connecting" && <><Loader2 className="animate-spin" size={14} /> Connecting...</>}
@@ -406,7 +406,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
             <motion.div
               drag
               dragConstraints={{ left: 20, top: 20, right: 300, bottom: 200 }}
-              className="absolute right-4 top-4 z-20 aspect-video w-28 cursor-grab overflow-hidden rounded-2xl border-2 border-border/70 bg-background shadow-xl md:right-6 md:top-6 md:w-48"
+              className="absolute top-4 right-4 md:top-6 md:right-6 w-28 md:w-48 aspect-video bg-[#0b0e14] rounded-2xl overflow-hidden border-2 border-white/10 shadow-xl z-20 cursor-grab"
             >
               <video
                 ref={localRef}
@@ -417,22 +417,22 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
                 className="w-full h-full object-cover"
               />
               {vidOff && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background">
-                  <VideoOff size={24} className="text-muted-foreground" />
+                <div className="absolute inset-0 bg-[#0b0e14] flex items-center justify-center">
+                  <VideoOff size={24} className="text-slate-500" />
                 </div>
               )}
             </motion.div>
           </div>
         </div>
 
-        <div className="z-30 flex max-w-[calc(100vw-2rem)] items-center gap-4 rounded-3xl border border-border/70 bg-card/90 px-5 py-3 shadow-2xl backdrop-blur-2xl md:gap-6 md:px-8 md:py-4">
+        <div className="px-5 md:px-8 py-3 md:py-4 bg-whatsapp-sidebar-dark/85 backdrop-blur-2xl rounded-3xl border border-white/10 flex items-center gap-4 md:gap-6 z-30 shadow-2xl max-w-[calc(100vw-2rem)]">
           {status === "incoming" ? (
             <>
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={acceptCall}
-                className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+                className="w-14 h-14 rounded-full bg-[#12f1ff] text-[#0b0e14] flex items-center justify-center shadow-lg"
               >
                 <Phone size={24} />
               </motion.button>
@@ -451,7 +451,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={toggleMute}
-                className={`rounded-2xl p-4 transition-all ${isMuted ? "bg-destructive/20 text-destructive" : "bg-accent text-foreground hover:bg-accent/80"}`}
+                className={`p-4 rounded-2xl transition-all ${isMuted ? "bg-rose-500/20 text-rose-400" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}
               >
                 {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
               </motion.button>
@@ -459,11 +459,11 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={toggleVideo}
-                className={`rounded-2xl p-4 transition-all ${vidOff ? "bg-destructive/20 text-destructive" : "bg-accent text-foreground hover:bg-accent/80"}`}
+                className={`p-4 rounded-2xl transition-all ${vidOff ? "bg-rose-500/20 text-rose-400" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}
               >
                 {vidOff ? <VideoOff size={24} /> : <Video size={24} />}
               </motion.button>
-              <div className="h-8 w-px bg-border/60" />
+              <div className="w-[1px] h-8 bg-white/10" />
               <motion.button
                 whileHover={{ scale: 1.1, rotate: 135 }}
                 whileTap={{ scale: 0.9 }}

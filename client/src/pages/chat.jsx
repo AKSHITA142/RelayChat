@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { gsap } from "gsap";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+
+// Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
+void motion;
 
 import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
@@ -12,18 +14,28 @@ import { AnimatePresence } from "framer-motion";
 import { Check, X as CloseIcon } from "lucide-react";
 import api from "../services/api";
 import { buildHistorySyncUpdate, ensureE2EERegistration, getCurrentDeviceId, getCurrentDeviceLabel, hydrateDecryptedMessage, markHistorySyncComplete, needsHistorySync } from "../services/e2ee";
-import { getThemeClassName, useChatTheme } from "../hooks/useChatTheme";
-import { cn } from "@/lib/utils";
+import { useChatTheme, THEMES } from "../hooks/useChatTheme";
 
 export default function Chat() {
   const [themeName] = useChatTheme();
+  const theme = THEMES[themeName] || THEMES.stealth_dark;
   const containerRef = useRef(null);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  // Smooth the mouse movement
+  const springConfig = { damping: 20, stiffness: 150 };
+  const smoothX = useSpring(mouseX, springConfig);
+  const smoothY = useSpring(mouseY, springConfig);
+
+  const x = useTransform(smoothX, (v) => `${v}px`);
+  const y = useTransform(smoothY, (v) => `${v}px`);
 
   const handleMouseMove = (e) => {
     if (!containerRef.current) return;
     const { left, top } = containerRef.current.getBoundingClientRect();
-    containerRef.current.style.setProperty("--x", `${e.clientX - left}px`);
-    containerRef.current.style.setProperty("--y", `${e.clientY - top}px`);
+    mouseX.set(e.clientX - left);
+    mouseY.set(e.clientY - top);
   };
 
   const [chats, setChats] = useState([]);
@@ -33,7 +45,7 @@ export default function Chat() {
   const [contacts, setContacts] = useState(() => getLoggedInUser()?.contacts || []);
   const [e2eeUser, setE2eeUser] = useState(() => getLoggedInUser());
   const [pendingHistorySyncApproval, setPendingHistorySyncApproval] = useState(null);
-  const [_historySyncRequesting, setHistorySyncRequesting] = useState(false);
+  const [historySyncRequesting, setHistorySyncRequesting] = useState(false);
   
   // Shared UI States for Side Panels
   const [isAddingContact, setIsAddingContact] = useState(false);
@@ -42,9 +54,9 @@ export default function Chat() {
   const [isShowingSettings, setIsShowingSettings] = useState(false);
 
   // Backup Restore Fallback States
-  const [restorePin, _setRestorePin] = useState("");
-  const [_restoringPin, setRestoringPin] = useState(false);
-  const [_restoreError, setRestoreError] = useState("");
+  const [restorePin, setRestorePin] = useState("");
+  const [restoringPin, setRestoringPin] = useState(false);
+  const [restoreError, setRestoreError] = useState("");
 
   useEffect(() => {
     connectSocket();
@@ -62,39 +74,11 @@ export default function Chat() {
         });
     }
     // Kill any rogue ringer audio
-    document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch { /* ignore cleanup errors */ } });
+    document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch {} });
 
     return () => {
       socket.disconnect();
     };
-  }, []);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    containerRef.current.style.setProperty("--x", "50%");
-    containerRef.current.style.setProperty("--y", "50%");
-  }, []);
-
-  useEffect(() => {
-    if (!containerRef.current) return undefined;
-
-    const ctx = gsap.context(() => {
-      gsap
-        .timeline({ defaults: { ease: "power3.out" } })
-        .fromTo(
-          "[data-page-hero]",
-          { autoAlpha: 0, y: 22, scale: 0.985 },
-          { autoAlpha: 1, y: 0, scale: 1, duration: 0.65, stagger: 0.1 }
-        )
-        .fromTo(
-          "[data-page-glow]",
-          { autoAlpha: 0, scale: 0.9 },
-          { autoAlpha: 1, scale: 1, duration: 0.8 },
-          0.05
-        );
-    }, containerRef);
-
-    return () => ctx.revert();
   }, []);
 
   useEffect(() => {
@@ -258,7 +242,7 @@ export default function Chat() {
     };
   }, []);
 
-  const _requestHistorySync = () => {
+  const requestHistorySync = () => {
     const currentDeviceId = getCurrentDeviceId();
     setHistorySyncRequesting(true);
     socket.emit("request-history-sync", {
@@ -275,7 +259,7 @@ export default function Chat() {
     });
   };
 
-  const _handlePINRestore = async () => {
+  const handlePINRestore = async () => {
     if (!restorePin || restorePin.length < 4) return setRestoreError("PIN too short");
     setRestoringPin(true);
     try {
@@ -312,7 +296,7 @@ export default function Chat() {
           message: m, currentUserId: updatedUser._id, targetUserId: updatedUser._id,
           targetDeviceId: targetDevice.deviceId, targetPublicKey: targetDevice.publicKey
         })));
-        // chunked batching handled inline below
+        const chunked = [];
         for (let i = 0; i < updates.length; i += 50) {
           const chunk = updates.slice(i, i + 50).filter(Boolean);
           if (chunk.length) await api.post("/message/sync-device-history", { updates: chunk });
@@ -325,7 +309,7 @@ export default function Chat() {
     }
   };
 
-  const _shouldShowHistorySyncBanner = () => {
+  const shouldShowHistorySyncBanner = () => {
     const user = e2eeUser || getLoggedInUser();
     if (!user?._id || !needsHistorySync(user._id)) return false;
     const hasOther = (user.encryptionDevices || []).some(d => d.deviceId !== getCurrentDeviceId());
@@ -340,57 +324,44 @@ export default function Chat() {
     <motion.div
       ref={containerRef}
       onMouseMove={handleMouseMove}
-      initial={{ opacity: 0, scale: 0.992 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.992 }}
-      transition={{ duration: 0.32, ease: "easeOut" }}
-      className={cn("group relative flex h-screen overflow-hidden bg-background text-foreground", getThemeClassName(themeName))}
+      style={{ 
+        "--x": x, 
+        "--y": y,
+        background: theme.background,
+        backgroundImage: theme.pattern,
+        backgroundSize: theme.patternSize
+      }}
+      className="relative flex h-screen overflow-hidden group"
     >
-      <div className="absolute inset-0 chat-canvas" />
-      <div data-page-glow className="proximity-glow opacity-0 group-hover:opacity-100" />
+      <div className="proximity-glow opacity-0 group-hover:opacity-100" />
 
       {pendingHistorySyncApproval && (
-        <motion.div
-          initial={{ opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -16 }}
-          className="absolute right-4 top-4 z-50 max-w-sm rounded-2xl border border-secondary/20 bg-card/95 p-4 shadow-2xl backdrop-blur"
-        >
-          <p className="text-sm font-semibold text-foreground">Approve new device</p>
+        <div className="absolute top-4 right-4 z-50 max-w-sm rounded-2xl border border-emerald-400/20 bg-slate-900/95 p-4 shadow-2xl backdrop-blur">
+          <p className="text-sm font-semibold text-white">Approve new device</p>
           <div className="mt-3 flex gap-2">
-            <button onClick={approveHistorySync} className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground"><Check size={16} /> Approve</button>
-            <button onClick={() => setPendingHistorySyncApproval(null)} className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground"><CloseIcon size={16} /> Decline</button>
+            <button onClick={approveHistorySync} className="flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white"><Check size={16} /> Approve</button>
+            <button onClick={() => setPendingHistorySyncApproval(null)} className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300"><CloseIcon size={16} /> Decline</button>
           </div>
-        </motion.div>
+        </div>
       )}
 
-      <motion.div
-        data-page-hero
-        className="relative z-10 flex h-full"
-      >
-        <Sidebar
-          chats={chats} setChats={setChats}
-          setSelectedChat={setSelectedChat} selectedChat={selectedChat}
-          onlineUsers={onlineUsers} contacts={contacts}
-          isAddingContact={isAddingContact} setIsAddingContact={setIsAddingContact}
-          isCreatingGroup={isCreatingGroup} setIsCreatingGroup={setIsCreatingGroup}
-          setIsShowingSettings={setIsShowingSettings}
-        />
-      </motion.div>
+      <Sidebar
+        chats={chats} setChats={setChats}
+        setSelectedChat={setSelectedChat} selectedChat={selectedChat}
+        onlineUsers={onlineUsers} contacts={contacts}
+        isAddingContact={isAddingContact} setIsAddingContact={setIsAddingContact}
+        isCreatingGroup={isCreatingGroup} setIsCreatingGroup={setIsCreatingGroup}
+        setIsShowingSettings={setIsShowingSettings}
+      />
 
-      <motion.div
-        data-page-hero
-        className="relative z-10 flex min-w-0 flex-1"
-      >
-        <ChatWindow
-          selectedChat={selectedChat} chats={chats}
-          setSelectedChat={setSelectedChat} onlineUsers={onlineUsers}
-          lastSeenMap={lastSeenMap} contacts={contacts}
-          setContacts={setContacts} setChats={setChats}
-          setIsAddingContact={setIsAddingContact} setIsCreatingGroup={setIsCreatingGroup}
-          setActiveVideoCall={setActiveVideoCall}
-        />
-      </motion.div>
+      <ChatWindow
+        selectedChat={selectedChat} chats={chats}
+        setSelectedChat={setSelectedChat} onlineUsers={onlineUsers}
+        lastSeenMap={lastSeenMap} contacts={contacts}
+        setContacts={setContacts} setChats={setChats}
+        setIsAddingContact={setIsAddingContact} setIsCreatingGroup={setIsCreatingGroup}
+        setActiveVideoCall={setActiveVideoCall}
+      />
 
       {/* Global Video Call Overlay */}
       <AnimatePresence mode="wait">
