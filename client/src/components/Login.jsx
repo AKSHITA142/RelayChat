@@ -22,7 +22,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   const [password, setPassword] = useState("");
   
   // Phone OTP state
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("+91");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [canResendAt, setCanResendAt] = useState(0);
@@ -174,7 +174,8 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   };
 
   const handleSendOtp = async () => {
-    if (!phone) return setError("Please enter a phone number");
+    const digits = phone.replace(/^\+91/, "").replace(/\D/g, "");
+    if (digits.length !== 10) return setError("Please enter exactly 10 digits after +91");
     onAction?.();
     setLoading(true);
     setError("");
