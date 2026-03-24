@@ -1,136 +1,125 @@
 import { X, Lock, Video, Phone, Search, AlertTriangle, Trash2, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Avatar } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 
-export default function ContactInfoPanel({ user, displayName, onClose, onVideoCall, onVoiceCall, onSearch, onClearChat }) {
+const actionStyles = {
+  Video: "border-primary/20 bg-primary/10 text-primary hover:bg-primary/15",
+  Voice: "border-secondary/20 bg-secondary/10 text-secondary hover:bg-secondary/15",
+  Search: "border-border bg-card/70 text-foreground hover:bg-accent",
+};
+
+export default function ContactInfoPanel({
+  user,
+  displayName,
+  onClose,
+  onVideoCall,
+  onVoiceCall,
+  onSearch,
+  onClearChat,
+}) {
   if (!user) return null;
 
   const avatarUrl = user.avatar ? `http://localhost:5002${user.avatar}` : null;
-  const initial = (displayName?.[0] || "?").toUpperCase();
   const phone = user.phoneNumber || "";
   const status = user.status || "Hey there! I am using RelayChat";
 
+  const quickActions = [
+    { icon: <Video size={20} />, label: "Video", action: onVideoCall },
+    { icon: <Phone size={20} />, label: "Voice", action: onVoiceCall },
+    { icon: <Search size={20} />, label: "Search", action: onSearch },
+  ];
+
   return (
     <AnimatePresence>
-      <motion.div
+      <motion.aside
         key="contact-info-panel"
         initial={{ x: "100%", opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: "100%", opacity: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="absolute top-0 right-0 h-full w-[340px] z-30 flex flex-col overflow-y-auto"
-        style={{
-          background: "rgba(11,14,20,0.97)",
-          backdropFilter: "blur(24px)",
-          borderLeft: "1px solid rgba(197,154,255,0.12)",
-        }}
+        className="absolute right-0 top-0 z-30 flex h-full w-[340px] flex-col overflow-y-auto border-l border-border/70 bg-card/95 backdrop-blur-2xl"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0">
-          <span className="text-xs font-bold uppercase tracking-widest text-[#a9abb3] font-space">Contact Info</span>
+        <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+          <span className="font-space text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Contact Info
+          </span>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#a9abb3] hover:text-[#00eefc] hover:bg-[#00eefc]/10 transition-all"
+            className="rounded-lg p-1.5 text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Profile */}
-        <div className="flex flex-col items-center pt-8 pb-6 px-6 gap-3">
-          <div className="relative">
-            <div
-              className="w-24 h-24 rounded-full ring-4 ring-[#c59aff]/40 shadow-[0_0_30px_rgba(197,154,255,0.25)] overflow-hidden flex items-center justify-center text-3xl font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #1e1530, #0d1a2a)" }}
-            >
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
-              ) : (
-                initial
-              )}
-            </div>
-            {/* online indicator placeholder */}
-          </div>
-          <h2 className="text-xl font-bold text-white font-space tracking-wide">{displayName}</h2>
-          {phone && (
-            <p className="text-sm font-medium text-[#00eefc]">{phone}</p>
-          )}
-          <p className="text-xs text-[#a9abb3] italic text-center px-2">"{status}"</p>
+        <div className="flex flex-col items-center gap-3 px-6 pb-6 pt-8 text-center">
+          <Avatar
+            src={avatarUrl}
+            alt={displayName}
+            fallback={(displayName?.[0] || "?").toUpperCase()}
+            size="xl"
+            className="border-4 border-primary/30 shadow-[0_0_32px_hsl(var(--primary)/0.18)]"
+          />
+          <h2 className="font-space text-xl font-bold tracking-wide text-foreground">{displayName}</h2>
+          {phone ? <p className="text-sm font-medium text-primary">{phone}</p> : null}
+          <p className="px-2 text-xs italic text-muted-foreground">"{status}"</p>
         </div>
 
-        {/* Quick Actions */}
         <div className="grid grid-cols-3 gap-3 px-5 pb-6">
-          {[
-            { icon: <Video size={20} />, label: "Video", color: "#00eefc", action: onVideoCall },
-            { icon: <Phone size={20} />, label: "Voice", color: "#4ade80", action: onVoiceCall },
-            { icon: <Search size={20} />, label: "Search", color: "#c59aff", action: onSearch },
-          ].map(({ icon, label, color, action }) => (
+          {quickActions.map(({ icon, label, action }) => (
             <button
               key={label}
               onClick={action}
-              className="flex flex-col items-center gap-2 py-4 rounded-xl transition-all hover:scale-105 active:scale-95"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: `1px solid ${color}22`,
-                boxShadow: `0 0 12px ${color}18`,
-              }}
+              className={cn(
+                "interactive-btn flex flex-col items-center gap-2 rounded-xl border py-4 transition-all",
+                actionStyles[label]
+              )}
             >
-              <span style={{ color }}>{icon}</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>
-                {label}
-              </span>
+              <span>{icon}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
             </button>
           ))}
         </div>
 
-        {/* About */}
         <div className="px-5 pb-5">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-[#a9abb3] mb-2">About</p>
-          <div
-            className="px-4 py-3 rounded-xl text-sm text-[#ecedf6]"
-            style={{ background: "rgba(255,255,255,0.04)", borderLeft: "2px solid #00eefc66" }}
-          >
+          <p className="mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">About</p>
+          <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
             {status}
           </div>
         </div>
 
-        {/* E2EE Info */}
-        <div className="mx-5 mb-5 px-4 py-3 rounded-xl flex items-start gap-3" style={{ background: "rgba(0,238,252,0.05)", border: "1px solid rgba(0,238,252,0.15)" }}>
-          <Lock size={18} className="text-[#00eefc] mt-0.5 shrink-0" />
+        <div className="mx-5 mb-5 flex items-start gap-3 rounded-xl border border-secondary/20 bg-secondary/10 px-4 py-3">
+          <Lock size={18} className="mt-0.5 shrink-0 text-secondary" />
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-[#00eefc]">End-to-End Encrypted</p>
-            <p className="text-[10px] text-[#a9abb3] mt-0.5 leading-relaxed">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-secondary">End-to-End Encrypted</p>
+            <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
               Messages are secured with AES-256 encryption. Only you and the recipient can read them.
             </p>
           </div>
         </div>
 
-        {/* Danger Actions */}
-        <div className="px-5 pt-3 pb-8 mt-auto space-y-1 border-t border-white/5">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-[#a9abb3] mb-3">Actions</p>
+        <div className="mt-auto space-y-1 border-t border-border/60 px-5 pb-8 pt-3">
+          <p className="mb-3 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Actions</p>
 
           <button
             onClick={onClearChat}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-amber-400 hover:bg-amber-500/10 transition-all"
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-amber-400 transition-all hover:bg-amber-500/10"
           >
             <Trash2 size={16} />
             Clear Chat
           </button>
 
-          <button
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-rose-400 hover:bg-rose-500/10 transition-all"
-          >
+          <button className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-destructive transition-all hover:bg-destructive/10">
             <Shield size={16} />
             Block {displayName?.split(" ")[0] || "User"}
           </button>
 
-          <button
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-rose-400 hover:bg-rose-500/10 transition-all"
-          >
+          <button className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-destructive transition-all hover:bg-destructive/10">
             <AlertTriangle size={16} />
             Report {displayName?.split(" ")[0] || "User"}
           </button>
         </div>
-      </motion.div>
+      </motion.aside>
     </AnimatePresence>
   );
 }

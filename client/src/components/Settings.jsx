@@ -1,43 +1,175 @@
 /* eslint-disable react/prop-types */
-import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { 
-  Edit3, 
-  Terminal, 
-  LogOut, 
-  Eye,
-  Lock, 
-  CheckCircle, 
-  ArrowLeft,
-  User,
-  ShieldCheck,
-  Palette,
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  CheckCircle2,
   Cloud,
+  Edit3,
+  Eye,
+  Loader2,
+  Lock,
+  LogOut,
+  Palette,
   Settings2,
   ShieldAlert,
-  Loader2
+  ShieldCheck,
+  Terminal,
+  User,
 } from "lucide-react";
 import api from "../services/api";
-import { THEME_NAMES, THEMES } from "../hooks/useChatTheme";
-import { useChatTheme } from "../hooks/useChatTheme"; // Import hook to apply theme
-import { Button } from "./stitch/Button";
-import { Card } from "./stitch/Card";
-import { Input } from "./stitch/Input";
+import { THEME_NAMES, getThemeClassName, useChatTheme } from "../hooks/useChatTheme";
+import { useGsapScrollReveal } from "../hooks/useGsapScrollReveal";
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  DialogShell,
+  DialogShellContent,
+  DialogShellDescription,
+  DialogShellHeader,
+  DialogShellTitle,
+} from "@/components/ui/dialog-shell";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+
+const THEME_KEYS = ["stealth_dark", "void", "minimal_dark", "minimal_light"];
+const TAB_ITEMS = [
+  { value: "profile", label: "Profile" },
+  { value: "privacy", label: "Privacy" },
+  { value: "theme", label: "Theme" },
+  { value: "backup", label: "Backup" },
+];
+
+function SectionFrame({ eyebrow, title, description, children }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
+      className="space-y-5"
+    >
+      <div className="space-y-2">
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">{eyebrow}</p>
+        <div className="space-y-1">
+          <h3 className="font-headline text-2xl font-black tracking-tight text-foreground">{title}</h3>
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {children}
+    </motion.section>
+  );
+}
+
+function StatusBanner({ tone = "success", children }) {
+  const toneClassName = {
+    success: "border-secondary/20 bg-secondary/10 text-secondary",
+    error: "border-destructive/20 bg-destructive/10 text-destructive",
+    info: "border-primary/20 bg-primary/10 text-primary",
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 6 }}
+      className={cn("rounded-2xl border px-4 py-3 text-sm", toneClassName[tone] || toneClassName.info)}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function PreferenceRow({ icon: Icon, title, description, checked, onCheckedChange }) {
+  return (
+    <Card data-settings-reveal className="flex items-center justify-between gap-4 border-border/70 bg-card/80 p-5">
+      <div className="flex items-center gap-4">
+        <div
+          className={cn(
+            "flex h-12 w-12 items-center justify-center rounded-2xl border transition-colors",
+            checked ? "border-primary/20 bg-primary/10 text-primary" : "border-border bg-muted/30 text-muted-foreground"
+          )}
+        >
+          <Icon size={22} />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <p className="text-xs leading-5 text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    </Card>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value }) {
+  return (
+    <Card data-settings-reveal className="relative overflow-hidden border-border/70 bg-card/80 p-5">
+      <div className="absolute -bottom-3 -right-3 opacity-10">
+        <Icon size={52} />
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Icon size={12} />
+          <p className="text-[10px] font-black uppercase tracking-[0.2em]">{label}</p>
+        </div>
+        <p className="text-2xl font-black tracking-tight text-foreground">{value}</p>
+      </div>
+    </Card>
+  );
+}
+
+function ThemeCard({ themeKey, currentTheme, onSelect }) {
+  const isSelected = currentTheme === themeKey;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(themeKey)}
+      data-settings-reveal
+      className={cn(
+        "surface-panel relative space-y-4 p-4 text-left transition-all",
+        isSelected ? "ring-2 ring-primary" : "hover:border-border"
+      )}
+    >
+      <div className={cn("theme-preview rounded-2xl border border-border/60 p-3", getThemeClassName(themeKey))}>
+        <div className="theme-preview__header" />
+        <div className="mt-3 space-y-2">
+          <div className="theme-preview__bubble theme-preview__bubble--other w-2/3" />
+          <div className="theme-preview__bubble theme-preview__bubble--own ml-auto w-1/2" />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/80">
+          {THEME_NAMES[themeKey] || themeKey}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {themeKey === "minimal_light" ? "Bright, minimal workspace." : "Dark ambient chat canvas."}
+        </p>
+      </div>
+
+      {isSelected ? (
+        <div className="absolute right-3 top-3 text-primary">
+          <CheckCircle2 size={16} fill="currentColor" />
+        </div>
+      ) : null}
+    </button>
+  );
+}
 
 export default function Settings({ user, onUpdate, onClose, onLogout }) {
-  const [_, setTheme] = useChatTheme();
-  
-  // Profile State
+  const [, setTheme] = useChatTheme();
+  const [activeTab, setActiveTab] = useState("profile");
   const [name, setName] = useState(user?.name || "");
   const [status, setStatus] = useState(user?.status || "Hey there! I'm using RelayChat.");
-  
-  // Privacy Settings State
   const [signalVisibility, setSignalVisibility] = useState(user?.signalVisibility ?? true);
   const [vaultProtocol, setVaultProtocol] = useState(user?.vaultProtocol ?? false);
   const [currentTheme, setCurrentTheme] = useState(user?.globalTheme || "stealth_dark");
   const [avatar, setAvatar] = useState(user?.avatar || "");
   const fileInputRef = useRef(null);
-  
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [backupPin, setBackupPin] = useState("");
@@ -47,23 +179,32 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
   const [verifyPhone, setVerifyPhone] = useState("");
   const [backupStatus, setBackupStatus] = useState("");
   const [isBackingUp, setIsBackingUp] = useState(false);
+  const mainRef = useRef(null);
+  const revealScopeRef = useRef(null);
 
-  // Fetch fresh data on load to ensure state is accurate
+  useGsapScrollReveal({
+    scopeRef: revealScopeRef,
+    scrollerRef: mainRef,
+    selector: "[data-settings-reveal]",
+    deps: [activeTab],
+  });
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await api.get("/user/profile");
-        const userData = res.data.user;
+        const response = await api.get("/user/profile");
+        const userData = response.data.user;
         setName(userData.name || "");
         setStatus(userData.status || "");
         setSignalVisibility(userData.signalVisibility ?? true);
         setVaultProtocol(userData.vaultProtocol ?? false);
         setCurrentTheme(userData.globalTheme || "stealth_dark");
         setAvatar(userData.avatar || "");
-      } catch (err) {
-        console.error("Failed to fetch fresh profile:", err);
+      } catch (error) {
+        console.error("Failed to fetch fresh profile:", error);
       }
     };
+
     fetchProfile();
   }, []);
 
@@ -73,48 +214,50 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
       status: overrides.status !== undefined ? overrides.status : status,
       signalVisibility: overrides.signalVisibility !== undefined ? overrides.signalVisibility : signalVisibility,
       vaultProtocol: overrides.vaultProtocol !== undefined ? overrides.vaultProtocol : vaultProtocol,
-      globalTheme: overrides.globalTheme !== undefined ? overrides.globalTheme : currentTheme
+      globalTheme: overrides.globalTheme !== undefined ? overrides.globalTheme : currentTheme,
     };
 
-    if (!payload.name.trim()) return setMessage("Identity error: Name cannot be empty.");
-    
+    if (!payload.name.trim()) {
+      setMessage("Identity error: Name cannot be empty.");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
     try {
-      const res = await api.put("/user/profile", payload);
-      const updatedUser = res.data.user;
+      const response = await api.put("/user/profile", payload);
+      const updatedUser = response.data.user;
       localStorage.setItem("user", JSON.stringify(updatedUser));
       onUpdate(updatedUser);
-      
-      // If theme changed, apply it globally immediately
+
       if (overrides.globalTheme) {
         setTheme(overrides.globalTheme);
       }
 
       setMessage("System synchronized successfully.");
-      setTimeout(() => setMessage(""), 3000);
-    } catch (err) {
-      console.error(err);
-      setMessage(err.response?.data?.message || "System error: Synchronization failed.");
+      window.setTimeout(() => setMessage(""), 3000);
+    } catch (error) {
+      console.error(error);
+      setMessage(error.response?.data?.message || "System error: Synchronization failed.");
     } finally {
       setLoading(false);
     }
   };
 
   const toggleSignalVisibility = () => {
-    const newVal = !signalVisibility;
-    setSignalVisibility(newVal);
-    handleUpdate({ signalVisibility: newVal });
+    const nextValue = !signalVisibility;
+    setSignalVisibility(nextValue);
+    handleUpdate({ signalVisibility: nextValue });
   };
 
   const toggleVaultProtocol = () => {
-    const newVal = !vaultProtocol;
-    setVaultProtocol(newVal);
-    handleUpdate({ vaultProtocol: newVal });
+    const nextValue = !vaultProtocol;
+    setVaultProtocol(nextValue);
+    handleUpdate({ vaultProtocol: nextValue });
   };
 
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files[0];
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files[0];
     if (!file) return;
 
     const formData = new FormData();
@@ -122,17 +265,17 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
 
     setLoading(true);
     try {
-      const res = await api.post("/user/profile/avatar", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
+      const response = await api.post("/user/profile/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
-      const updatedUser = res.data.user;
+      const updatedUser = response.data.user;
       setAvatar(updatedUser.avatar);
       localStorage.setItem("user", JSON.stringify(updatedUser));
       onUpdate(updatedUser);
       setMessage("Avatar enhanced successfully.");
-      setTimeout(() => setMessage(""), 3000);
-    } catch (err) {
-      console.error(err);
+      window.setTimeout(() => setMessage(""), 3000);
+    } catch (error) {
+      console.error(error);
       setMessage("System error: Avatar upload failed.");
     } finally {
       setLoading(false);
@@ -150,8 +293,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
       setBackupStatus("Error: PIN must be at least 4 digits.");
       return;
     }
-    
-    // Check if we need to verify old PIN first
+
     if (user?.encryptedBackupKey && !isResetMode && !isVerifyingOldPin) {
       setIsVerifyingOldPin(true);
       setBackupStatus("Security Check: Previous PIN required.");
@@ -162,12 +304,11 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
     setBackupStatus("");
     try {
       const { backupPrivateKeyToCloud, restorePrivateKeyFromCloud } = await import("../services/e2ee");
-      
-      // If we are in verification mode, try old PIN first
+
       if (isVerifyingOldPin) {
         try {
           await restorePrivateKeyFromCloud(api, user?._id || user?.id, oldPin);
-        } catch (e) {
+        } catch {
           setBackupStatus("Verification failed: Incorrect previous PIN.");
           setIsBackingUp(false);
           return;
@@ -180,18 +321,17 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
       setOldPin("");
       setIsVerifyingOldPin(false);
       setIsResetMode(false);
-      
-      // Refresh user data to update encryptedBackupKey state
+
       const refreshed = await api.get("/user/profile");
       if (refreshed.data?.user) {
         localStorage.setItem("user", JSON.stringify(refreshed.data.user));
         onUpdate(refreshed.data.user);
       }
-      
-      setTimeout(() => setBackupStatus(""), 4000);
-    } catch (err) {
-      console.error(err);
-      setBackupStatus(err.message || "Backup failed: Internal system error.");
+
+      window.setTimeout(() => setBackupStatus(""), 4000);
+    } catch (error) {
+      console.error(error);
+      setBackupStatus(error.message || "Backup failed: Internal system error.");
     } finally {
       setIsBackingUp(false);
     }
@@ -202,400 +342,355 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
       setBackupStatus("Security Note: Enter mobile for identity proof.");
       return;
     }
+
     setIsBackingUp(true);
     try {
       await api.post("/user/verify-reset", { phoneNumber: verifyPhone });
       setIsResetMode(true);
       setIsVerifyingOldPin(false);
       setBackupStatus("Mobile Verified. Override permission granted.");
-    } catch (err) {
-      setBackupStatus(err.response?.data?.message || "Identity theft protection: Phone mismatch.");
+    } catch (error) {
+      setBackupStatus(error.response?.data?.message || "Identity theft protection: Phone mismatch.");
     } finally {
       setIsBackingUp(false);
     }
   };
 
-  const currentThemeData = THEMES[currentTheme] || THEMES.stealth_dark;
+  const isMessageError = message.includes("Error") || message.includes("failed");
+  const isBackupError = backupStatus.includes("Error") || backupStatus.includes("failed") || backupStatus.includes("mismatch");
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-[#0b0e14]/85 backdrop-blur-3xl overflow-y-auto"
-      style={{ backgroundImage: currentThemeData.pattern, backgroundSize: currentThemeData.patternSize }}
-    >
-      {/* Full UI Security Background */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <img 
-          src="/backgrounds/security_lock.png" 
-          alt="Security System Backdrop"
-          className="w-full h-full object-cover opacity-25 contrast-100 brightness-40 scale-105 blur-[8px]"
-        />
-        <div className="absolute inset-0 bg-gradient-to-tr from-[#0b0e14] via-transparent to-[#0b0e14] opacity-80" />
-        <div className="absolute inset-0 bg-black/40" />
-      </div>
+    <DialogShell open onOpenChange={(open) => !open && onClose()}>
+      <DialogShellContent className="max-w-6xl overflow-hidden p-0">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className={cn("relative", getThemeClassName(currentTheme))}>
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute inset-0 chat-canvas opacity-90" />
+            <div className="absolute left-[-12%] top-[-16%] h-[34rem] w-[34rem] rounded-full bg-primary/15 blur-[140px]" />
+            <div className="absolute bottom-[-16%] right-[-12%] h-[34rem] w-[34rem] rounded-full bg-secondary/12 blur-[160px]" />
+            <div className="absolute inset-0 bg-background/45" />
+          </div>
 
-      <div className="w-full max-w-6xl min-h-[85vh] grid grid-cols-1 lg:grid-cols-12 gap-12 relative my-auto z-10">
-        
-        {/* Close Button */}
-        <button 
-          onClick={onClose}
-          className="absolute -top-4 -right-4 p-3 bg-white/5 hover:bg-white/10 rounded-full text-white/50 hover:text-white transition-all z-50 border border-white/10 shadow-xl active:scale-90"
-        >
-          <ArrowLeft size={24} />
-        </button>
+          <div className="relative grid max-h-[90vh] overflow-hidden lg:grid-cols-[280px,1fr]">
+            <aside className="border-b border-border/70 bg-card/75 p-6 backdrop-blur-xl lg:border-b-0 lg:border-r lg:p-8">
+              <DialogShellHeader className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">Relaychat Control</p>
+                <DialogShellTitle className="font-headline text-3xl font-black tracking-tight">Settings</DialogShellTitle>
+                <DialogShellDescription>
+                  Update your identity, privacy posture, visual theme, and recovery key setup.
+                </DialogShellDescription>
+              </DialogShellHeader>
 
-        {/* Left Column: Profile Card */}
-        <section className="lg:col-span-5 space-y-8 h-full">
-          <Card className="p-8 relative overflow-hidden h-full flex flex-col items-center justify-center border-white/10 shadow-3xl bg-[#0b0e14]/90 backdrop-blur-3xl">
-             {/* Decorate Spark */}
-             <div className="absolute -top-24 -right-24 w-64 h-64 blur-[120px] rounded-full opacity-40 transition-colors" style={{ backgroundColor: currentThemeData.primary }}></div>
-             <div className="absolute -bottom-24 -left-24 w-64 h-64 blur-[120px] rounded-full opacity-30 transition-colors" style={{ backgroundColor: currentThemeData.secondary || currentThemeData.primary }}></div>
-            
-             <div className="flex flex-col items-center text-center space-y-8 w-full relative z-10">
-                <div className="relative group">
-                  <div className="absolute -inset-1.5 opacity-40 group-hover:opacity-80 transition duration-1000 animate-pulse rounded-full blur-md" style={{ background: currentThemeData.primary }}></div>
-                  <div className="relative w-44 h-44 md:w-52 md:h-52 rounded-full overflow-hidden border-2 border-white/10 bg-[#1f1f25]/40 flex items-center justify-center shadow-inner backdrop-blur-md">
-                    {avatar ? (
-                      <img 
-                        src={`http://localhost:5002${avatar}`} 
-                        alt={name} 
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-6xl font-black text-white/20 bg-gradient-to-br from-white/5 to-white/10 uppercase font-headline">
-                        {name?.[0] || "?"}
-                      </div>
-                    )}
-                  </div>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleAvatarChange} 
-                    className="hidden" 
-                    accept="image/*"
-                  />
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-4 right-4 text-[#131318] p-3 rounded-full shadow-2xl hover:scale-110 active:scale-90 transition-all" 
-                    style={{ backgroundColor: currentThemeData.primary }}
-                  >
-                    <Edit3 size={20} />
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  <h2 className="font-headline text-3xl md:text-4xl font-black tracking-tight uppercase text-white drop-shadow-lg">
-                    {name || "Identity_Null"}
-                  </h2>
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="w-2 h-2 rounded-full animate-pulse shadow-[0_0_8px]" style={{ backgroundColor: signalVisibility ? (currentThemeData.primary === '#ffffff' ? '#ffffff' : '#10b981') : '#64748b', boxShadow: signalVisibility ? `0 0 8px ${currentThemeData.primary === '#ffffff' ? '#ffffff' : '#10b981'}` : 'none' }} />
-                    <p className="text-[10px] font-bold tracking-[0.25em] text-slate-500 uppercase">
-                      Status: <span className={signalVisibility ? "text-emerald-400" : "text-slate-400"} style={{ color: signalVisibility ? (currentThemeData.primary === '#ffffff' ? '#ffffff' : '#10b981') : undefined }}>{signalVisibility ? "Visible Node" : "Ghost Protocol"}</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="w-full space-y-6 pt-4 text-left">
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase tracking-[0.25em] ml-1 font-black" style={{ color: currentThemeData.primary }}>Archive Label</label>
-                    <Input 
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Your Identity Name..."
-                      icon={User}
-                      className="bg-black/20 border-white/10 focus:border-cyan-400/50 text-white"
-                      style={{ focusBorderColor: currentThemeData.primary }}
+              <div className="mt-8 space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <Avatar
+                      src={avatar ? `http://localhost:5002${avatar}` : undefined}
+                      alt={name || "Profile"}
+                      fallback={name?.[0] || "?"}
+                      size="xl"
+                      className="border-primary/20 shadow-[0_0_32px_hsl(var(--primary)/0.2)]"
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase tracking-[0.25em] ml-1 font-black" style={{ color: currentThemeData.primary }}>System Frequency</label>
-                    <Input 
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                      placeholder="Status broadcast..."
-                      icon={Terminal}
-                      className="bg-black/20 border-white/10 focus:border-purple-400/50 text-white"
-                      style={{ focusBorderColor: currentThemeData.primary }}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                      accept="image/*"
                     />
-                  </div>
-                  
-                  <div className="pt-2">
-                    <Button 
-                      onClick={() => handleUpdate()} 
-                      disabled={loading}
-                      className="w-full shadow-lg"
-                      style={{ backgroundColor: currentThemeData.primary, borderColor: currentThemeData.primary, color: '#131318' }}
+                    <Button
+                      size="icon"
+                      type="button"
+                      className="absolute -bottom-1 -right-1 rounded-full"
+                      onClick={() => fileInputRef.current?.click()}
                     >
-                      {loading ? "Synchronizing Archive..." : "Submit to Ledger"}
+                      <Edit3 size={14} />
                     </Button>
                   </div>
+                  <div className="space-y-1">
+                    <h2 className="font-headline text-xl font-black tracking-tight text-foreground">{name || "Identity_Null"}</h2>
+                    <p className="text-xs text-muted-foreground">{status || "No status broadcast set."}</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                      {signalVisibility ? "Visible Node" : "Ghost Protocol"}
+                    </p>
+                  </div>
+                </div>
 
-                  {message && (
-                    <motion.p 
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`text-xs text-center font-bold px-4 py-2 rounded-lg bg-white/5 border ${message.includes("Error") || message.includes("failed") ? "text-rose-400 border-rose-500/20" : "text-emerald-400 border-emerald-500/20"}`}
+                <Card className="space-y-3 border-border/70 bg-card/70 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Quick state</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                      {THEME_NAMES[currentTheme] || currentTheme}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+                      <p className="text-muted-foreground">Visibility</p>
+                      <p className="mt-1 font-semibold text-foreground">{signalVisibility ? "Enabled" : "Hidden"}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+                      <p className="text-muted-foreground">Vault</p>
+                      <p className="mt-1 font-semibold text-foreground">{vaultProtocol ? "Masked" : "Standard"}</p>
+                    </div>
+                  </div>
+                </Card>
+
+                <TabsList className="grid w-full grid-cols-2 gap-2 rounded-2xl bg-transparent p-0 lg:grid-cols-1 lg:border-0 lg:bg-transparent">
+                  {TAB_ITEMS.map((item) => (
+                    <TabsTrigger
+                      key={item.value}
+                      value={item.value}
+                      className="justify-start rounded-2xl border border-border/60 bg-card/70 px-4 py-3 text-left data-[state=active]:border-primary/20 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                     >
-                      {message}
-                    </motion.p>
-                  )}
-                </div>
-             </div>
+                      {item.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
 
-             <div className="mt-12 w-full pt-8 border-t border-white/5 relative z-10">
-                <button 
-                  onClick={handleLeave}
-                  className="flex items-center justify-center gap-4 w-full px-8 py-3.5 bg-rose-500/5 rounded-2xl border border-rose-500/20 text-rose-400 font-black text-[11px] tracking-[0.2em] uppercase hover:bg-rose-500/10 transition-all duration-300 active:scale-95 shadow-lg group"
-                >
-                  <LogOut size={18} className="transition-transform group-hover:-translate-x-1" />
+                <Button variant="destructive" className="w-full justify-center gap-2 rounded-2xl" onClick={handleLeave}>
+                  <LogOut size={16} />
                   Termination Sequence
-                </button>
-             </div>
-          </Card>
-        </section>
-
-        {/* Right Column: Categories */}
-        <section className="lg:col-span-7 space-y-12 h-full flex flex-col justify-center">
-          
-          {/* Privacy Section */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-5">
-              <div className="p-3 bg-cyan-400/10 rounded-2xl border border-cyan-400/20">
-                <ShieldCheck className="text-cyan-400" size={24} />
+                </Button>
               </div>
-              <h3 className="text-2xl font-black tracking-tighter uppercase text-white">Privacy & Keys</h3>
-              <div className="h-px flex-grow bg-gradient-to-r from-white/10 to-transparent"></div>
-            </div>
+            </aside>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div 
-                onClick={toggleSignalVisibility}
-                className="bg-[#1f1f25]/40 backdrop-blur border border-white/5 rounded-2xl p-5 flex items-center justify-between group hover:bg-white/5 hover:border-white/10 transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-all ${signalVisibility ? 'bg-cyan-400/10 text-cyan-400 border-cyan-400/10' : 'bg-white/5 text-slate-500 border-white/5'}`}>
-                    <Eye size={22} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-white tracking-tight">Signal Visibility</p>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Sync online status</p>
-                  </div>
-                </div>
-                <div className={`w-12 h-6 rounded-full relative p-1 transition-all duration-300 ${signalVisibility ? 'bg-cyan-400 shadow-[0_0_15px_rgba(0,251,251,0.2)]' : 'bg-white/10 border border-white/10'}`}>
-                  <motion.div 
-                    animate={{ x: signalVisibility ? 24 : 0 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    className="w-4 h-4 bg-white rounded-full shadow-md" 
-                  />
-                </div>
-              </div>
+            <main ref={mainRef} className="overflow-y-auto bg-background/20 p-6 lg:p-8">
+              <div ref={revealScopeRef} className="space-y-6">
+                <AnimatePresence mode="wait">
+                  {message ? (
+                    <StatusBanner key={message} tone={isMessageError ? "error" : "success"}>
+                      {message}
+                    </StatusBanner>
+                  ) : null}
+                </AnimatePresence>
 
-              <div 
-                onClick={toggleVaultProtocol}
-                className="bg-[#1f1f25]/40 backdrop-blur border border-white/5 rounded-2xl p-5 flex items-center justify-between group hover:bg-white/5 hover:border-white/10 transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-all ${vaultProtocol ? 'bg-purple-500/10 text-purple-400 border-purple-500/10' : 'bg-white/5 text-slate-500 border-white/5'}`}>
-                    <Lock size={22} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-white tracking-tight">Vault Protocol</p>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Mask identity</p>
-                  </div>
-                </div>
-                <div className={`w-12 h-6 rounded-full relative p-1 transition-all duration-300 ${vaultProtocol ? 'bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'bg-white/10 border border-white/10'}`}>
-                   <motion.div 
-                    animate={{ x: vaultProtocol ? 24 : 0 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    className="w-4 h-4 bg-white rounded-full shadow-md" 
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Cloud Key Backup Integrated Card */}
-            <div className="bg-[#1f1f25]/40 backdrop-blur border border-white/5 rounded-2xl p-6 space-y-5 group hover:border-white/10 transition-all">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-emerald-500/10 text-emerald-400 border border-emerald-500/10">
-                    <Cloud size={22} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-white tracking-tight uppercase">Cloud Key Backup</p>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Secure recovery system</p>
-                  </div>
-                </div>
-                {backupStatus && (
-                  <motion.p 
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${backupStatus.includes("Error") ? "bg-rose-500/20 text-rose-400" : "bg-emerald-500/20 text-emerald-400"}`}
+                <TabsContent value="profile">
+                  <SectionFrame
+                    eyebrow="Identity"
+                    title="Profile settings"
+                    description="Manage the public label and status that appear across Relaychat."
                   >
-                    {backupStatus}
-                  </motion.p>
-                )}
-              </div>
+                    <div className="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
+                      <Card data-settings-reveal className="space-y-5 border-border/70 bg-card/80 p-6">
+                        <div className="grid gap-5 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                              Archive label
+                            </label>
+                            <Input
+                              value={name}
+                              onChange={(event) => setName(event.target.value)}
+                              placeholder="Your identity name..."
+                              icon={User}
+                            />
+                          </div>
 
-              {user?.encryptedBackupKey && !isResetMode && (
-                <div className="p-4 bg-rose-500/5 rounded-2xl border border-rose-500/10 space-y-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <ShieldAlert size={14} className="text-rose-400" />
-                    <p className="text-[10px] font-black uppercase text-white/70">Previous Identification Required</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="relative">
-                      <Lock size={12} className="absolute left-3 top-3 text-rose-500/50" />
-                      <input 
-                        type="password"
-                        placeholder="Current Security PIN"
-                        value={oldPin}
-                        onChange={(e) => setOldPin(e.target.value)}
-                        className="w-full bg-black/40 border border-white/5 rounded-xl px-9 py-2 text-[10px] text-rose-200 outline-none focus:border-rose-500/30 transition-all font-mono"
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                              System frequency
+                            </label>
+                            <Input
+                              value={status}
+                              onChange={(event) => setStatus(event.target.value)}
+                              placeholder="Status broadcast..."
+                              icon={Terminal}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3">
+                          <Button onClick={() => handleUpdate()} disabled={loading}>
+                            {loading ? (
+                              <>
+                                <Loader2 className="animate-spin" />
+                                Synchronizing
+                              </>
+                            ) : (
+                              "Submit to ledger"
+                            )}
+                          </Button>
+                          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                            Update avatar
+                          </Button>
+                        </div>
+                      </Card>
+
+                      <Card data-settings-reveal className="space-y-4 border-border/70 bg-card/80 p-6">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+                          Identity preview
+                        </p>
+                        <div className="rounded-3xl border border-border/70 bg-background/50 p-5">
+                          <div className="flex items-center gap-4">
+                            <Avatar
+                              src={avatar ? `http://localhost:5002${avatar}` : undefined}
+                              alt={name || "Profile"}
+                              fallback={name?.[0] || "?"}
+                              size="lg"
+                              className="border-primary/20"
+                            />
+                            <div className="space-y-1">
+                              <p className="font-semibold text-foreground">{name || "Identity_Null"}</p>
+                              <p className="text-sm text-muted-foreground">{status || "No status broadcast set."}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-xs leading-6 text-muted-foreground">
+                          These values are saved to your profile and reused across conversations, presence, and future device sessions.
+                        </p>
+                      </Card>
+                    </div>
+                  </SectionFrame>
+                </TabsContent>
+
+                <TabsContent value="privacy">
+                  <SectionFrame
+                    eyebrow="Protection"
+                    title="Privacy controls"
+                    description="Control presence visibility and identity masking without changing your account flows."
+                  >
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <PreferenceRow
+                        icon={Eye}
+                        title="Signal visibility"
+                        description="Sync your online status to other users."
+                        checked={signalVisibility}
+                        onCheckedChange={toggleSignalVisibility}
+                      />
+                      <PreferenceRow
+                        icon={Lock}
+                        title="Vault protocol"
+                        description="Mask your identity in higher privacy mode."
+                        checked={vaultProtocol}
+                        onCheckedChange={toggleVaultProtocol}
                       />
                     </div>
-                    
-                    <div className="relative flex gap-2">
-                       <input 
-                        type="text"
-                        placeholder="Or Mobile Register Number"
-                        value={verifyPhone}
-                        onChange={(e) => setVerifyPhone(e.target.value)}
-                        className="flex-grow bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-[10px] text-cyan-200 outline-none focus:border-cyan-500/30 transition-all"
-                       />
-                       <button 
-                        onClick={handleForgotPinReset}
-                        className="px-3 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase rounded-xl transition-all"
-                       >
-                         Verify
-                       </button>
+
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <MetricCard icon={Lock} label="Encryption" value="AES-256-GCM" />
+                      <MetricCard icon={Cloud} label="E2EE storage" value="Enabled" />
+                      <MetricCard icon={ShieldCheck} label="Profile state" value={vaultProtocol ? "Masked" : "Standard"} />
                     </div>
-                  </div>
-                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Forgot your PIN? Verify your mobile to bypass the old encryption.</p>
-                </div>
-              )}
+                  </SectionFrame>
+                </TabsContent>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                <div className="md:col-span-8 relative">
-                   <Lock size={14} className="absolute left-3 top-3 text-slate-500" />
-                   <input 
-                    type="password"
-                    placeholder={user?.encryptedBackupKey ? "Enter New Security PIN" : "Enter Security PIN (4+ digits)"}
-                    value={backupPin}
-                    onChange={(e) => setBackupPin(e.target.value)}
-                    className="w-full bg-black/40 border border-white/5 rounded-xl px-10 py-2.5 text-xs text-white outline-none focus:border-emerald-500/50 transition-all font-mono"
-                   />
-                </div>
-                <button 
-                  onClick={handleBackupKey}
-                  disabled={isBackingUp || (!backupPin)}
-                  className="md:col-span-4 bg-emerald-500 text-[#0b0e14] font-black text-[10px] uppercase tracking-widest rounded-xl hover:brightness-110 active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
-                >
-                  {isBackingUp ? (
-                    <>
-                      <Loader2 className="animate-spin" size={12} />
-                      Validating
-                    </>
-                  ) : (user?.encryptedBackupKey ? "Reset Key" : "Save Backup")}
-                </button>
-              </div>
-              <p className="text-[9px] text-slate-600 uppercase font-bold tracking-widest leading-relaxed">
-                This PIN encrypts your private keys before uploading. <span className="text-emerald-500/50">Keep it safe for multi-device synchronization.</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Theme Section */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-5">
-              <div className="p-3 bg-purple-500/10 rounded-2xl border border-purple-500/20" style={{ backgroundColor: `${currentThemeData.primary}1a`, borderColor: `${currentThemeData.primary}33` }}>
-                <Palette className="text-purple-400" size={24} style={{ color: currentThemeData.primary }} />
-              </div>
-              <h3 className="text-2xl font-black tracking-tighter uppercase text-white">Visual Spectrum</h3>
-              <div className="h-px flex-grow bg-gradient-to-r from-white/10 to-transparent"></div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-              {['stealth_dark', 'void', 'minimal_dark', 'minimal_light'].map((themeKey) => {
-                const t = THEMES[themeKey] || THEMES.stealth_dark;
-                const isSelected = currentTheme === themeKey;
-                return (
-                  <div 
-                    key={themeKey}
-                    onClick={() => {
-                      setCurrentTheme(themeKey);
-                      handleUpdate({ globalTheme: themeKey });
-                    }}
-                    className={`relative bg-[#1f1f25]/40 backdrop-blur rounded-2xl p-6 flex flex-col items-center text-center space-y-4 cursor-pointer border-2 transition-all hover:bg-white/5 ${
-                      isSelected ? 'shadow-[0_0_25px]' : 'border-white/5'
-                    }`}
-                    style={{ 
-                      borderColor: isSelected ? t.primary : 'rgba(255,255,255,0.05)',
-                      boxShadow: isSelected ? `0 0 25px ${t.primary}33` : 'none'
-                    }}
+                <TabsContent value="theme">
+                  <SectionFrame
+                    eyebrow="Appearance"
+                    title="Theme studio"
+                    description="Preview and apply the global chat theme used across Relaychat."
                   >
-                    <div 
-                      className="w-14 h-14 rounded-full shadow-2xl border-2 border-white/10"
-                      style={{ 
-                        background: t.background.startsWith('linear-gradient') ? t.background : 
-                                    t.sendBtn.startsWith('linear-gradient') ? t.sendBtn : t.primary 
-                      }}
-                    />
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/70">
-                      {THEME_NAMES[themeKey] || themeKey}
-                    </p>
-                    {isSelected && (
-                      <div className="absolute top-3 right-3 drop-shadow-glow" style={{ color: t.primary }}>
-                        <CheckCircle size={16} fill="currentColor" />
-                        <div className="absolute inset-0 blur-sm rounded-full opacity-40" style={{ backgroundColor: t.primary }} />
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      {THEME_KEYS.map((themeKey) => (
+                        <ThemeCard
+                          key={themeKey}
+                          themeKey={themeKey}
+                          currentTheme={currentTheme}
+                          onSelect={(nextTheme) => {
+                            setCurrentTheme(nextTheme);
+                            handleUpdate({ globalTheme: nextTheme });
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </SectionFrame>
+                </TabsContent>
+
+                <TabsContent value="backup">
+                  <SectionFrame
+                    eyebrow="Recovery"
+                    title="Backup and restore"
+                    description="Protect your encrypted key material with a cloud backup PIN and verification fallback."
+                  >
+                    <Card data-settings-reveal className="space-y-5 border-border/70 bg-card/80 p-6">
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-foreground">Cloud key backup</p>
+                          <p className="text-sm leading-6 text-muted-foreground">
+                            This PIN encrypts your private keys before upload. Keep it safe for multi-device synchronization.
+                          </p>
+                        </div>
+                        <AnimatePresence mode="wait">
+                          {backupStatus ? (
+                            <StatusBanner key={backupStatus} tone={isBackupError ? "error" : "info"}>
+                              {backupStatus}
+                            </StatusBanner>
+                          ) : null}
+                        </AnimatePresence>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+
+                      {user?.encryptedBackupKey && !isResetMode ? (
+                        <Card data-settings-reveal className="space-y-4 border-destructive/15 bg-destructive/5 p-5">
+                          <div className="flex items-center gap-2 text-destructive">
+                            <ShieldAlert size={16} />
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">
+                              Previous identification required
+                            </p>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <Input
+                              type="password"
+                              placeholder="Current security PIN"
+                              value={oldPin}
+                              onChange={(event) => setOldPin(event.target.value)}
+                              icon={Lock}
+                            />
+                            <div className="flex gap-2">
+                              <Input
+                                type="text"
+                                placeholder="Registered mobile number"
+                                value={verifyPhone}
+                                onChange={(event) => setVerifyPhone(event.target.value)}
+                                className="flex-1"
+                              />
+                              <Button variant="outline" onClick={handleForgotPinReset}>
+                                Verify
+                              </Button>
+                            </div>
+                          </div>
+
+                          <p className="text-xs leading-6 text-muted-foreground">
+                            Forgot your PIN? Verify your mobile number to bypass the previous encryption checkpoint.
+                          </p>
+                        </Card>
+                      ) : null}
+
+                      <div className="grid gap-4 md:grid-cols-[1fr,auto]">
+                        <Input
+                          type="password"
+                          placeholder={
+                            user?.encryptedBackupKey ? "Enter new security PIN" : "Enter security PIN (4+ digits)"
+                          }
+                          value={backupPin}
+                          onChange={(event) => setBackupPin(event.target.value)}
+                          icon={Lock}
+                          className="font-mono"
+                        />
+                        <Button onClick={handleBackupKey} disabled={isBackingUp || !backupPin} className="min-w-[11rem]">
+                          {isBackingUp ? (
+                            <>
+                              <Loader2 className="animate-spin" />
+                              Validating
+                            </>
+                          ) : user?.encryptedBackupKey ? (
+                            "Reset key"
+                          ) : (
+                            "Save backup"
+                          )}
+                        </Button>
+                      </div>
+                    </Card>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <MetricCard icon={Cloud} label="Backup state" value={user?.encryptedBackupKey ? "Configured" : "Not set"} />
+                      <MetricCard icon={Settings2} label="Version" value="RP-2.0.4" />
+                    </div>
+                  </SectionFrame>
+                </TabsContent>
+              </div>
+            </main>
           </div>
-
-          {/* Metadata Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="bg-[#1f1f25]/40 backdrop-blur border border-white/5 rounded-2xl p-6 space-y-3 relative overflow-hidden group hover:bg-white/5 transition-all">
-              <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                <Lock size={64} />
-              </div>
-              <div className="flex items-center gap-2 text-slate-500 font-black">
-                <Lock size={12} />
-                <p className="text-[10px] uppercase tracking-widest">Encryption</p>
-              </div>
-              <p className="text-2xl font-black text-white tracking-tighter">AES-256-GCM</p>
-            </div>
-            
-            <div className="bg-[#1f1f25]/40 backdrop-blur border border-white/5 rounded-2xl p-6 space-y-3 relative overflow-hidden group hover:bg-white/5 transition-all">
-              <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                <Cloud size={64} />
-              </div>
-              <div className="flex items-center gap-2 text-slate-500 font-black">
-                <Cloud size={12} />
-                <p className="text-[10px] uppercase tracking-widest">E2EE Storage</p>
-              </div>
-              <p className="text-2xl font-black text-white tracking-tighter">ENABLED</p>
-            </div>
-
-            <div className="bg-[#1f1f25]/40 backdrop-blur border border-white/5 rounded-2xl p-6 space-y-3 relative overflow-hidden group hover:bg-white/5 transition-all">
-                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <Settings2 size={64} />
-                </div>
-              <div className="flex items-center gap-2 text-slate-500 font-black">
-                <Settings2 size={12} />
-                <p className="text-[10px] uppercase tracking-widest">Version</p>
-              </div>
-              <p className="text-2xl font-black text-white tracking-tighter">RP-2.0.4</p>
-            </div>
-          </div>
-
-        </section>
-      </div>
-    </motion.div>
+        </Tabs>
+      </DialogShellContent>
+    </DialogShell>
   );
 }
