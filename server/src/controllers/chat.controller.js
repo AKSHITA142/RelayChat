@@ -50,6 +50,10 @@ exports.createChat = async (req, res) => {
 exports.getMyChats = async (req, res) => {
   const userId = req.user.id;
 
+  console.log("getMyChats called by User:", req.user.id); 
+  const _c = await Chat.find({ participants: req.user.id }); 
+  console.log("Found chats in DB:", _c.length);
+
   
   const chats = await Chat.find({ participants: userId })
     .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")

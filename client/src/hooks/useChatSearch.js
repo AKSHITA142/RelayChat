@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 export function useChatSearch(messages, scrollToMessage) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,11 +40,11 @@ export function useChatSearch(messages, scrollToMessage) {
     scrollToMessage?.(messages[searchResults[nextIndex]]._id);
   };
 
-  const resetSearch = () => {
+  const resetSearch = useCallback(() => {
     setSearchQuery("");
     setSearchResults([]);
     setCurrentSearchIndex(-1);
-  };
+  }, []);
 
   return {
     searchQuery,
