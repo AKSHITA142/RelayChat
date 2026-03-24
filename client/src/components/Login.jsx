@@ -25,7 +25,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   const [password, setPassword] = useState("");
   
   // Phone OTP state
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("+91");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [canResendAt, setCanResendAt] = useState(0);
@@ -177,7 +177,8 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   };
 
   const handleSendOtp = async () => {
-    if (!phone) return setError("Please enter a phone number");
+    const digits = phone.replace(/^\+91/, "").replace(/\D/g, "");
+    if (digits.length !== 10) return setError("Please enter exactly 10 digits after +91");
     onAction?.();
     setLoading(true);
     setError("");
@@ -493,14 +494,23 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-4"
                 >
-                  <Input
-                    icon={Phone}
-                    type="text"
-                    placeholder="Phone (+91987...)"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    disabled={otpSent}
-                  />
+                  <div className="flex items-center w-full rounded-xl overflow-hidden border border-[#45484f]/30 bg-[#12151c] focus-within:border-[#c59aff]/60 transition-colors">
+                    <span className="px-4 py-3 text-sm font-bold text-[#c59aff] border-r border-[#45484f]/30 select-none whitespace-nowrap bg-[#c59aff]/5">+91</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      placeholder="Enter 10-digit number"
+                      value={phone.replace(/^\+91/, "")}
+                      onChange={e => {
+                        const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                        setPhone("+91" + digits);
+                      }}
+                      disabled={otpSent}
+                      maxLength={10}
+                      className="flex-1 bg-transparent px-4 py-3 text-sm text-[#ecedf6] placeholder-[#45484f] outline-none font-inter tracking-widest"
+                    />
+                    <span className="px-3 text-xs text-[#45484f] font-bold">{phone.replace(/^\+91/, "").length}/10</span>
+                  </div>
                   
                   {otpSent && (
                     <motion.div 
