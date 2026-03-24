@@ -5,8 +5,68 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: 220 33% 98%;
+    --foreground: 222 47% 11%;
+    --primary: 266 74% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 186 100% 49%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 18% 90%;
+    --muted-foreground: 215 16% 47%;
+    --border: 220 13% 84%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --input: 220 13% 84%;
+    --ring: 266 74% 58%;
+    --accent: 220 18% 94%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 346 77% 49%;
+    --destructive-foreground: 0 0% 100%;
+    --radius: 0.9rem;
+    --chat-canvas: hsl(var(--background));
+    --chat-pattern: none;
+    --chat-pattern-size: 24px 24px;
+    --chat-bubble-own: hsl(var(--primary));
+    --chat-bubble-own-foreground: hsl(var(--primary-foreground));
+    --chat-bubble-other: hsl(var(--card));
+    --chat-bubble-other-foreground: hsl(var(--foreground));
+  }
+
+  .dark {
+    --background: 225 25% 7%;
+    --foreground: 210 40% 98%;
+    --primary: 266 68% 76%;
+    --primary-foreground: 225 25% 7%;
+    --secondary: 186 100% 49%;
+    --secondary-foreground: 225 25% 7%;
+    --muted: 223 16% 18%;
+    --muted-foreground: 215 20% 70%;
+    --border: 223 16% 22%;
+    --card: 222 22% 10%;
+    --card-foreground: 210 40% 98%;
+    --input: 223 16% 22%;
+    --ring: 266 68% 76%;
+    --accent: 223 16% 18%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 346 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --chat-canvas: hsl(var(--background));
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
   body {
-    @apply bg-[#0b0e14] text-white font-sans antialiased;
+    @apply bg-background text-foreground font-sans antialiased;
+    min-height: 100vh;
+    background-image: radial-gradient(circle at top left, hsl(var(--primary) / 0.18), transparent 38%),
+      radial-gradient(circle at bottom right, hsl(var(--secondary) / 0.14), transparent 32%);
   }
 
   ::-webkit-scrollbar {
@@ -18,25 +78,199 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-white/10 rounded-full;
+    @apply rounded-full bg-border/80;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-white/20;
+    @apply bg-border;
   }
 }
 
 @layer components {
+  .theme-chat-stealth_dark {
+    --background: 240 10% 5%;
+    --foreground: 210 40% 98%;
+    --primary: 184 8% 55%;
+    --primary-foreground: 225 25% 7%;
+    --secondary: 184 7% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 223 16% 16%;
+    --muted-foreground: 215 20% 70%;
+    --border: 223 16% 18%;
+    --card: 224 19% 8%;
+    --card-foreground: 210 40% 98%;
+    --input: 223 16% 18%;
+    --ring: 184 8% 55%;
+    --accent: 223 16% 16%;
+    --accent-foreground: 210 40% 98%;
+    --chat-canvas: #08080a;
+    --chat-pattern: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    --chat-pattern-size: 24px 24px;
+    --chat-bubble-own: rgba(131, 148, 147, 0.14);
+    --chat-bubble-own-foreground: #ffffff;
+    --chat-bubble-other: rgba(255, 255, 255, 0.04);
+    --chat-bubble-other-foreground: #ffffff;
+  }
+
+  .theme-chat-void {
+    --background: 240 14% 4%;
+    --foreground: 210 40% 98%;
+    --primary: 266 72% 78%;
+    --primary-foreground: 225 25% 7%;
+    --secondary: 275 45% 20%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 240 12% 14%;
+    --muted-foreground: 215 20% 70%;
+    --border: 240 12% 18%;
+    --card: 240 12% 8%;
+    --card-foreground: 210 40% 98%;
+    --input: 240 12% 18%;
+    --ring: 266 72% 78%;
+    --accent: 240 12% 16%;
+    --accent-foreground: 210 40% 98%;
+    --chat-canvas: #060608;
+    --chat-pattern: radial-gradient(rgba(182, 160, 255, 0.08) 1px, transparent 1px);
+    --chat-pattern-size: 32px 32px;
+    --chat-bubble-own: linear-gradient(135deg, rgba(197, 154, 255, 0.16), rgba(139, 92, 246, 0.08));
+    --chat-bubble-own-foreground: #ffffff;
+    --chat-bubble-other: rgba(255, 255, 255, 0.04);
+    --chat-bubble-other-foreground: #ffffff;
+  }
+
+  .theme-chat-minimal_dark {
+    --background: 0 0% 0%;
+    --foreground: 210 40% 98%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 225 25% 7%;
+    --secondary: 223 17% 20%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 223 17% 16%;
+    --muted-foreground: 215 20% 70%;
+    --border: 223 17% 24%;
+    --card: 0 0% 5%;
+    --card-foreground: 210 40% 98%;
+    --input: 223 17% 24%;
+    --ring: 0 0% 100%;
+    --accent: 223 17% 16%;
+    --accent-foreground: 210 40% 98%;
+    --chat-canvas: #000000;
+    --chat-pattern: radial-gradient(rgba(255, 255, 255, 0.06) 1.5px, transparent 1.5px);
+    --chat-pattern-size: 16px 16px;
+    --chat-bubble-own: #d1d5db;
+    --chat-bubble-own-foreground: #000000;
+    --chat-bubble-other: #1f2937;
+    --chat-bubble-other-foreground: #ffffff;
+  }
+
+  .theme-chat-minimal_light {
+    --background: 210 40% 96%;
+    --foreground: 222 47% 11%;
+    --primary: 222 47% 11%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 86%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 18% 91%;
+    --muted-foreground: 215 16% 35%;
+    --border: 220 13% 80%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --input: 220 13% 80%;
+    --ring: 222 47% 11%;
+    --accent: 220 18% 94%;
+    --accent-foreground: 222 47% 11%;
+    --chat-canvas: linear-gradient(to bottom, #d1d5db, #f8fafc);
+    --chat-pattern: radial-gradient(rgba(0, 0, 0, 0.1) 1.5px, transparent 1.5px);
+    --chat-pattern-size: 16px 16px;
+    --chat-bubble-own: #111827;
+    --chat-bubble-own-foreground: #ffffff;
+    --chat-bubble-other: #ffffff;
+    --chat-bubble-other-foreground: #111827;
+  }
+
   .glass-card {
-    @apply bg-white/5 backdrop-blur-md border border-[#45484f]/30 rounded-2xl shadow-xl;
+    @apply rounded-xl border border-border bg-card/70 shadow-glow backdrop-blur-xl;
+  }
+
+  .surface-panel {
+    @apply rounded-2xl border border-border bg-card/70 shadow-glow backdrop-blur-xl;
+  }
+
+  .surface-muted {
+    @apply rounded-2xl border border-border bg-muted/40 backdrop-blur-xl;
+  }
+
+  .action-icon {
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card/60 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground;
+  }
+
+  .chat-canvas {
+    background: var(--chat-canvas);
+    background-image: var(--chat-pattern);
+    background-size: var(--chat-pattern-size);
+  }
+
+  .theme-preview {
+    background: var(--chat-canvas);
+    background-image: var(--chat-pattern);
+    background-size: var(--chat-pattern-size);
+  }
+
+  .theme-preview__header {
+    @apply h-2 rounded-t-md bg-card/90;
+  }
+
+  .theme-preview__bubble {
+    @apply h-2 rounded-full;
+  }
+
+  .theme-preview__bubble--own {
+    background: var(--chat-bubble-own);
+  }
+
+  .theme-preview__bubble--other {
+    background: var(--chat-bubble-other);
   }
 
   .interactive-btn {
     @apply transition-all duration-200 active:scale-95;
   }
+
+  .message-bubble--own {
+    background: var(--chat-bubble-own);
+    color: var(--chat-bubble-own-foreground);
+  }
+
+  .message-bubble--other {
+    background: var(--chat-bubble-other);
+    color: var(--chat-bubble-other-foreground);
+  }
+
+  .waveform-player {
+    background: color-mix(in srgb, var(--wave-track) 8%, transparent);
+    border-color: color-mix(in srgb, var(--wave-track) 18%, transparent);
+  }
+
+  .waveform-player__toggle {
+    @apply flex items-center justify-center;
+    background: var(--wave-accent);
+    color: var(--wave-icon);
+  }
+
+  .waveform-player__bar {
+    height: var(--bar-height, 40%);
+    background: var(--bar-color, color-mix(in srgb, var(--wave-track) 40%, transparent));
+    transition: background 0.1s;
+  }
+
+  .waveform-player__time {
+    color: color-mix(in srgb, var(--wave-track) 70%, transparent);
+  }
+
+  .waveform-player__volume {
+    color: color-mix(in srgb, var(--wave-track) 63%, transparent);
+  }
 }
 
-/* Custom animations if needed */
 @keyframes slideUp {
   from { transform: translateY(10px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
@@ -52,11 +286,7 @@
     inset: 0;
     z-index: 50;
     pointer-events: none;
-    transition: opacity 0.5s duration;
-    background: radial-gradient(
-      800px circle at var(--x) var(--y),
-      rgba(59, 130, 246, 0.15),
-      transparent 80%
-    );
+    transition: opacity 0.5s ease;
+    background: radial-gradient(800px circle at var(--x) var(--y), hsl(var(--primary) / 0.16), transparent 80%);
   }
 }
