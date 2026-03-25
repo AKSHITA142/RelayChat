@@ -45,6 +45,8 @@ export default function ChatHeader({
   onRequestAddMember,
   onRequestRemoveMember,
   onOpenAddContact,
+  onToggleShowDeleted,
+  showDeleted,
   onClearChat,
   onStartVideoCall,
   menuRef,
@@ -188,6 +190,17 @@ export default function ChatHeader({
                   Add to contacts
                 </button>
               ) : null}
+              <div className="my-1 h-px bg-border/60" />
+              <button
+                onClick={onToggleShowDeleted}
+                className={cn(
+                  "flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors",
+                  showDeleted ? "bg-primary/5 text-primary" : "text-foreground hover:bg-accent hover:text-primary"
+                )}
+              >
+                <Palette size={16} />
+                {showDeleted ? "Hide retracted" : "Reveal hidden messages"}
+              </button>
               <div className="my-1 h-px bg-border/60" />
               <button onClick={onClearChat} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
                 <Trash2 size={16} />

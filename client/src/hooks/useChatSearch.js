@@ -1,11 +1,11 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 
 export function useChatSearch(messages, scrollToMessage) {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentSearchIndex, setCurrentSearchIndex] = useState(-1);
   const [searchResults, setSearchResults] = useState([]);
 
-  const handleSearch = useCallback((query) => {
+  const handleSearch = (query) => {
     setSearchQuery(query);
 
     if (!query.trim()) {
@@ -27,9 +27,9 @@ export function useChatSearch(messages, scrollToMessage) {
     } else {
       setCurrentSearchIndex(-1);
     }
-  }, [messages, scrollToMessage]);
+  };
 
-  const navigateSearch = useCallback((direction) => {
+  const navigateSearch = (direction) => {
     if (searchResults.length === 0) return;
 
     let nextIndex = currentSearchIndex + direction;
@@ -38,7 +38,7 @@ export function useChatSearch(messages, scrollToMessage) {
 
     setCurrentSearchIndex(nextIndex);
     scrollToMessage?.(messages[searchResults[nextIndex]]._id);
-  }, [currentSearchIndex, searchResults, messages, scrollToMessage]);
+  };
 
   const resetSearch = useCallback(() => {
     setSearchQuery("");
@@ -46,12 +46,12 @@ export function useChatSearch(messages, scrollToMessage) {
     setCurrentSearchIndex(-1);
   }, []);
 
-  return useMemo(() => ({
+  return {
     searchQuery,
     currentSearchIndex,
     searchResults,
     handleSearch,
     navigateSearch,
     resetSearch,
-  }), [searchQuery, currentSearchIndex, searchResults, handleSearch, navigateSearch, resetSearch]);
+  };
 }

@@ -74,6 +74,7 @@ export default function ChatWindow({
 
   const [showMenu, setShowMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [recipientEncryptionUser, setRecipientEncryptionUser] = useState(null);
@@ -408,7 +409,7 @@ export default function ChatWindow({
 
     const loadMessages = async () => {
       try {
-        const response = await api.get(`/message/${selectedChat._id}`);
+        const response = await api.get(`/message/${selectedChat._id}?includeDeleted=${showDeleted}`);
         if (isCancelled) return;
 
         if (Array.isArray(response.data)) {
@@ -447,7 +448,7 @@ export default function ChatWindow({
       isCancelled = true;
       socket.emit("close-chat", selectedChat._id);
     };
-  }, [selectedChat?._id, myUserId, resetSearch]);
+  }, [selectedChat, showDeleted, myUserId, resetSearch]);
 
   useEffect(() => {
     if (!selectedChat?._id) return;
@@ -631,7 +632,18 @@ export default function ChatWindow({
     };
 
     const deleteForMeHandler = ({ messageId }) => {
-      setMessages((previous) => previous.filter((message) => message._id !== messageId));
+      if (!showDeleted) {
+        setMessages((previous) => previous.filter((message) => message._id !== messageId));
+        return;
+      }
+
+      setMessages((previous) =>
+        previous.map((message) =>
+          message._id === messageId
+            ? { ...message, deletedFor: [...(message.deletedFor || []), myUserId] }
+            : message
+        )
+      );
     };
 
     const restoreForMeHandler = ({ messageId }) => {
@@ -676,7 +688,7 @@ export default function ChatWindow({
       socket.off("message-deleted-for-everyone", deleteForEveryoneHandler);
       socket.off("message-reacted", reactionHandler);
     };
-  }, [selectedChat?._id, myUserId]);
+  }, [selectedChat, myUserId, showDeleted]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -776,7 +788,7 @@ export default function ChatWindow({
 
       if (!selectedChat?.isGroup && recipient) {
         const currentUser = getLoggedInUser();
-  const recipientDevices = buildDeviceRecipients([recipientEncryptionUser || recipient]);
+        const recipientDevices = buildDeviceRecipients([recipientEncryptionUser || recipient]);
         const senderRecipients = buildDeviceRecipients([currentUser || { _id: myUserId }]);
         const recipients = [...senderRecipients, ...recipientDevices];
 
@@ -968,6 +980,11 @@ export default function ChatWindow({
           setShowAddContact(true);
           setShowMenu(false);
         }}
+        onToggleShowDeleted={() => {
+          setShowDeleted((value) => !value);
+          setShowMenu(false);
+        }}
+        showDeleted={showDeleted}
         onClearChat={handleClearChat}
         onStartVideoCall={startVideoCall}
         menuRef={menuRef}
