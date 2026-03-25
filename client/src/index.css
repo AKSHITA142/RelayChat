@@ -1,57 +1,82 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 220 33% 98%;
-    --foreground: 222 47% 11%;
-    --primary: 266 74% 58%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 186 100% 49%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 220 18% 90%;
-    --muted-foreground: 215 16% 47%;
-    --border: 220 13% 84%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --input: 220 13% 84%;
-    --ring: 266 74% 58%;
-    --accent: 220 18% 94%;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 346 77% 49%;
+  :root,
+  .dark {
+    color-scheme: dark;
+    --background: 229 34% 7%;
+    --foreground: 210 33% 98%;
+    --primary: 266 82% 74%;
+    --primary-foreground: 229 34% 7%;
+    --secondary: 186 95% 62%;
+    --secondary-foreground: 229 34% 7%;
+    --accent: 281 74% 65%;
+    --accent-foreground: 0 0% 100%;
+    --muted: 225 18% 15%;
+    --muted-foreground: 217 17% 70%;
+    --border: 223 17% 22%;
+    --card: 227 26% 11%;
+    --card-foreground: 210 33% 98%;
+    --input: 223 17% 20%;
+    --ring: 266 82% 74%;
+    --destructive: 0 72% 60%;
     --destructive-foreground: 0 0% 100%;
-    --radius: 0.9rem;
-    --chat-canvas: hsl(var(--background));
-    --chat-pattern: none;
-    --chat-pattern-size: 24px 24px;
-    --chat-bubble-own: hsl(var(--primary));
-    --chat-bubble-own-foreground: hsl(var(--primary-foreground));
-    --chat-bubble-other: hsl(var(--card));
-    --chat-bubble-other-foreground: hsl(var(--foreground));
+    --radius: 1rem;
+    --chat-canvas:
+      radial-gradient(circle at 14% 18%, hsl(var(--primary) / 0.18), transparent 28%),
+      radial-gradient(circle at 85% 12%, hsl(var(--secondary) / 0.12), transparent 26%),
+      linear-gradient(180deg, #080b16 0%, #090d18 48%, #070a13 100%);
+    --chat-pattern:
+      linear-gradient(to right, rgba(255, 255, 255, 0.032) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.032) 1px, transparent 1px);
+    --chat-pattern-size: 30px 30px;
+    --chat-bubble-own: linear-gradient(135deg, rgba(164, 116, 255, 0.78), rgba(99, 102, 241, 0.88));
+    --chat-bubble-own-foreground: #ffffff;
+    --chat-bubble-other: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
+    --chat-bubble-other-foreground: #f8fafc;
+    --wave-track: hsl(var(--foreground));
+    --wave-accent: hsl(var(--primary));
+    --wave-icon: hsl(var(--primary-foreground));
   }
 
-  .dark {
-    --background: 225 25% 7%;
-    --foreground: 210 40% 98%;
-    --primary: 266 68% 76%;
-    --primary-foreground: 225 25% 7%;
-    --secondary: 186 100% 49%;
-    --secondary-foreground: 225 25% 7%;
-    --muted: 223 16% 18%;
-    --muted-foreground: 215 20% 70%;
-    --border: 223 16% 22%;
-    --card: 222 22% 10%;
-    --card-foreground: 210 40% 98%;
-    --input: 223 16% 22%;
-    --ring: 266 68% 76%;
-    --accent: 223 16% 18%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 346 84% 60%;
+  .light {
+    color-scheme: light;
+    --background: 220 33% 97%;
+    --foreground: 224 44% 11%;
+    --primary: 258 84% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 190 95% 42%;
+    --secondary-foreground: 0 0% 100%;
+    --accent: 284 66% 54%;
+    --accent-foreground: 0 0% 100%;
+    --muted: 220 22% 92%;
+    --muted-foreground: 220 13% 42%;
+    --border: 220 20% 84%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 44% 11%;
+    --input: 220 20% 84%;
+    --ring: 258 84% 58%;
+    --destructive: 0 74% 54%;
     --destructive-foreground: 0 0% 100%;
-    --chat-canvas: hsl(var(--background));
+    --chat-canvas:
+      radial-gradient(circle at 14% 18%, hsl(var(--primary) / 0.12), transparent 28%),
+      radial-gradient(circle at 86% 14%, hsl(var(--secondary) / 0.12), transparent 26%),
+      linear-gradient(180deg, #f7faff 0%, #f3f7fd 52%, #eef3fb 100%);
+    --chat-pattern:
+      linear-gradient(to right, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+    --chat-pattern-size: 28px 28px;
+    --chat-bubble-own: linear-gradient(135deg, #4f46e5, #7c3aed);
+    --chat-bubble-own-foreground: #ffffff;
+    --chat-bubble-other: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+    --chat-bubble-other-foreground: #111827;
+    --wave-track: hsl(var(--foreground));
+    --wave-accent: hsl(var(--primary));
+    --wave-icon: hsl(var(--primary-foreground));
   }
 
   * {
@@ -62,15 +87,57 @@
     @apply scroll-smooth;
   }
 
+  html,
+  body,
+  #root {
+    min-height: 100vh;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     min-height: 100vh;
-    background-image: radial-gradient(circle at top left, hsl(var(--primary) / 0.18), transparent 38%),
-      radial-gradient(circle at bottom right, hsl(var(--secondary) / 0.14), transparent 32%);
+    position: relative;
+    background-image:
+      radial-gradient(circle at 10% 14%, hsl(var(--primary) / 0.18), transparent 24%),
+      radial-gradient(circle at 88% 12%, hsl(var(--secondary) / 0.12), transparent 26%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(229 34% 6%) 48%, hsl(231 38% 5%) 100%);
+  }
+
+  body::before,
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  body::before {
+    z-index: -2;
+    background:
+      radial-gradient(circle at 20% 20%, hsl(var(--primary) / 0.16), transparent 18%),
+      radial-gradient(circle at 80% 0%, hsl(var(--secondary) / 0.1), transparent 18%),
+      radial-gradient(circle at 50% 100%, hsl(var(--accent) / 0.14), transparent 24%);
+    filter: blur(14px);
+    opacity: 0.95;
+  }
+
+  body::after {
+    z-index: -1;
+    opacity: 0.08;
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(circle at center, black, transparent 92%);
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.24);
+    color: hsl(var(--foreground));
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
   }
 
   ::-webkit-scrollbar-track {
@@ -78,7 +145,8 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-border/80;
+    @apply rounded-full;
+    background-color: hsl(var(--border) / 0.75);
   }
 
   ::-webkit-scrollbar-thumb:hover {
@@ -88,12 +156,14 @@
 
 @layer components {
   .theme-chat-stealth_dark {
-    --background: 240 10% 5%;
+    --background: 229 34% 7%;
     --foreground: 210 40% 98%;
-    --primary: 184 8% 55%;
-    --primary-foreground: 225 25% 7%;
-    --secondary: 184 7% 17%;
+    --primary: 184 18% 63%;
+    --primary-foreground: 222 47% 8%;
+    --secondary: 192 48% 48%;
     --secondary-foreground: 210 40% 98%;
+    --accent: 272 52% 62%;
+    --accent-foreground: 210 40% 98%;
     --muted: 223 16% 16%;
     --muted-foreground: 215 20% 70%;
     --border: 223 16% 18%;
@@ -101,14 +171,16 @@
     --card-foreground: 210 40% 98%;
     --input: 223 16% 18%;
     --ring: 184 8% 55%;
-    --accent: 223 16% 16%;
-    --accent-foreground: 210 40% 98%;
-    --chat-canvas: #08080a;
-    --chat-pattern: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-    --chat-pattern-size: 24px 24px;
-    --chat-bubble-own: rgba(131, 148, 147, 0.14);
+    --chat-canvas:
+      radial-gradient(circle at 15% 16%, rgba(57, 156, 150, 0.18), transparent 26%),
+      linear-gradient(180deg, #05070a 0%, #07090e 100%);
+    --chat-pattern:
+      linear-gradient(to right, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px);
+    --chat-pattern-size: 26px 26px;
+    --chat-bubble-own: linear-gradient(135deg, rgba(77, 154, 148, 0.76), rgba(39, 86, 83, 0.86));
     --chat-bubble-own-foreground: #ffffff;
-    --chat-bubble-other: rgba(255, 255, 255, 0.04);
+    --chat-bubble-other: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
     --chat-bubble-other-foreground: #ffffff;
   }
 
@@ -128,12 +200,17 @@
     --ring: 266 72% 78%;
     --accent: 240 12% 16%;
     --accent-foreground: 210 40% 98%;
-    --chat-canvas: #060608;
-    --chat-pattern: radial-gradient(rgba(182, 160, 255, 0.08) 1px, transparent 1px);
+    --chat-canvas:
+      radial-gradient(circle at 18% 12%, rgba(170, 126, 255, 0.18), transparent 24%),
+      radial-gradient(circle at 82% 18%, rgba(83, 200, 255, 0.12), transparent 22%),
+      linear-gradient(180deg, #05060b 0%, #06070d 48%, #04050a 100%);
+    --chat-pattern:
+      linear-gradient(to right, rgba(182, 160, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(182, 160, 255, 0.06) 1px, transparent 1px);
     --chat-pattern-size: 32px 32px;
     --chat-bubble-own: linear-gradient(135deg, rgba(197, 154, 255, 0.16), rgba(139, 92, 246, 0.08));
     --chat-bubble-own-foreground: #ffffff;
-    --chat-bubble-other: rgba(255, 255, 255, 0.04);
+    --chat-bubble-other: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.035));
     --chat-bubble-other-foreground: #ffffff;
   }
 
@@ -153,8 +230,12 @@
     --ring: 0 0% 100%;
     --accent: 223 17% 16%;
     --accent-foreground: 210 40% 98%;
-    --chat-canvas: #000000;
-    --chat-pattern: radial-gradient(rgba(255, 255, 255, 0.06) 1.5px, transparent 1.5px);
+    --chat-canvas:
+      radial-gradient(circle at 10% 12%, rgba(255, 255, 255, 0.08), transparent 18%),
+      linear-gradient(180deg, #000000 0%, #050505 100%);
+    --chat-pattern:
+      linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
     --chat-pattern-size: 16px 16px;
     --chat-bubble-own: #d1d5db;
     --chat-bubble-own-foreground: #000000;
@@ -178,8 +259,12 @@
     --ring: 222 47% 11%;
     --accent: 220 18% 94%;
     --accent-foreground: 222 47% 11%;
-    --chat-canvas: linear-gradient(to bottom, #d1d5db, #f8fafc);
-    --chat-pattern: radial-gradient(rgba(0, 0, 0, 0.1) 1.5px, transparent 1.5px);
+    --chat-canvas:
+      radial-gradient(circle at 16% 14%, rgba(59, 130, 246, 0.12), transparent 20%),
+      linear-gradient(to bottom, #dbe5f3, #f8fafc);
+    --chat-pattern:
+      linear-gradient(to right, rgba(15, 23, 42, 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(15, 23, 42, 0.08) 1px, transparent 1px);
     --chat-pattern-size: 16px 16px;
     --chat-bubble-own: #111827;
     --chat-bubble-own-foreground: #ffffff;
@@ -187,20 +272,90 @@
     --chat-bubble-other-foreground: #111827;
   }
 
-  .glass-card {
-    @apply rounded-xl border border-border bg-card/70 shadow-glow backdrop-blur-xl;
+  .surface-panel {
+    @apply relative isolate overflow-hidden rounded-[28px] border border-white/10 text-card-foreground shadow-panel backdrop-blur-2xl;
+    background-color: hsl(var(--card) / 0.72);
   }
 
-  .surface-panel {
-    @apply rounded-2xl border border-border bg-card/70 shadow-glow backdrop-blur-xl;
+  .surface-panel::before,
+  .surface-muted::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(145deg, hsl(var(--primary) / 0.35), transparent 35%, hsl(var(--secondary) / 0.18) 72%, rgba(255, 255, 255, 0.08));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  .surface-panel::after {
+    content: "";
+    position: absolute;
+    inset: auto -18% 46% 36%;
+    height: 12rem;
+    pointer-events: none;
+    background: radial-gradient(circle, hsl(var(--primary) / 0.18), transparent 68%);
+    filter: blur(76px);
+    opacity: 0.8;
+  }
+
+  .surface-panel > *,
+  .surface-muted > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .glass-card {
+    @apply surface-panel;
   }
 
   .surface-muted {
-    @apply rounded-2xl border border-border bg-muted/40 backdrop-blur-xl;
+    @apply relative isolate overflow-hidden rounded-[26px] border border-white/10 backdrop-blur-2xl;
+    background-color: hsl(var(--muted) / 0.46);
+  }
+
+  .surface-inline {
+    @apply rounded-2xl border border-white/10 backdrop-blur-xl;
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .feature-pill {
+    @apply inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground;
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+
+  .section-badge {
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em];
+    border: 1px solid hsl(var(--primary) / 0.2);
+    background-color: hsl(var(--primary) / 0.12);
+    color: hsl(var(--primary));
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(var(--foreground)), hsl(var(--secondary)));
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  .app-noise {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 26px 26px;
+    mask-image: radial-gradient(circle at center, black, transparent 88%);
   }
 
   .action-icon {
-    @apply inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card/60 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground;
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 text-muted-foreground transition-all duration-300 hover:text-foreground;
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+
+  .action-icon:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: hsl(var(--primary) / 0.3);
   }
 
   .chat-canvas {
@@ -216,7 +371,8 @@
   }
 
   .theme-preview__header {
-    @apply h-2 rounded-t-md bg-card/90;
+    @apply h-2 rounded-t-md;
+    background-color: hsl(var(--card) / 0.9);
   }
 
   .theme-preview__bubble {
@@ -232,7 +388,7 @@
   }
 
   .interactive-btn {
-    @apply transition-all duration-200 active:scale-95;
+    @apply transition-all duration-300 active:scale-95;
   }
 
   .message-bubble--own {
@@ -276,8 +432,17 @@
   to { transform: translateY(0); opacity: 1; }
 }
 
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
 .animate-slide-up {
   animation: slideUp 0.3s ease-out forwards;
+}
+
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
 }
 
 @layer utilities {
@@ -287,6 +452,6 @@
     z-index: 50;
     pointer-events: none;
     transition: opacity 0.5s ease;
-    background: radial-gradient(800px circle at var(--x) var(--y), hsl(var(--primary) / 0.16), transparent 80%);
+    background: radial-gradient(820px circle at var(--x) var(--y), hsl(var(--primary) / 0.18), transparent 78%);
   }
 }

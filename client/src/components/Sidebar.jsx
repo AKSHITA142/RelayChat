@@ -8,6 +8,9 @@ import {
   User,
   Users,
   X,
+  Settings,
+  UserPlus,
+  ShieldCheck,
 } from "lucide-react";
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
@@ -25,6 +28,7 @@ import {
 } from "@/components/ui/sheet-panel";
 import { UserListItem } from "@/components/ui/user-list-item";
 import { cn } from "@/lib/utils";
+import DropdownMenu, { DropdownItem, DropdownSeparator } from "@/components/ui/dropdown-menu";
 
 const getChatPreview = (chat) => {
   const msg = chat.lastMessage;
@@ -102,63 +106,101 @@ function SidebarContent({
   }, [search, chats, contacts, myUserId]);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border/70 px-4 py-4">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-              Conversations
-            </div>
+    <div className="relative flex h-full flex-col">
+      {/* Premium Background Effects */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
+      <div className="pointer-events-none absolute inset-0 z-0">
+        <div className="absolute left-[-20%] top-[-10%] h-[24rem] w-[24rem] rounded-full bg-gradient-to-br from-secondary/16 via-secondary/8 to-transparent blur-[100px] animate-float-slow" />
+        <div className="absolute right-[-15%] bottom-[-20%] h-[20rem] w-[20rem] rounded-full bg-gradient-to-tl from-primary/12 via-primary/6 to-transparent blur-[80px] animate-float-slow" style={{ animationDelay: '2s' }} />
+      </div>
+
+      {/* Enhanced Header Section */}
+      <div className="relative z-10 border-b border-white/10 px-4 pb-4 pt-5 backdrop-blur-sm">
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className="space-y-3">
+            <div className="section-badge shadow-lg">Conversations</div>
             <div>
-              <h2 className="font-space text-2xl font-bold tracking-tight text-foreground">Messages</h2>
-              <p className="text-xs text-muted-foreground">Search, start, and manage every chat from one place.</p>
+              <h2 className="font-headline text-3xl font-bold tracking-[-0.04em] text-gradient">Messages</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Search, pin down context, and move through every conversation from one premium inbox.
+              </p>
             </div>
           </div>
 
-          <div className="flex shrink-0 gap-2">
-            <IconButton
-              icon={User}
-              label="Settings"
-              variant="ghost"
-              onClick={() => {
-                setIsShowingSettings(true);
-                setIsCreatingGroup(false);
-                setIsAddingContact(false);
-                setContactError("");
-                closeMobile?.();
-              }}
-            />
-            <IconButton
-              icon={isAddingContact ? X : Plus}
-              label="Add chat"
-              variant={isAddingContact ? "primary" : "default"}
-              onClick={() => {
-                setIsAddingContact(!isAddingContact);
-                setIsCreatingGroup(false);
-                setContactError("");
-              }}
-            />
-            <IconButton
-              icon={isCreatingGroup ? X : Users}
-              label="Create group"
-              variant={isCreatingGroup ? "primary" : "default"}
-              onClick={() => {
-                setIsCreatingGroup(!isCreatingGroup);
-                setIsAddingContact(false);
-                setGroupName("");
-                setSelectedGroupUsers([]);
-                setContactError("");
-              }}
-            />
-            <IconButton icon={LogOut} label="Log out" variant="destructive" onClick={handleLogout} />
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {/* WhatsApp-style Three Dot Menu */}
+            <DropdownMenu className="surface-panel">
+              <DropdownItem 
+                icon={UserPlus}
+                onClick={() => {
+                  setIsAddingContact(!isAddingContact);
+                  setIsCreatingGroup(false);
+                  setContactError("");
+                }}
+              >
+                {isAddingContact ? "Cancel Add Contact" : "Add Contact"}
+              </DropdownItem>
+              
+              <DropdownItem 
+                icon={Users}
+                onClick={() => {
+                  setIsCreatingGroup(!isCreatingGroup);
+                  setIsAddingContact(false);
+                  setGroupName("");
+                  setSelectedGroupUsers([]);
+                  setContactError("");
+                }}
+              >
+                {isCreatingGroup ? "Cancel Group" : "Create Group"}
+              </DropdownItem>
+              
+              <DropdownSeparator />
+              
+              <DropdownItem 
+                icon={Settings}
+                onClick={() => {
+                  setIsShowingSettings(true);
+                  setIsCreatingGroup(false);
+                  setIsAddingContact(false);
+                  setContactError("");
+                  closeMobile?.();
+                }}
+              >
+                Settings
+              </DropdownItem>
+              
+              <DropdownItem 
+                icon={ShieldCheck}
+                variant="success"
+                onClick={() => {
+                  // Add security/privacy options
+                  console.log("Security options");
+                }}
+              >
+                Privacy & Security
+              </DropdownItem>
+            </DropdownMenu>
           </div>
         </div>
 
-        <SearchField
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search conversations..."
-        />
+        <div className="grid gap-3">
+          <SearchField
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search conversations..."
+          />
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="surface-panel rounded-[20px] px-4 py-3 transition-all duration-300 hover:scale-[1.02] hover:shadow-panel">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">Threads</p>
+              <p className="mt-2 text-xl font-bold tracking-tight text-gradient">{filteredChats.length}</p>
+            </div>
+            <div className="surface-panel rounded-[20px] px-4 py-3 transition-all duration-300 hover:scale-[1.02] hover:shadow-panel">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">Live now</p>
+              <p className="mt-2 text-xl font-bold tracking-tight text-gradient">{Math.max(onlineUsers.length - 1, 0)}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <AnimatePresence mode="wait">
@@ -169,12 +211,12 @@ function SidebarContent({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden px-4 pt-4"
           >
-            <Card className="space-y-4 border-border/70 bg-card/82 p-4">
+            <Card className="space-y-5 p-5">
               {isAddingContact ? (
                 <>
                   <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Start private chat</p>
-                    <p className="text-xs text-muted-foreground">Open a direct conversation with a verified phone number.</p>
+                    <p className="text-sm text-muted-foreground">Open a direct conversation with a verified phone number.</p>
                   </div>
                   <SearchField
                     value={contactPhone}
@@ -192,7 +234,7 @@ function SidebarContent({
                 <>
                   <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">New group collective</p>
-                    <p className="text-xs text-muted-foreground">Bundle recent contacts into a fresh shared conversation.</p>
+                    <p className="text-sm text-muted-foreground">Bundle recent contacts into a fresh shared conversation.</p>
                   </div>
 
                   <SearchField
@@ -245,7 +287,7 @@ function SidebarContent({
                           );
                         })
                       ) : (
-                        <p className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground">
+                        <p className="surface-inline rounded-[20px] px-4 py-6 text-center text-xs text-muted-foreground">
                           No recent contacts are available for a new group yet.
                         </p>
                       )}
@@ -268,75 +310,123 @@ function SidebarContent({
         ) : null}
       </AnimatePresence>
 
-      <div className="flex-1 overflow-y-auto px-3 py-4">
-        <div className="mb-3 flex items-center justify-between px-1">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">Recent chats</p>
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">{filteredChats.length} threads</p>
-        </div>
+      <div className="relative z-10 flex-1 overflow-y-auto px-4 py-4">
+        <AnimatePresence mode="wait">
+          {filteredChats.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="flex flex-col items-center justify-center py-12 text-center"
+            >
+              <div className="surface-panel mb-4 flex h-16 w-16 items-center justify-center rounded-2xl">
+                <MessageSquare className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="font-headline text-lg font-semibold text-foreground">No conversations yet</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {search ? "Try adjusting your search terms" : "Start your first conversation to see it here"}
+              </p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="list"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-2"
+            >
+              {filteredChats.map((chat) => {
+                const isSelected = selectedChat?._id === chat._id;
+                const otherUser = chat.participants?.find(
+                  (user) => user && (user._id?.toString() || user.toString()) !== myUserId?.toString()
+                );
 
-        <AnimatePresence initial={false}>
-          <div className="space-y-2">
-            {filteredChats.map((chat) => {
-              const isSelected = selectedChat?._id === chat._id;
-              const otherUser = chat.participants?.find(
-                (user) => user && (user._id?.toString() || user.toString()) !== myUserId?.toString()
-              );
+                let displayName = chat.isGroup ? chat.groupName || "Unnamed Group" : "Unknown User";
+                if (!chat.isGroup && otherUser) {
+                  const saved = contacts.find((contact) => contact && contact.userId?.toString() === otherUser?._id?.toString());
+                  displayName = saved ? saved.savedName : otherUser.phoneNumber || "User";
+                }
 
-              let displayName = chat.isGroup ? chat.groupName || "Unnamed Group" : "Unknown User";
-              if (!chat.isGroup && otherUser) {
-                const saved = contacts.find((contact) => contact && contact.userId?.toString() === otherUser?._id?.toString());
-                displayName = saved ? saved.savedName : otherUser.phoneNumber || "User";
-              }
+                const isOnline =
+                  !chat.isGroup &&
+                  otherUser?._id &&
+                  onlineUsers.some((userId) => userId?.toString() === otherUser._id.toString());
 
-              const isOnline =
-                !chat.isGroup &&
-                otherUser?._id &&
-                onlineUsers.some((userId) => userId?.toString() === otherUser._id.toString());
-
-              return (
-                <motion.div
-                  key={chat._id}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  <UserListItem
-                    title={displayName}
-                    subtitle={getChatPreview(chat)}
-                    avatarSrc={!chat.isGroup && otherUser?.avatar ? `http://localhost:5002${otherUser.avatar}` : undefined}
-                    avatarFallback={chat.isGroup ? "G" : displayName?.[0]}
-                    status={chat.isGroup ? undefined : isOnline ? "online" : "offline"}
-                    statusLabel={chat.isGroup ? undefined : isOnline ? "Active" : "Offline"}
-                    selected={isSelected}
-                    interactive
-                    onClick={() => {
-                      setSelectedChat(chat);
-                      setChats((prev) =>
-                        prev.map((item) => (item._id === chat._id ? { ...item, unreadCount: 0 } : item))
-                      );
-                      closeMobile?.();
-                    }}
-                    badge={
-                      chat.isGroup ? (
-                        <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-primary">
-                          Group
-                        </span>
-                      ) : null
-                    }
-                    rightContent={
-                      chat.unreadCount > 0 ? (
-                        <span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-black text-secondary-foreground">
-                          {chat.unreadCount}
-                        </span>
-                      ) : null
-                    }
-                  />
-                </motion.div>
-              );
-            })}
-          </div>
+                return (
+                  <motion.div
+                    key={chat._id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    whileHover={{ scale: 1.02 }}
+                    transition={{ type: "spring", damping: 20, stiffness: 300 }}
+                  >
+                    <div 
+                      className={cn(
+                        "surface-panel rounded-2xl p-4 transition-all duration-300 cursor-pointer",
+                        isSelected && "ring-2 ring-primary/50 shadow-panel"
+                      )}
+                      onClick={() => {
+                        setSelectedChat(chat);
+                        setChats((prev) =>
+                          prev.map((item) => (item._id === chat._id ? { ...item, unreadCount: 0 } : item))
+                        );
+                        closeMobile?.();
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="surface-panel h-12 w-12 flex items-center justify-center rounded-xl text-sm font-bold">
+                            {chat.isGroup ? "G" : displayName?.[0]}
+                          </div>
+                          {!chat.isGroup && isOnline && (
+                            <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 border-2 border-background" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-foreground truncate">{displayName}</h4>
+                            {chat.isGroup && (
+                              <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-primary">
+                                Group
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate mt-1">{getChatPreview(chat)}</p>
+                        </div>
+                        {chat.unreadCount > 0 && (
+                          <span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-black text-secondary-foreground shadow-sm">
+                            {chat.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          )}
         </AnimatePresence>
+      </div>
+
+      {/* Fixed Sign-Out Button at Bottom */}
+      <div className="relative z-10 border-t border-white/10 backdrop-blur-sm">
+        <motion.button
+          onClick={handleLogout}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="surface-panel flex w-full items-center gap-3 px-4 py-4 text-left transition-all duration-300 hover:shadow-panel"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/20 text-destructive">
+            <LogOut size={18} />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-foreground">Sign Out</p>
+            <p className="text-xs text-muted-foreground">End your session securely</p>
+          </div>
+        </motion.button>
       </div>
     </div>
   );
@@ -462,10 +552,10 @@ export default function Sidebar({
       <div className="fixed left-4 top-4 z-40 md:hidden">
         <SheetPanel open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetPanelTrigger asChild>
-            <IconButton icon={MessageSquare} label="Open chats" variant="primary" className="shadow-lg" />
+            <IconButton icon={MessageSquare} label="Open chats" variant="primary" className="shadow-button" />
           </SheetPanelTrigger>
           <SheetPanelContent side="left" className="w-[92vw] max-w-sm p-0">
-            <SheetPanelHeader className="border-b border-border/70 px-4 py-4">
+            <SheetPanelHeader className="border-b border-white/10 px-4 py-4">
               <SheetPanelTitle>Chats</SheetPanelTitle>
             </SheetPanelHeader>
             <SidebarContent {...sidebarProps} closeMobile={() => setMobileOpen(false)} />
@@ -473,7 +563,7 @@ export default function Sidebar({
         </SheetPanel>
       </div>
 
-      <aside className="hidden h-full w-full max-w-sm shrink-0 border-r border-border/70 bg-card/78 backdrop-blur-xl md:flex lg:max-w-md">
+      <aside className="hidden h-full w-full max-w-sm shrink-0 overflow-hidden rounded-[32px] border border-white/10 bg-card/56 shadow-panel backdrop-blur-2xl md:flex lg:max-w-md">
         <SidebarContent {...sidebarProps} />
       </aside>
     </>

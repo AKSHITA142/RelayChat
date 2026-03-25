@@ -99,7 +99,7 @@ export default function GroupDialogs({
           <div className="space-y-6">
             <div className="space-y-3">
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Quick add by phone</p>
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <SearchField
                   value={phoneToAdd}
                   onChange={(event) => setPhoneToAdd(event.target.value)}
@@ -146,7 +146,7 @@ export default function GroupDialogs({
                         );
                       })
                   ) : (
-                    <p className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground">
+                    <p className="surface-inline rounded-[20px] px-4 py-6 text-center text-xs text-muted-foreground">
                       No new suggestions from recent chats.
                     </p>
                   )}
@@ -184,7 +184,7 @@ export default function GroupDialogs({
                         );
                       })
                   ) : (
-                    <p className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground">
+                    <p className="surface-inline rounded-[20px] px-4 py-6 text-center text-xs text-muted-foreground">
                       No contacts available.
                     </p>
                   )}
@@ -267,12 +267,12 @@ export default function GroupDialogs({
 
           {selectedMessageForInfo ? (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-border/60 bg-card/60 p-4">
+              <div className="surface-inline rounded-[22px] p-4">
                 <p className="mb-2 text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Message</p>
                 <p className="break-words text-sm text-foreground">{selectedMessageForInfo.content}</p>
               </div>
 
-              <div className="rounded-2xl border border-border/60 bg-card/60 p-4">
+              <div className="surface-inline rounded-[22px] p-4">
                 <p className="mb-2 text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Sent</p>
                 <p className="text-sm text-foreground">{formatTimestamp(selectedMessageForInfo.createdAt)}</p>
               </div>
@@ -325,7 +325,7 @@ export default function GroupDialogs({
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="pointer-events-none absolute left-1/2 top-20 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-6 py-3 text-destructive shadow-2xl backdrop-blur-xl"
+            className="pointer-events-none absolute left-1/2 top-24 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-[22px] border border-destructive/20 bg-destructive/12 px-6 py-3 text-destructive shadow-panel backdrop-blur-xl"
           >
             <Shield size={18} />
             <span className="text-sm font-bold">{adminNotice}</span>

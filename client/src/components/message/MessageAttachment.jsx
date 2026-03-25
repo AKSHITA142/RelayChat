@@ -15,8 +15,8 @@ export default function MessageAttachment({
     return (
       <div
         className={cn(
-          "rounded-2xl border px-4 py-3 text-sm",
-          isOwn ? "border-primary-foreground/10 bg-primary-foreground/10" : "border-border/60 bg-card/70"
+          "rounded-[22px] border px-4 py-3 text-sm",
+          isOwn ? "border-primary-foreground/10 bg-primary-foreground/10" : "border-white/10 bg-white/6"
         )}
       >
         Unable to decrypt attachment
@@ -27,7 +27,7 @@ export default function MessageAttachment({
   if (effectiveFileType.startsWith("image/") && attachmentUrl) {
     return (
       <div className="space-y-3">
-        <div className="relative overflow-hidden rounded-2xl border border-black/10">
+        <div className="relative overflow-hidden rounded-[22px] border border-black/10">
           <img
             src={attachmentUrl}
             alt={effectiveFileName}
@@ -66,10 +66,10 @@ export default function MessageAttachment({
           target="_blank"
           rel="noopener noreferrer"
           className={cn(
-            "flex items-center gap-3 rounded-2xl border p-3 transition-colors",
+            "flex items-center gap-3 rounded-[22px] border p-3 transition-colors",
             isOwn
               ? "border-primary-foreground/10 bg-primary-foreground/10 hover:bg-primary-foreground/15"
-              : "border-border/60 bg-card/70 hover:bg-card"
+              : "border-white/10 bg-white/6 hover:bg-white/10"
           )}
         >
           <div
@@ -94,13 +94,13 @@ export default function MessageAttachment({
   }
 
   return (
-    <div
-      className={cn(
-        "rounded-2xl border px-4 py-3 text-sm",
-        isOwn ? "border-primary-foreground/10 bg-primary-foreground/10" : "border-border/60 bg-card/70"
-      )}
-    >
-      Loading attachment...
+      <div
+        className={cn(
+          "rounded-[22px] border px-4 py-3 text-sm",
+          isOwn ? "border-primary-foreground/10 bg-primary-foreground/10" : "border-white/10 bg-white/6"
+        )}
+      >
+        Loading attachment...
     </div>
   );
 }

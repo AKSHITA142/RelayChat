@@ -28,7 +28,7 @@ export default function MessageReactions({
             exit={{ opacity: 0, scale: 0.8, y: 10 }}
             transition={{ type: "spring", stiffness: 380, damping: 24 }}
             className={cn(
-              "absolute bottom-full z-[60] mb-3 flex items-center gap-1 rounded-full border border-border/80 bg-card/95 p-1.5 shadow-2xl backdrop-blur-xl",
+              "absolute bottom-full z-[60] mb-3 flex items-center gap-1 rounded-full border border-white/10 bg-card/88 p-1.5 shadow-panel backdrop-blur-xl",
               isOwn ? "right-0" : "left-0"
             )}
           >
@@ -41,7 +41,7 @@ export default function MessageReactions({
                   event.stopPropagation();
                   onSelect(emoji);
                 }}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-xl transition-colors hover:bg-accent"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-xl transition-colors hover:bg-white/8"
               >
                 {emoji}
               </motion.button>
@@ -63,7 +63,7 @@ export default function MessageReactions({
                 event.stopPropagation();
                 onSelect(emoji);
               }}
-              className="flex items-center gap-1 rounded-full border border-border/70 bg-card/95 px-2 py-1 text-sm shadow-lg backdrop-blur-md"
+              className="flex items-center gap-1 rounded-full border border-white/10 bg-card/88 px-2 py-1 text-sm shadow-lg backdrop-blur-md"
             >
               <span>{emoji}</span>
               {count > 1 ? <span className="text-[10px] font-bold text-muted-foreground">{count}</span> : null}

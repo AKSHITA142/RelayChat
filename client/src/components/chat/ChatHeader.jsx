@@ -52,7 +52,7 @@ export default function ChatHeader({
   menuRef,
 }) {
   return (
-    <div className="z-20 flex h-20 items-center justify-between border-b border-border/70 bg-card/82 px-5 backdrop-blur-xl md:px-6">
+    <div className="z-20 mx-3 mt-3 flex min-h-[5.5rem] items-center justify-between rounded-[28px] border border-white/10 bg-card/72 px-4 py-3 shadow-lifted backdrop-blur-2xl md:mx-4 md:px-5">
       <div className="flex min-w-0 items-center gap-4">
         <div className="relative">
           <Avatar
@@ -63,7 +63,7 @@ export default function ChatHeader({
             className="border-primary/15 bg-primary/10 text-primary"
           />
           {!selectedChat.isGroup && isOnline ? (
-            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-secondary shadow-lg" />
+            <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card bg-secondary shadow-[0_0_16px_hsl(var(--secondary)/0.9)]" />
           ) : null}
         </div>
 
@@ -76,7 +76,7 @@ export default function ChatHeader({
                   value={tempGroupName}
                   onChange={(event) => setTempGroupName(event.target.value)}
                   onKeyDown={(event) => event.key === "Enter" && onRenameSubmit()}
-                  className="rounded-lg border border-primary/30 bg-background/50 px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
+                  className="h-11 rounded-2xl border border-white/10 bg-white/6 px-4 text-sm text-foreground outline-none ring-0 transition-all focus:border-primary/30"
                   autoFocus
                 />
                 <IconButton icon={Check} label="Save name" variant="primary" size="sm" onClick={onRenameSubmit} />
@@ -87,7 +87,7 @@ export default function ChatHeader({
                 <button
                   type="button"
                   onClick={() => !selectedChat?.isGroup && onToggleContactInfo()}
-                  className="truncate text-left font-space text-lg font-semibold tracking-tight text-foreground transition-colors hover:text-primary"
+                  className="truncate text-left font-headline text-xl font-bold tracking-[-0.03em] text-foreground transition-colors hover:text-primary"
                   title={!selectedChat?.isGroup ? "View contact info" : undefined}
                 >
                   {displayName}
@@ -97,7 +97,7 @@ export default function ChatHeader({
                   <button
                     type="button"
                     onClick={onOpenAddContact}
-                    className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                    className="rounded-full border border-primary/20 bg-primary/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
                   >
                     Add Contact
                   </button>
@@ -159,23 +159,23 @@ export default function ChatHeader({
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className="absolute right-0 top-14 z-50 w-56 rounded-2xl border border-border/80 bg-card/95 py-2 shadow-2xl backdrop-blur-xl"
+              className="absolute right-0 top-16 z-50 w-60 rounded-[24px] border border-white/10 bg-card/88 py-2 shadow-panel backdrop-blur-2xl"
             >
-              <button onClick={onOpenSearch} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent hover:text-primary">
+              <button onClick={onOpenSearch} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8 hover:text-primary">
                 <Search size={16} />
                 Search messages
               </button>
-              <button onClick={onOpenParticipants} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent hover:text-primary">
+              <button onClick={onOpenParticipants} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8 hover:text-primary">
                 <Users size={16} />
                 View participants
               </button>
-              <button onClick={onStartRename} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent hover:text-primary">
+              <button onClick={onStartRename} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8 hover:text-primary">
                 <Edit2 size={16} />
                 Rename {selectedChat.isGroup ? "group" : "chat"}
               </button>
               {selectedChat.isGroup ? (
                 <>
-                  <button onClick={onRequestAddMember} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent hover:text-primary">
+                  <button onClick={onRequestAddMember} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8 hover:text-primary">
                     <UserPlus size={16} />
                     Add member
                   </button>
@@ -185,23 +185,23 @@ export default function ChatHeader({
                   </button>
                 </>
               ) : !savedContact && otherUser ? (
-                <button onClick={onOpenAddContact} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent hover:text-primary">
+                <button onClick={onOpenAddContact} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8 hover:text-primary">
                   <UserPlus size={16} />
                   Add to contacts
                 </button>
               ) : null}
-              <div className="my-1 h-px bg-border/60" />
+              <div className="my-1 h-px bg-white/10" />
               <button
                 onClick={onToggleShowDeleted}
                 className={cn(
                   "flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors",
-                  showDeleted ? "bg-primary/5 text-primary" : "text-foreground hover:bg-accent hover:text-primary"
+                  showDeleted ? "bg-primary/8 text-primary" : "text-foreground hover:bg-white/8 hover:text-primary"
                 )}
               >
                 <Palette size={16} />
                 {showDeleted ? "Hide retracted" : "Reveal hidden messages"}
               </button>
-              <div className="my-1 h-px bg-border/60" />
+              <div className="my-1 h-px bg-white/10" />
               <button onClick={onClearChat} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
                 <Trash2 size={16} />
                 Clear chat

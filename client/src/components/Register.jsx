@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import { User, Mail, Lock, Phone, ArrowLeft, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { User, Mail, Lock, Phone, ArrowLeft, CheckCircle, AlertCircle, Loader2, ShieldCheck } from "lucide-react";
 import api from "../services/api";
 import { ensureE2EERegistration } from "../services/e2ee";
 import AuthShell from "@/components/auth/AuthShell";
@@ -89,28 +89,38 @@ export default function Register({ onRegister, onBackToLogin }) {
       footer={
         <motion.p className="text-sm text-muted-foreground">
           Already a member?{" "}
-          <span onClick={onBackToLogin} className="cursor-pointer font-bold text-secondary hover:underline">
+          <span onClick={onBackToLogin} className="cursor-pointer font-bold text-secondary transition-colors hover:text-foreground">
             Login here
           </span>
         </motion.p>
       }
     >
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full space-y-6">
-        <div className="flex gap-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           {stepMeta.map((item) => {
             const active = step >= item.id;
             return (
               <div
                 key={item.id}
-                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] ${
-                  active ? "border-primary/20 bg-primary/10 text-primary" : "border-border bg-muted/40 text-muted-foreground"
+                className={`rounded-[22px] border px-4 py-3 ${
+                  active ? "border-primary/20 bg-primary/12 text-primary" : "border-white/10 bg-white/6 text-muted-foreground"
                 }`}
               >
-                <span>{item.id}</span>
-                <span>{item.label}</span>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em]">Step {item.id}</p>
+                <p className="mt-2 text-sm font-semibold">{item.label}</p>
               </div>
             );
           })}
+        </div>
+
+        <div className="surface-inline rounded-[24px] p-4">
+          <div className="section-badge">
+            <ShieldCheck size={12} />
+            Guided onboarding
+          </div>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            Create your identity first, then confirm your phone number before RelayChat provisions your secure workspace.
+          </p>
         </div>
 
         <AnimatePresence mode="wait">
@@ -119,10 +129,10 @@ export default function Register({ onRegister, onBackToLogin }) {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className={`flex w-full items-center gap-3 rounded-xl border p-3 text-sm font-medium ${
+              className={`flex w-full items-center gap-3 rounded-[22px] border px-4 py-3 text-sm font-medium backdrop-blur-xl ${
                 error.startsWith("Success")
-                  ? "border-secondary/20 bg-secondary/10 text-secondary"
-                  : "border-destructive/20 bg-destructive/10 text-destructive"
+                  ? "border-secondary/20 bg-secondary/12 text-secondary"
+                  : "border-destructive/20 bg-destructive/12 text-destructive"
               }`}
             >
               {error.startsWith("Success") ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
@@ -140,19 +150,19 @@ export default function Register({ onRegister, onBackToLogin }) {
               exit={{ opacity: 0, x: -20 }}
               className="space-y-4"
             >
-              <Input icon={User} placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)} />
-              <Input icon={Mail} placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input icon={User} placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input icon={Mail} placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} />
               <Input
                 icon={Lock}
                 type="password"
-                placeholder="Create Password"
+                placeholder="Create password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <Input icon={Phone} placeholder="Phone Number (+91...)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <Input icon={Phone} placeholder="Phone number (+91...)" value={phone} onChange={(e) => setPhone(e.target.value)} />
 
               <Button onClick={handleStartRegistration} disabled={loading} className="w-full">
-                {loading ? <Loader2 className="animate-spin" /> : "Verify & Continue"}
+                {loading ? <Loader2 className="animate-spin" /> : "Verify and continue"}
               </Button>
             </motion.div>
           ) : (
@@ -175,11 +185,11 @@ export default function Register({ onRegister, onBackToLogin }) {
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <Button onClick={handleCompleteRegistration} disabled={loading} className="w-full">
-                  {loading ? <Loader2 className="animate-spin" /> : "Verify Identity"}
+                  {loading ? <Loader2 className="animate-spin" /> : "Verify identity"}
                 </Button>
                 <Button variant="outline" onClick={() => setStep(1)} className="w-full">
                   <ArrowLeft size={16} />
-                  Change Details
+                  Change details
                 </Button>
               </div>
             </motion.div>

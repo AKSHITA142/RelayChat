@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 
-import { CheckCircle, AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, Mail, Phone, ShieldCheck } from "lucide-react";
 import api from "../services/api";
 import { connectSocket } from "../services/socket";
 import { ensureE2EERegistration } from "../services/e2ee";
@@ -13,6 +13,9 @@ import AuthShell from "@/components/auth/AuthShell";
 import PhoneOtpForm from "@/components/auth/PhoneOtpForm";
 import EmailLoginForm from "@/components/auth/EmailLoginForm";
 import RestoreSessionUI from "@/components/auth/RestoreSessionUI";
+import { cn } from "@/lib/utils";
+import Advanced3DBackground from "@/components/ui/advanced-3d-bg";
+import AuthCard3D, { AuthInput3D, AuthButton3D } from "@/components/ui/3d-auth-card";
 
 export default function Login({ onLogin, onSignup, canResume = false, sessionExpired = false, onAction }) {
   const [loginMethod, setLoginMethod] = useState("phone"); // Default to Phone OTP
@@ -275,15 +278,23 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
     visible: { opacity: 1, x: 0 }
   };
 
+  const authSteps = showRestorePrompt
+    ? ["Authenticate", "Verify device", "Restore access"]
+    : isRegistering
+      ? ["Verify phone", "Create profile", "Enter workspace"]
+      : loginMethod === "phone"
+        ? [otpSent ? "Phone entered" : "Enter phone", otpSent ? "Verify code" : "Receive code", "Secure device check"]
+        : ["Enter credentials", "Secure device check", "Restore access"];
+
   const authNotice = error ? (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`mb-6 flex w-full items-center gap-3 rounded-xl border p-3 text-sm font-medium ${
+      className={`mb-6 flex w-full items-center gap-3 rounded-[22px] border px-4 py-3 text-sm font-medium backdrop-blur-xl ${
         error.startsWith("Success")
-          ? "border-secondary/20 bg-secondary/10 text-secondary"
-          : "border-destructive/20 bg-destructive/10 text-destructive"
+          ? "border-secondary/20 bg-secondary/12 text-secondary"
+          : "border-destructive/20 bg-destructive/12 text-destructive"
       }`}
     >
       {error.startsWith("Success") ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
@@ -340,13 +351,57 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
         !isRegistering ? (
           <motion.p variants={itemVariants} className="text-sm text-muted-foreground">
             Don't have an account?{" "}
-            <span onClick={onSignup} className="cursor-pointer font-bold text-secondary hover:underline">
+            <span onClick={onSignup} className="cursor-pointer font-bold text-secondary transition-colors hover:text-foreground">
               Sign up for free
             </span>
           </motion.p>
         ) : null
       }
     >
+      <motion.div variants={itemVariants} initial="hidden" animate="visible" className="mb-6 flex flex-col gap-4">
+        <div className="grid gap-2 sm:grid-cols-3">
+          {authSteps.map((step, index) => (
+            <div key={step} className="surface-inline rounded-[20px] px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+                Step {index + 1}
+              </p>
+              <p className="mt-2 text-sm font-semibold text-foreground">{step}</p>
+            </div>
+          ))}
+        </div>
+
+        {!isRegistering ? (
+          <div className="inline-flex w-full rounded-[22px] border border-white/10 bg-white/6 p-1.5 backdrop-blur-xl sm:w-fit">
+            {[
+              { id: "phone", label: "Phone", icon: Phone },
+              { id: "email", label: "Email", icon: Mail },
+            ].map(({ id, label, icon: Icon }) => {
+              const active = loginMethod === id;
+
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    setLoginMethod(id);
+                    setError("");
+                  }}
+                  className={cn(
+                    "interactive-btn inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition-all",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-button"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon size={15} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </motion.div>
+
       {authNotice}
 
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full">

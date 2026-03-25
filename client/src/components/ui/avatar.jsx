@@ -3,7 +3,7 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const avatarVariants = cva(
-  "relative inline-flex shrink-0 items-center justify-center overflow-hidden border border-border/60 bg-accent text-foreground shadow-sm",
+  "relative inline-flex shrink-0 items-center justify-center overflow-hidden border border-white/10 bg-gradient-to-br from-primary/18 via-card to-secondary/10 text-foreground shadow-[0_18px_44px_-28px_rgba(2,8,23,0.85)]",
   {
     variants: {
       size: {
@@ -34,7 +34,7 @@ const Avatar = React.forwardRef(
         {src ? (
           <img src={src} alt={alt} className={cn("h-full w-full object-cover", imageClassName)} />
         ) : (
-          <span className="font-semibold uppercase tracking-tight">{derivedFallback}</span>
+          <span className="font-semibold uppercase tracking-tight text-foreground/95">{derivedFallback}</span>
         )}
       </div>
     );

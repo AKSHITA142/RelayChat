@@ -23,7 +23,7 @@ export default function MessageInput({
   onStartVoice,
 }) {
   return (
-    <footer className="relative z-10 border-t border-border/70 bg-card/82 p-4 backdrop-blur-xl">
+    <footer className="relative z-10 px-3 pb-3 pt-2 md:px-4 md:pb-4">
       <AnimatePresence mode="wait">
         {isVoiceRecording ? (
           <motion.div
@@ -48,10 +48,10 @@ export default function MessageInput({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="flex items-center justify-between rounded-2xl border border-secondary/20 bg-secondary/10 px-4 py-3"
+                  className="surface-inline flex items-center justify-between rounded-[22px] border-secondary/20 bg-secondary/12 px-4 py-3"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="rounded-xl bg-secondary/20 p-2">
+                    <div className="rounded-xl border border-secondary/20 bg-secondary/20 p-2">
                       <FilePlus size={16} className="text-secondary" />
                     </div>
                     <div>
@@ -64,7 +64,7 @@ export default function MessageInput({
               ) : null}
             </AnimatePresence>
 
-            <div className="relative flex items-end gap-3">
+            <div className="surface-panel relative flex items-end gap-3 px-3 py-3 md:px-4">
               <div className="flex gap-2">
                 <IconButton
                   icon={Smile}
@@ -91,7 +91,7 @@ export default function MessageInput({
               />
 
               <div className="relative flex-1">
-                <div className="rounded-[1.75rem] border border-input bg-background/60 px-5 py-3 shadow-[0_20px_60px_-38px_hsl(var(--primary)/0.35)]">
+                <div className="rounded-[1.8rem] border border-white/10 bg-white/6 px-5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_20px_60px_-38px_hsl(var(--primary)/0.35)] backdrop-blur-xl">
                   <textarea
                     value={text}
                     onChange={(event) => onTextChange(event.target.value)}
@@ -114,7 +114,7 @@ export default function MessageInput({
                       initial={{ opacity: 0, y: 18, scale: 0.94 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 18, scale: 0.94 }}
-                      className="absolute bottom-[calc(100%+0.75rem)] left-0 z-50 grid grid-cols-5 gap-3 rounded-2xl border border-border/80 bg-card/95 p-4 shadow-2xl backdrop-blur-xl"
+                      className="absolute bottom-[calc(100%+0.85rem)] left-0 z-50 grid grid-cols-5 gap-3 rounded-[24px] border border-white/10 bg-card/88 p-4 shadow-panel backdrop-blur-2xl"
                     >
                       {EMOJIS.map((emoji) => (
                         <motion.button
@@ -125,7 +125,7 @@ export default function MessageInput({
                             onTextChange(`${text}${emoji}`);
                             setShowEmojiPicker(false);
                           }}
-                          className="rounded-xl p-1 text-2xl transition-colors hover:bg-accent/70"
+                          className="rounded-xl p-1 text-2xl transition-colors hover:bg-white/8"
                         >
                           {emoji}
                         </motion.button>
@@ -142,8 +142,8 @@ export default function MessageInput({
                 className={cn(
                   "flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg transition-all",
                   text.trim() || selectedFile
-                    ? "bg-primary text-primary-foreground shadow-primary/20"
-                    : "border border-input bg-background/60 text-foreground hover:border-primary hover:text-primary"
+                    ? "border border-primary/30 bg-primary text-primary-foreground shadow-button"
+                    : "border border-white/10 bg-white/6 text-foreground hover:border-primary/25 hover:text-primary"
                 )}
               >
                 {text.trim() || selectedFile ? <Send size={22} /> : <Mic size={22} />}

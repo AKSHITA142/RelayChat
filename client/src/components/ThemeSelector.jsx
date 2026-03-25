@@ -23,7 +23,7 @@ export default function ThemeSelector({ currentTheme, onSelect, onClose }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -12, scale: 0.94 }}
         transition={{ type: "spring", damping: 22, stiffness: 320 }}
-        className="absolute right-14 top-14 z-[90] w-60 rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-3xl"
+        className="surface-panel absolute right-14 top-14 z-[90] w-72 p-4"
       >
         <div className="mb-3 flex items-center justify-between">
           <p className="text-xs font-black uppercase tracking-widest text-primary">
@@ -31,7 +31,7 @@ export default function ThemeSelector({ currentTheme, onSelect, onClose }) {
           </p>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
+            className="rounded-xl border border-white/10 bg-white/6 p-1.5 text-muted-foreground transition-all hover:text-foreground"
           >
             <X size={14} />
           </button>
@@ -51,9 +51,9 @@ export default function ThemeSelector({ currentTheme, onSelect, onClose }) {
                   onClose();
                 }}
                 className={cn(
-                  "relative rounded-xl border border-transparent p-2 transition-all",
-                  "bg-card/70 hover:border-border hover:bg-accent/60",
-                  isActive && "border-primary bg-primary/10"
+                  "relative rounded-[20px] border border-white/10 p-2.5 transition-all",
+                  "bg-white/6 hover:-translate-y-0.5 hover:border-primary/20 hover:bg-white/10",
+                  isActive && "border-primary/25 bg-primary/12 shadow-[0_16px_38px_-24px_hsl(var(--primary)/0.65)]"
                 )}
               >
                 <div className={cn("theme-preview rounded-lg border border-border/60 p-1", getThemeClassName(themeKey))}>

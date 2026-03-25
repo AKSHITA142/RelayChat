@@ -31,9 +31,9 @@ const UserListItem = React.forwardRef(
         ref={ref}
         onClick={onClick}
         className={cn(
-          "flex w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition-all",
-          (onClick || interactive) && "cursor-pointer hover:bg-accent/60",
-          selected && "border-primary/20 bg-primary/10",
+          "group/item flex w-full items-center gap-3 rounded-[24px] border border-white/5 px-3.5 py-3.5 text-left transition-all duration-300",
+          (onClick || interactive) && "cursor-pointer hover:-translate-y-0.5 hover:border-primary/15 hover:bg-white/8",
+          selected && "border-primary/25 bg-primary/12 shadow-[0_18px_42px_-26px_hsl(var(--primary)/0.55)]",
           className
         )}
         {...props}
@@ -47,7 +47,7 @@ const UserListItem = React.forwardRef(
           </div>
           {subtitle || status ? (
             <div className="mt-1 flex items-center gap-2">
-              {subtitle ? <p className="truncate text-xs text-muted-foreground">{subtitle}</p> : null}
+              {subtitle ? <p className="truncate text-xs text-muted-foreground transition-colors group-hover/item:text-foreground/80">{subtitle}</p> : null}
               {status ? <StatusBadge status={status} label={statusLabel} /> : null}
             </div>
           ) : null}

@@ -13,7 +13,7 @@ const SheetPanelOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-background/80 backdrop-blur-sm",
+      "fixed inset-0 z-50 bg-background/70 backdrop-blur-md",
       "data-[state=open]:animate-in data-[state=closed]:animate-out",
       "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
@@ -25,16 +25,16 @@ const SheetPanelOverlay = React.forwardRef(({ className, ...props }, ref) => (
 SheetPanelOverlay.displayName = "SheetPanelOverlay";
 
 const sheetPanelVariants = cva(
-  "fixed z-50 flex flex-col gap-4 border border-border/70 bg-card/95 p-6 shadow-2xl backdrop-blur-xl transition ease-in-out",
+  "fixed z-50 flex flex-col gap-4 bg-transparent p-0 shadow-none transition ease-in-out",
   {
     variants: {
       side: {
-        top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
+        top: "inset-x-0 top-0 data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
         bottom:
-          "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        left: "inset-y-0 left-0 h-full w-full max-w-md border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
+          "inset-x-0 bottom-0 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+        left: "inset-y-0 left-0 h-full w-full max-w-md data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
         right:
-          "inset-y-0 right-0 h-full w-full max-w-md border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
+          "inset-y-0 right-0 h-full w-full max-w-md data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
       },
     },
     defaultVariants: {
@@ -55,9 +55,11 @@ const SheetPanelContent = React.forwardRef(({ side, className, children, hideClo
       )}
       {...props}
     >
-      {children}
+      <div className="surface-panel relative flex h-full w-full flex-col overflow-hidden p-6">
+        {children}
+      </div>
       {hideClose ? null : (
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-xl border border-white/10 bg-white/6 p-1.5 text-muted-foreground transition-colors hover:text-foreground">
           <X className="size-4" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
@@ -69,7 +71,7 @@ const SheetPanelContent = React.forwardRef(({ side, className, children, hideClo
 SheetPanelContent.displayName = "SheetPanelContent";
 
 const SheetPanelHeader = ({ className, ...props }) => (
-  <div className={cn("flex flex-col space-y-1.5 text-left", className)} {...props} />
+  <div className={cn("flex flex-col space-y-2 text-left", className)} {...props} />
 );
 
 const SheetPanelFooter = ({ className, ...props }) => (
@@ -77,7 +79,7 @@ const SheetPanelFooter = ({ className, ...props }) => (
 );
 
 const SheetPanelTitle = React.forwardRef(({ className, ...props }, ref) => (
-  <DialogPrimitive.Title ref={ref} className={cn("text-lg font-semibold text-foreground", className)} {...props} />
+  <DialogPrimitive.Title ref={ref} className={cn("font-headline text-lg font-bold tracking-tight text-foreground", className)} {...props} />
 ));
 
 SheetPanelTitle.displayName = "SheetPanelTitle";
@@ -85,7 +87,7 @@ SheetPanelTitle.displayName = "SheetPanelTitle";
 const SheetPanelDescription = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm leading-relaxed text-muted-foreground", className)}
+    className={cn("text-sm leading-6 text-muted-foreground", className)}
     {...props}
   />
 ));

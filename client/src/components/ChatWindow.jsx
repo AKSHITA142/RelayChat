@@ -20,6 +20,7 @@ import {
   hydrateDecryptedMessage,
 } from "../services/e2ee";
 import { cn } from "@/lib/utils";
+import Background3D from "@/components/ui/neural-network-bg";
 
 const getEntityId = (value) => {
   if (!value) return null;
@@ -882,27 +883,27 @@ export default function ChatWindow({
 
   if (!selectedChat) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-background/60">
+      <div className="flex flex-1 items-center justify-center px-4 py-6">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="grid max-w-4xl grid-cols-1 gap-6 px-8 md:grid-cols-3"
+          className="grid max-w-5xl grid-cols-1 gap-6 px-2 md:grid-cols-3"
         >
           {[
-            { icon: <FilePlus className="text-secondary" />, title: "Collaborate", desc: "Share documents and media instantly." },
-            { icon: <UserPlus className="text-primary" />, title: "Expand Network", desc: "Start a conversation with anyone." },
-            { icon: <Cpu className="text-foreground" />, title: "AI Powered", desc: "Ask our intelligence for assistance." },
+            { icon: <FilePlus className="text-secondary" />, title: "Collaborate", desc: "Share documents, images, voice notes, and encrypted attachments without leaving the thread." },
+            { icon: <UserPlus className="text-primary" />, title: "Expand Network", desc: "Start a private chat or build a group space the moment you need one." },
+            { icon: <Cpu className="text-foreground" />, title: "Premium Focus", desc: "A glass-driven workspace keeps search, motion, and message context easy to track." },
           ].map((card) => (
             <motion.div
               key={card.title}
               whileHover={{ y: -5 }}
               className="glass-card group flex cursor-pointer flex-col items-center p-6 text-center"
             >
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/70 transition-colors group-hover:bg-accent">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/6 transition-colors group-hover:bg-white/10">
                 {card.icon}
               </div>
-              <h3 className="mb-2 font-bold text-foreground">{card.title}</h3>
-              <p className="text-xs leading-relaxed text-muted-foreground">{card.desc}</p>
+              <h3 className="mb-2 font-headline text-xl font-bold tracking-tight text-foreground">{card.title}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">{card.desc}</p>
             </motion.div>
           ))}
         </motion.div>
@@ -911,128 +912,138 @@ export default function ChatWindow({
   }
 
   return (
-    <div className={cn("relative flex h-full flex-1 flex-col overflow-hidden bg-background text-foreground", chatThemeClassName)}>
-      {showContactInfo && !selectedChat?.isGroup ? (
-        <ContactInfoPanel
-          user={otherUser}
+    <div className={cn("relative flex h-full flex-1 flex-col overflow-hidden text-foreground", chatThemeClassName)}>
+      {/* Premium Advanced 3D Background Layers */}
+      <Background3D className="absolute inset-0 z-0" />
+
+      {/* Enhanced Content Container */}
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col backdrop-blur-sm">
+        {/* Contact Info Panel - Enhanced with Glass */}
+        {showContactInfo && !selectedChat?.isGroup ? (
+          <motion.div
+            initial={{ opacity: 0, x: 300 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 300 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="absolute inset-0 z-20"
+          >
+            <div className="surface-panel h-full backdrop-blur-2xl border-l border-white/10">
+              <ContactInfoPanel
+                user={otherUser}
+                displayName={displayName}
+                onClose={() => setShowContactInfo(false)}
+                onVideoCall={() => {
+                  setShowContactInfo(false);
+                  setActiveVideoCall?.({ chatId: selectedChat._id, recipientId: otherUser?._id, isVideo: true });
+                }}
+                onVoiceCall={() => {
+                  setShowContactInfo(false);
+                  setActiveVideoCall?.({ chatId: selectedChat._id, recipientId: otherUser?._id, isVideo: false });
+                }}
+                onSearch={() => {
+                  setShowContactInfo(false);
+                  setShowSearch(true);
+                }}
+                onClearChat={() => {
+                  setShowContactInfo(false);
+                }}
+              />
+            </div>
+          </motion.div>
+        ) : null}
+        <ChatHeader
+          selectedChat={selectedChat}
           displayName={displayName}
-          onClose={() => setShowContactInfo(false)}
-          onVideoCall={() => {
-            setShowContactInfo(false);
-            setActiveVideoCall?.({ chatId: selectedChat._id, recipientId: otherUser?._id, isVideo: true });
+          otherUser={otherUser}
+          isOnline={isOnline}
+          isTyping={isTyping}
+          lastSeenText={lastSeenText}
+          savedContact={savedContact}
+          isRenaming={isRenaming}
+          tempGroupName={tempGroupName}
+          setTempGroupName={setTempGroupName}
+          onRenameSubmit={handleRenameChat}
+          onCancelRename={() => setIsRenaming(false)}
+          onStartRename={() => {
+            setIsRenaming(true);
+            setTempGroupName(displayName);
+            setShowMenu(false);
           }}
-          onVoiceCall={() => {
-            setShowContactInfo(false);
-            setActiveVideoCall?.({ chatId: selectedChat._id, recipientId: otherUser?._id, isVideo: false });
-          }}
-          onSearch={() => {
-            setShowContactInfo(false);
+          onToggleContactInfo={() => setShowContactInfo((value) => !value)}
+          showThemePicker={showThemePicker}
+          setShowThemePicker={setShowThemePicker}
+          activeThemeName={activeThemeName}
+          onThemeSelect={handleThemeSelect}
+          showMenu={showMenu}
+          setShowMenu={setShowMenu}
+          onOpenSearch={() => {
             setShowSearch(true);
+            setShowMenu(false);
           }}
-          onClearChat={() => {
-            setShowContactInfo(false);
+          onOpenParticipants={() => {
+            setShowParticipants(true);
+            setShowMenu(false);
           }}
+          onRequestAddMember={requestAddMember}
+          onRequestRemoveMember={requestRemoveMember}
+          onOpenAddContact={() => {
+            setShowAddContact(true);
+            setShowMenu(false);
+          }}
+          onToggleShowDeleted={() => {
+            setShowDeleted((value) => !value);
+            setShowMenu(false);
+          }}
+          showDeleted={showDeleted}
+          onClearChat={handleClearChat}
+          onStartVideoCall={startVideoCall}
+          menuRef={menuRef}
         />
-      ) : null}
 
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <div className="absolute inset-0 chat-canvas" />
-        <div className="absolute left-[-12%] top-[-18%] h-[32rem] w-[32rem] rounded-full bg-primary/15 blur-[120px]" />
-        <div className="absolute bottom-[-18%] right-[-12%] h-[32rem] w-[32rem] rounded-full bg-secondary/12 blur-[140px]" />
+        <ChatSearchOverlay
+          visible={showSearch}
+          searchQuery={searchQuery}
+          onSearchChange={handleSearch}
+          resultCount={searchResults.length}
+          currentIndex={currentSearchIndex}
+          onNext={navigateSearch}
+          onPrev={navigateSearch}
+          onClose={closeSearch}
+          onPaste={handlePaste}
+        />
+
+        <MessageList
+          messages={messages}
+          myUserId={myUserId}
+          selectedChat={selectedChat}
+          searchQuery={searchQuery}
+          searchResults={searchResults}
+          currentSearchIndex={currentSearchIndex}
+          onDeleteMe={(messageId) => socket.emit("delete-for-me", { messageId })}
+          onDeleteEveryone={(messageId) =>
+            socket.emit("delete-for-everyone", { messageId, chatId: selectedChat?._id })
+          }
+          onShowMessageInfo={handleShowMessageInfo}
+          messagesEndRef={messagesEndRef}
+        />
+
+        <MessageInput
+          text={text}
+          onTextChange={handleTextChange}
+          onSend={handleSend}
+          onPaste={handlePaste}
+          selectedFile={selectedFile}
+          onClearSelectedFile={() => setSelectedFile(null)}
+          onFilePicked={setSelectedFile}
+          showEmojiPicker={showEmojiPicker}
+          setShowEmojiPicker={setShowEmojiPicker}
+          fileInputRef={fileInputRef}
+          isVoiceRecording={isVoiceRecording}
+          onVoiceSend={handleVoiceSend}
+          onCancelVoice={() => setIsVoiceRecording(false)}
+          onStartVoice={() => setIsVoiceRecording(true)}
+        />
       </div>
-
-      <ChatHeader
-        selectedChat={selectedChat}
-        displayName={displayName}
-        otherUser={otherUser}
-        isOnline={isOnline}
-        isTyping={isTyping}
-        lastSeenText={lastSeenText}
-        savedContact={savedContact}
-        isRenaming={isRenaming}
-        tempGroupName={tempGroupName}
-        setTempGroupName={setTempGroupName}
-        onRenameSubmit={handleRenameChat}
-        onCancelRename={() => setIsRenaming(false)}
-        onStartRename={() => {
-          setIsRenaming(true);
-          setTempGroupName(displayName);
-          setShowMenu(false);
-        }}
-        onToggleContactInfo={() => setShowContactInfo((value) => !value)}
-        showThemePicker={showThemePicker}
-        setShowThemePicker={setShowThemePicker}
-        activeThemeName={activeThemeName}
-        onThemeSelect={handleThemeSelect}
-        showMenu={showMenu}
-        setShowMenu={setShowMenu}
-        onOpenSearch={() => {
-          setShowSearch(true);
-          setShowMenu(false);
-        }}
-        onOpenParticipants={() => {
-          setShowParticipants(true);
-          setShowMenu(false);
-        }}
-        onRequestAddMember={requestAddMember}
-        onRequestRemoveMember={requestRemoveMember}
-        onOpenAddContact={() => {
-          setShowAddContact(true);
-          setShowMenu(false);
-        }}
-        onToggleShowDeleted={() => {
-          setShowDeleted((value) => !value);
-          setShowMenu(false);
-        }}
-        showDeleted={showDeleted}
-        onClearChat={handleClearChat}
-        onStartVideoCall={startVideoCall}
-        menuRef={menuRef}
-      />
-
-      <ChatSearchOverlay
-        visible={showSearch}
-        searchQuery={searchQuery}
-        onSearchChange={handleSearch}
-        resultCount={searchResults.length}
-        currentIndex={currentSearchIndex}
-        onNext={navigateSearch}
-        onPrev={navigateSearch}
-        onClose={closeSearch}
-        onPaste={handlePaste}
-      />
-
-      <MessageList
-        messages={messages}
-        myUserId={myUserId}
-        selectedChat={selectedChat}
-        searchQuery={searchQuery}
-        searchResults={searchResults}
-        currentSearchIndex={currentSearchIndex}
-        onDeleteMe={(messageId) => socket.emit("delete-for-me", { messageId })}
-        onDeleteEveryone={(messageId) =>
-          socket.emit("delete-for-everyone", { messageId, chatId: selectedChat?._id })
-        }
-        onShowMessageInfo={handleShowMessageInfo}
-        messagesEndRef={messagesEndRef}
-      />
-
-      <MessageInput
-        text={text}
-        onTextChange={handleTextChange}
-        onSend={handleSend}
-        onPaste={handlePaste}
-        selectedFile={selectedFile}
-        onClearSelectedFile={() => setSelectedFile(null)}
-        onFilePicked={setSelectedFile}
-        showEmojiPicker={showEmojiPicker}
-        setShowEmojiPicker={setShowEmojiPicker}
-        fileInputRef={fileInputRef}
-        isVoiceRecording={isVoiceRecording}
-        onVoiceSend={handleVoiceSend}
-        onCancelVoice={() => setIsVoiceRecording(false)}
-        onStartVoice={() => setIsVoiceRecording(true)}
-      />
 
       <GroupDialogs
         showAddContact={showAddContact}

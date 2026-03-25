@@ -21,9 +21,9 @@ export default function ChatSearchOverlay({
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: "auto", opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          className="absolute left-0 right-0 top-20 z-40 overflow-hidden border-b border-border/70 bg-card/95 px-6 py-3 shadow-xl backdrop-blur-xl"
+          className="absolute left-4 right-4 top-24 z-40 overflow-hidden rounded-[24px] border border-white/10 bg-card/82 px-4 py-4 shadow-panel backdrop-blur-2xl"
         >
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
             <SearchField
               value={searchQuery}
               onChange={(event) => onSearchChange(event.target.value)}
@@ -32,7 +32,7 @@ export default function ChatSearchOverlay({
               className="flex-1"
             />
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2 lg:justify-end">
               <span className="min-w-[7rem] text-right text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
                 {resultCount > 0 ? `${resultCount - currentIndex} of ${resultCount}` : "No matches"}
               </span>

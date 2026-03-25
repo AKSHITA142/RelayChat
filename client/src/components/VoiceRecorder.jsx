@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Mic, X, Send, Square } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Send, X } from "lucide-react";
+import { motion } from "framer-motion";
 
 
 export default function VoiceRecorder({ onSend, onCancel }) {
@@ -102,7 +102,7 @@ export default function VoiceRecorder({ onSend, onCancel }) {
   };
 
   return (
-    <div className="animate-slide-up flex w-full items-center gap-4 rounded-2xl border border-border/70 bg-card/85 px-4 py-2 backdrop-blur-xl">
+    <div className="animate-slide-up surface-panel flex w-full items-center gap-4 px-4 py-3">
       <motion.button
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
@@ -112,8 +112,8 @@ export default function VoiceRecorder({ onSend, onCancel }) {
         <X size={20} />
       </motion.button>
 
-      <div className="flex-1 flex items-center gap-3">
-        <div className="flex items-center gap-1 min-w-[45px]">
+      <div className="flex flex-1 items-center gap-3">
+        <div className="flex min-w-[45px] items-center gap-1">
           <motion.div
             animate={{ opacity: [1, 0.5, 1] }}
             transition={{ repeat: Infinity, duration: 1.5 }}
@@ -122,8 +122,7 @@ export default function VoiceRecorder({ onSend, onCancel }) {
           <span className="text-xs font-mono text-muted-foreground">{formatTime(recordingTime)}</span>
         </div>
 
-        {/* Real-time Waveform Visualizer */}
-        <div className="flex-1 flex items-center justify-center gap-[3px] h-8">
+        <div className="flex h-8 flex-1 items-center justify-center gap-[3px]">
           {visualizerData.map((val, i) => (
             <motion.div
               key={i}
@@ -140,7 +139,7 @@ export default function VoiceRecorder({ onSend, onCancel }) {
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={stopRecording}
-        className="rounded-full bg-primary p-3 text-primary-foreground shadow-lg shadow-primary/20 transition-all"
+        className="rounded-full border border-primary/30 bg-primary p-3 text-primary-foreground shadow-button transition-all"
       >
         <Send size={20} />
       </motion.button>

@@ -51,9 +51,9 @@ function SectionFrame({ eyebrow, title, description, children }) {
       className="space-y-5"
     >
       <div className="space-y-2">
-        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">{eyebrow}</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary shadow-lg">{eyebrow}</p>
         <div className="space-y-1">
-          <h3 className="font-headline text-2xl font-black tracking-tight text-foreground">{title}</h3>
+          <h3 className="font-headline text-2xl font-black tracking-tight text-gradient">{title}</h3>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
         </div>
       </div>
@@ -64,9 +64,9 @@ function SectionFrame({ eyebrow, title, description, children }) {
 
 function StatusBanner({ tone = "success", children }) {
   const toneClassName = {
-    success: "border-secondary/20 bg-secondary/10 text-secondary",
-    error: "border-destructive/20 bg-destructive/10 text-destructive",
-    info: "border-primary/20 bg-primary/10 text-primary",
+    success: "border-secondary/20 bg-secondary/12 text-secondary",
+    error: "border-destructive/20 bg-destructive/12 text-destructive",
+    info: "border-primary/20 bg-primary/12 text-primary",
   };
 
   return (
@@ -74,7 +74,7 @@ function StatusBanner({ tone = "success", children }) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 6 }}
-      className={cn("rounded-2xl border px-4 py-3 text-sm", toneClassName[tone] || toneClassName.info)}
+      className={cn("surface-panel rounded-[22px] border px-4 py-3 text-sm backdrop-blur-xl transition-all duration-300", toneClassName[tone] || toneClassName.info)}
     >
       {children}
     </motion.div>
@@ -83,12 +83,12 @@ function StatusBanner({ tone = "success", children }) {
 
 function PreferenceRow({ icon: Icon, title, description, checked, onCheckedChange }) {
   return (
-    <Card data-settings-reveal className="flex items-center justify-between gap-4 border-border/70 bg-card/80 p-5">
+    <Card data-settings-reveal className="surface-panel flex items-center justify-between gap-4 p-5 transition-all duration-300 hover:shadow-panel hover:scale-[1.01]">
       <div className="flex items-center gap-4">
         <div
           className={cn(
-            "flex h-12 w-12 items-center justify-center rounded-2xl border transition-colors",
-            checked ? "border-primary/20 bg-primary/10 text-primary" : "border-border bg-muted/30 text-muted-foreground"
+            "surface-panel flex h-12 w-12 items-center justify-center rounded-2xl border transition-all duration-300",
+            checked ? "border-primary/20 bg-primary/12 text-primary shadow-sm" : "border-white/10 bg-white/6 text-muted-foreground hover:border-primary/10"
           )}
         >
           <Icon size={22} />
@@ -105,7 +105,7 @@ function PreferenceRow({ icon: Icon, title, description, checked, onCheckedChang
 
 function MetricCard({ icon: Icon, label, value }) {
   return (
-    <Card data-settings-reveal className="relative overflow-hidden border-border/70 bg-card/80 p-5">
+    <Card data-settings-reveal className="surface-panel relative overflow-hidden p-5 transition-all duration-300 hover:shadow-panel hover:scale-[1.02]">
       <div className="absolute -bottom-3 -right-3 opacity-10">
         <Icon size={52} />
       </div>
@@ -114,7 +114,7 @@ function MetricCard({ icon: Icon, label, value }) {
           <Icon size={12} />
           <p className="text-[10px] font-black uppercase tracking-[0.2em]">{label}</p>
         </div>
-        <p className="text-2xl font-black tracking-tight text-foreground">{value}</p>
+        <p className="text-2xl font-black tracking-tight text-gradient">{value}</p>
       </div>
     </Card>
   );
@@ -124,16 +124,18 @@ function ThemeCard({ themeKey, currentTheme, onSelect }) {
   const isSelected = currentTheme === themeKey;
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={() => onSelect(themeKey)}
       data-settings-reveal
+      whileHover={{ scale: 1.02, y: -2 }}
+      whileTap={{ scale: 0.98 }}
       className={cn(
-        "surface-panel relative space-y-4 p-4 text-left transition-all",
-        isSelected ? "ring-2 ring-primary" : "hover:border-border"
+        "surface-panel relative space-y-4 p-4 text-left transition-all duration-300",
+        isSelected ? "ring-2 ring-primary shadow-panel" : "hover:border-primary/15 hover:shadow-lg"
       )}
     >
-      <div className={cn("theme-preview rounded-2xl border border-border/60 p-3", getThemeClassName(themeKey))}>
+      <div className={cn("theme-preview rounded-2xl border border-white/10 p-3", getThemeClassName(themeKey))}>
         <div className="theme-preview__header" />
         <div className="mt-3 space-y-2">
           <div className="theme-preview__bubble theme-preview__bubble--other w-2/3" />
@@ -155,7 +157,7 @@ function ThemeCard({ themeKey, currentTheme, onSelect }) {
           <CheckCircle2 size={16} fill="currentColor" />
         </div>
       ) : null}
-    </button>
+    </motion.button>
   );
 }
 
@@ -365,13 +367,14 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
         <Tabs value={activeTab} onValueChange={setActiveTab} className={cn("relative", getThemeClassName(currentTheme))}>
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute inset-0 chat-canvas opacity-90" />
+            <div className="absolute inset-0 app-noise opacity-30" />
             <div className="absolute left-[-12%] top-[-16%] h-[34rem] w-[34rem] rounded-full bg-primary/15 blur-[140px]" />
             <div className="absolute bottom-[-16%] right-[-12%] h-[34rem] w-[34rem] rounded-full bg-secondary/12 blur-[160px]" />
             <div className="absolute inset-0 bg-background/45" />
           </div>
 
           <div className="relative grid max-h-[90vh] overflow-hidden lg:grid-cols-[280px,1fr]">
-            <aside className="border-b border-border/70 bg-card/75 p-6 backdrop-blur-xl lg:border-b-0 lg:border-r lg:p-8">
+            <aside className="border-b border-white/10 bg-card/70 p-6 backdrop-blur-2xl lg:border-b-0 lg:border-r lg:p-8">
               <DialogShellHeader className="space-y-2">
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">Relaychat Control</p>
                 <DialogShellTitle className="font-headline text-3xl font-black tracking-tight">Settings</DialogShellTitle>
@@ -415,7 +418,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
                   </div>
                 </div>
 
-                <Card className="space-y-3 border-border/70 bg-card/70 p-4">
+                <Card className="space-y-3 p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Quick state</span>
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
@@ -423,11 +426,11 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+                    <div className="surface-inline rounded-[18px] px-3 py-2">
                       <p className="text-muted-foreground">Visibility</p>
                       <p className="mt-1 font-semibold text-foreground">{signalVisibility ? "Enabled" : "Hidden"}</p>
                     </div>
-                    <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+                    <div className="surface-inline rounded-[18px] px-3 py-2">
                       <p className="text-muted-foreground">Vault</p>
                       <p className="mt-1 font-semibold text-foreground">{vaultProtocol ? "Masked" : "Standard"}</p>
                     </div>
@@ -439,7 +442,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
                     <TabsTrigger
                       key={item.value}
                       value={item.value}
-                      className="justify-start rounded-2xl border border-border/60 bg-card/70 px-4 py-3 text-left data-[state=active]:border-primary/20 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                      className="justify-start rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-left data-[state=active]:border-primary/20 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                     >
                       {item.label}
                     </TabsTrigger>
@@ -470,7 +473,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
                     description="Manage the public label and status that appear across Relaychat."
                   >
                     <div className="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
-                      <Card data-settings-reveal className="space-y-5 border-border/70 bg-card/80 p-6">
+                      <Card data-settings-reveal className="space-y-5 p-6">
                         <div className="grid gap-5 md:grid-cols-2">
                           <div className="space-y-2">
                             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
@@ -514,11 +517,11 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
                         </div>
                       </Card>
 
-                      <Card data-settings-reveal className="space-y-4 border-border/70 bg-card/80 p-6">
+                      <Card data-settings-reveal className="space-y-4 p-6">
                         <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
                           Identity preview
                         </p>
-                        <div className="rounded-3xl border border-border/70 bg-background/50 p-5">
+                        <div className="surface-inline rounded-3xl p-5">
                           <div className="flex items-center gap-4">
                             <Avatar
                               src={avatar ? `http://localhost:5002${avatar}` : undefined}
@@ -600,7 +603,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
                     title="Backup and restore"
                     description="Protect your encrypted key material with a cloud backup PIN and verification fallback."
                   >
-                    <Card data-settings-reveal className="space-y-5 border-border/70 bg-card/80 p-6">
+                    <Card data-settings-reveal className="space-y-5 p-6">
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="space-y-1">
                           <p className="text-sm font-semibold text-foreground">Cloud key backup</p>
@@ -618,7 +621,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
                       </div>
 
                       {user?.encryptedBackupKey && !isResetMode ? (
-                        <Card data-settings-reveal className="space-y-4 border-destructive/15 bg-destructive/5 p-5">
+                        <Card data-settings-reveal className="space-y-4 border-destructive/15 bg-destructive/8 p-5">
                           <div className="flex items-center gap-2 text-destructive">
                             <ShieldAlert size={16} />
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">

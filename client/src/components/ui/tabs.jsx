@@ -30,7 +30,7 @@ function TabsList({ className, ...props }) {
   return (
     <div
       role="tablist"
-      className={cn("inline-flex items-center gap-2 rounded-2xl border border-border/70 bg-card/60 p-1.5", className)}
+      className={cn("inline-flex items-center gap-2 rounded-[22px] border border-white/10 bg-white/6 p-1.5 backdrop-blur-xl", className)}
       {...props}
     />
   );
@@ -48,9 +48,11 @@ function TabsTrigger({ value, className, children, ...props }) {
       data-state={isActive ? "active" : "inactive"}
       onClick={() => context?.setValue(value)}
       className={cn(
-        "inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+        "interactive-btn inline-flex items-center justify-center rounded-2xl px-3.5 py-2 text-sm font-semibold transition-all",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        isActive ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        isActive
+          ? "bg-primary text-primary-foreground shadow-button"
+          : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
         className
       )}
       {...props}

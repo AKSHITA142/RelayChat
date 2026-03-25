@@ -2,15 +2,15 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const statusBadgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]",
+  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] backdrop-blur-xl",
   {
     variants: {
       status: {
-        online: "border-secondary/20 bg-secondary/10 text-secondary",
-        active: "border-primary/20 bg-primary/10 text-primary",
-        busy: "border-destructive/20 bg-destructive/10 text-destructive",
-        offline: "border-border bg-muted/50 text-muted-foreground",
-        neutral: "border-border bg-accent text-accent-foreground",
+        online: "border-secondary/20 bg-secondary/12 text-secondary",
+        active: "border-primary/20 bg-primary/12 text-primary",
+        busy: "border-destructive/20 bg-destructive/12 text-destructive",
+        offline: "border-white/10 bg-white/6 text-muted-foreground",
+        neutral: "border-white/10 bg-white/6 text-accent-foreground",
       },
     },
     defaultVariants: {

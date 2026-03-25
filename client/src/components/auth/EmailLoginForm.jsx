@@ -18,28 +18,38 @@ export default function EmailLoginForm({
       initial={{ opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }}
-      className="space-y-4"
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="space-y-5"
     >
-      <Input icon={Mail} type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <Input
-        icon={Lock}
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+      <div className="surface-inline rounded-[24px] p-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-secondary">Credential sign-in</p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Use your saved credentials here, then continue through the same trusted-device verification flow.
+        </p>
+      </div>
+
+      <div className="grid gap-4">
+        <Input icon={Mail} type="email" placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} />
+        <Input
+          icon={Lock}
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+      </div>
 
       <Button onClick={onSubmit} disabled={loading} className="w-full">
-        {loading ? <Loader2 className="animate-spin" /> : "Login to Workspace"}
+        {loading ? <Loader2 className="animate-spin" /> : "Login to workspace"}
       </Button>
 
       <button
         type="button"
         onClick={onBack}
-        className="flex w-full items-center justify-center gap-2 pt-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/4 px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft size={16} />
-        Back to Security Code
+        Back to phone verification
       </button>
     </motion.div>
   );

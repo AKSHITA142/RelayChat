@@ -14,6 +14,7 @@ import api from "../services/api";
 import { buildHistorySyncUpdate, ensureE2EERegistration, getCurrentDeviceId, getCurrentDeviceLabel, hydrateDecryptedMessage, markHistorySyncComplete, needsHistorySync } from "../services/e2ee";
 import { getThemeClassName, useChatTheme } from "../hooks/useChatTheme";
 import { cn } from "@/lib/utils";
+import Background3D from "@/components/ui/3d-background";
 
 export default function Chat() {
   const [themeName] = useChatTheme();
@@ -339,14 +340,15 @@ export default function Chat() {
   return (
     <motion.div
       ref={containerRef}
+      className={cn("relative group flex h-full w-full overflow-hidden text-foreground", getThemeClassName(themeName))}
       onMouseMove={handleMouseMove}
-      initial={{ opacity: 0, scale: 0.992 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.992 }}
-      transition={{ duration: 0.32, ease: "easeOut" }}
-      className={cn("group relative flex h-screen overflow-hidden bg-background text-foreground", getThemeClassName(themeName))}
     >
+      {/* Premium 3D Background */}
+      <Background3D variant="geometric" className="absolute inset-0 z-0" />
+      
+      {/* Original Background Layers */}
       <div className="absolute inset-0 chat-canvas" />
+      <div className="absolute inset-0 app-noise opacity-20" />
       <div data-page-glow className="proximity-glow opacity-0 group-hover:opacity-100" />
 
       {pendingHistorySyncApproval && (
@@ -354,43 +356,66 @@ export default function Chat() {
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -16 }}
-          className="absolute right-4 top-4 z-50 max-w-sm rounded-2xl border border-secondary/20 bg-card/95 p-4 shadow-2xl backdrop-blur"
+          className="absolute right-4 top-4 z-50 max-w-sm rounded-[24px] border border-secondary/20 bg-card/88 p-4 shadow-panel backdrop-blur-2xl"
         >
           <p className="text-sm font-semibold text-foreground">Approve new device</p>
           <div className="mt-3 flex gap-2">
-            <button onClick={approveHistorySync} className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground"><Check size={16} /> Approve</button>
-            <button onClick={() => setPendingHistorySyncApproval(null)} className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground"><CloseIcon size={16} /> Decline</button>
+            <button onClick={approveHistorySync} className="flex items-center gap-2 rounded-2xl border border-secondary/20 bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground"><Check size={16} /> Approve</button>
+            <button onClick={() => setPendingHistorySyncApproval(null)} className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/6 px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground"><CloseIcon size={16} /> Decline</button>
           </div>
         </motion.div>
       )}
 
-      <motion.div
-        data-page-hero
-        className="relative z-10 flex h-full"
-      >
-        <Sidebar
-          chats={chats} setChats={setChats}
-          setSelectedChat={setSelectedChat} selectedChat={selectedChat}
-          onlineUsers={onlineUsers} contacts={contacts}
-          isAddingContact={isAddingContact} setIsAddingContact={setIsAddingContact}
-          isCreatingGroup={isCreatingGroup} setIsCreatingGroup={setIsCreatingGroup}
-          setIsShowingSettings={setIsShowingSettings}
-        />
-      </motion.div>
+      <div className="relative z-10 flex h-full w-full gap-0 p-3 md:gap-3 md:p-4">
+        {/* Mobile-First Sidebar */}
+        <motion.div
+          data-page-hero
+          className={cn(
+            "relative flex h-full",
+            selectedChat ? "hidden md:flex" : "flex w-full md:w-auto"
+          )}
+        >
+          <Sidebar
+            chats={chats} setChats={setChats}
+            setSelectedChat={setSelectedChat} selectedChat={selectedChat}
+            onlineUsers={onlineUsers} contacts={contacts}
+            isAddingContact={isAddingContact} setIsAddingContact={setIsAddingContact}
+            isCreatingGroup={isCreatingGroup} setIsCreatingGroup={setIsCreatingGroup}
+            setIsShowingSettings={setIsShowingSettings}
+          />
+        </motion.div>
 
-      <motion.div
-        data-page-hero
-        className="relative z-10 flex min-w-0 flex-1"
-      >
-        <ChatWindow
-          selectedChat={selectedChat} chats={chats}
-          setSelectedChat={setSelectedChat} onlineUsers={onlineUsers}
-          lastSeenMap={lastSeenMap} contacts={contacts}
-          setContacts={setContacts} setChats={setChats}
-          setIsAddingContact={setIsAddingContact} setIsCreatingGroup={setIsCreatingGroup}
-          setActiveVideoCall={setActiveVideoCall}
-        />
-      </motion.div>
+        {/* Enhanced Chat Window with Mobile Back Button */}
+        <motion.div
+          data-page-hero
+          className={cn(
+            "relative flex min-w-0 overflow-hidden rounded-[32px] border border-white/10 bg-card/28 shadow-panel backdrop-blur-sm",
+            selectedChat ? "flex-1" : "hidden md:flex flex-1"
+          )}
+        >
+          <ChatWindow
+            selectedChat={selectedChat} chats={chats}
+            setSelectedChat={setSelectedChat} onlineUsers={onlineUsers}
+            lastSeenMap={lastSeenMap} contacts={contacts}
+            setContacts={setContacts} setChats={setChats}
+            setIsAddingContact={setIsAddingContact} setIsCreatingGroup={setIsCreatingGroup}
+            setActiveVideoCall={setActiveVideoCall}
+          />
+        </motion.div>
+
+        {/* Mobile Back Button */}
+        {selectedChat && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            onClick={() => setSelectedChat(null)}
+            className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/6 backdrop-blur-sm md:hidden"
+          >
+            <CloseIcon size={16} />
+          </motion.button>
+        )}
+      </div>
 
       {/* Global Video Call Overlay */}
       <AnimatePresence mode="wait">

@@ -23,7 +23,7 @@ export default function MessageActions({
         onMouseDown={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
         className={cn(
-          "absolute -right-10 top-3 rounded-full border border-border/60 bg-card/80 p-1.5 shadow-md transition-all duration-200",
+          "absolute -right-10 top-3 rounded-full border border-white/10 bg-card/78 p-1.5 shadow-md transition-all duration-200",
           "opacity-0 backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100",
           isOpen ? "opacity-100" : "translate-x-1",
           isOwn ? "text-primary-foreground/80 hover:text-primary-foreground" : "text-muted-foreground hover:text-primary"
@@ -47,7 +47,7 @@ export default function MessageActions({
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.92, opacity: 0, y: menuIsUpwards ? 10 : -10 }}
               className={cn(
-                "absolute z-[101] min-w-[180px] overflow-hidden rounded-2xl border border-border/80 bg-card/95 py-1.5 shadow-2xl backdrop-blur-2xl",
+                "absolute z-[101] min-w-[190px] overflow-hidden rounded-[22px] border border-white/10 bg-card/88 py-1.5 shadow-panel backdrop-blur-2xl",
                 isOwn ? "right-3" : "left-3",
                 menuIsUpwards ? "bottom-[calc(100%-10px)]" : "top-[calc(100%-10px)]"
               )}
@@ -62,7 +62,7 @@ export default function MessageActions({
                     <Info size={16} />
                     View info
                   </button>
-                  <div className="h-px bg-border/60" />
+                  <div className="h-px bg-white/10" />
                 </>
               ) : null}
 
@@ -79,7 +79,7 @@ export default function MessageActions({
                 <button
                   type="button"
                   onClick={onDeleteMe}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-accent"
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8"
                 >
                   <Trash2 size={16} className="text-muted-foreground" />
                   Remove for me

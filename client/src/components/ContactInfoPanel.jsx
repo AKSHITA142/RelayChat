@@ -38,15 +38,15 @@ export default function ContactInfoPanel({
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: "100%", opacity: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="absolute right-0 top-0 z-30 flex h-full w-[340px] flex-col overflow-y-auto border-l border-border/70 bg-card/95 backdrop-blur-2xl"
+        className="absolute right-0 top-0 z-30 flex h-full w-full max-w-[360px] flex-col overflow-y-auto border-l border-white/10 bg-card/82 shadow-panel backdrop-blur-2xl"
       >
-        <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <span className="font-space text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Contact Info
           </span>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
+            className="rounded-xl border border-white/10 bg-white/6 p-1.5 text-muted-foreground transition-all hover:text-foreground"
           >
             <X size={18} />
           </button>
@@ -71,7 +71,7 @@ export default function ContactInfoPanel({
               key={label}
               onClick={action}
               className={cn(
-                "interactive-btn flex flex-col items-center gap-2 rounded-xl border py-4 transition-all",
+                "interactive-btn flex flex-col items-center gap-2 rounded-2xl border py-4 transition-all",
                 actionStyles[label]
               )}
             >
@@ -83,12 +83,12 @@ export default function ContactInfoPanel({
 
         <div className="px-5 pb-5">
           <p className="mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">About</p>
-          <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
+          <div className="surface-inline rounded-[20px] border-primary/20 bg-primary/8 px-4 py-3 text-sm text-foreground">
             {status}
           </div>
         </div>
 
-        <div className="mx-5 mb-5 flex items-start gap-3 rounded-xl border border-secondary/20 bg-secondary/10 px-4 py-3">
+        <div className="mx-5 mb-5 flex items-start gap-3 rounded-[20px] border border-secondary/20 bg-secondary/12 px-4 py-3">
           <Lock size={18} className="mt-0.5 shrink-0 text-secondary" />
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wider text-secondary">End-to-End Encrypted</p>
@@ -98,7 +98,7 @@ export default function ContactInfoPanel({
           </div>
         </div>
 
-        <div className="mt-auto space-y-1 border-t border-border/60 px-5 pb-8 pt-3">
+        <div className="mt-auto space-y-1 border-t border-white/10 px-5 pb-8 pt-3">
           <p className="mb-3 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Actions</p>
 
           <button
