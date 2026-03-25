@@ -8,7 +8,6 @@ import {
   FileText,
   ExternalLink,
   MoreVertical,
-  Clock,
   Info
 } from "lucide-react";
 import ReactionPicker from "./ReactionPicker";
@@ -134,10 +133,6 @@ export default function Message({
     setShowMenu(false);
   };
 
-  const handleRestoreForMe = () => {
-    socket.emit("restore-for-me", { messageId: msg._id });
-    setShowMenu(false);
-  };
 
   const handleDeleteForEveryone = () => {
     if (window.confirm("Permanently delete this message for all participants?")) {
@@ -235,13 +230,11 @@ export default function Message({
     >
       <div
         className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-sm transition-all relative ${
-          msg.deletedFor?.includes(myId)
-            ? "bg-slate-800/50 text-slate-500 border border-dashed border-slate-600 grayscale opacity-40"
-            : isHighlighted
-              ? "ring-4 ring-amber-400/50 scale-[1.02]"
-              : ""
+          isHighlighted
+            ? "ring-4 ring-amber-400/50 scale-[1.02]"
+            : ""
         }`}
-        style={msg.deletedFor?.includes(myId) ? {} : {
+        style={{
           background: isHighlighted ? "#fef3c7" : (isOwn ? ownBg : otherBg),
           color: isHighlighted ? "#1a1a1a" : (isOwn ? ownText : otherText),
           borderRadius: isOwn ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
@@ -414,24 +407,13 @@ export default function Message({
                   <div className="h-px bg-white/10" />
                 </>
               )}
-              {msg.deletedFor?.includes(myId) ? (
-                <button
-                  onClick={handleRestoreForMe}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors"
-                  style={{ color: primary }}
-                >
-                  <Clock size={16} />
-                  Bring it back
-                </button>
-              ) : (
-                <button
-                  onClick={handleDeleteForMe}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-                >
-                  <Trash2 size={16} className="text-slate-500" />
-                  Remove for me
-                </button>
-              )}
+              <button
+                onClick={handleDeleteForMe}
+                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                <Trash2 size={16} className="text-slate-500" />
+                Remove for me
+              </button>
               {isMe && !msg.isDeleted && (
                 <button
                   onClick={handleDeleteForEveryone}

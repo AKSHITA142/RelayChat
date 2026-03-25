@@ -14,7 +14,6 @@ import {
   Check, 
   CheckCheck,
   MoreHorizontal, 
-  Cpu, 
   FilePlus, 
   UserCheck, 
   Loader2,
@@ -126,7 +125,6 @@ export default function ChatWindow({
   const [searchQuery, setSearchQuery] = useState("");
   const [currentSearchIndex, setCurrentSearchIndex] = useState(-1);
   const [searchResults, setSearchResults] = useState([]);
-  const [showDeleted, setShowDeleted] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [recipientEncryptionUser, setRecipientEncryptionUser] = useState(null);
@@ -354,7 +352,7 @@ export default function ChatWindow({
 
     const loadMessages = async () => {
       try {
-        const res = await api.get(`/message/${selectedChat._id}?includeDeleted=${showDeleted}`);
+        const res = await api.get(`/message/${selectedChat._id}`);
         if (isCancelled) return;
 
         if (Array.isArray(res.data)) {
@@ -395,7 +393,7 @@ export default function ChatWindow({
       isCancelled = true;
       socket.emit("close-chat", selectedChat._id);
     };
-  }, [selectedChat, showDeleted, myUserId]);
+  }, [selectedChat, myUserId]);
 
   useEffect(() => {
     if (!selectedChat?._id) return;
@@ -589,13 +587,7 @@ export default function ChatWindow({
     };
 
     const deleteForMeHandler = ({ messageId }) => {
-      if (!showDeleted) {
-        setMessages(prev => prev.filter(m => m._id !== messageId));
-      } else {
-        // If showing deleted, we just need to re-fetch or update the message status locally
-        // For simplicity, let's just update the local message object if we have it
-        setMessages(prev => prev.map(m => m._id === messageId ? { ...m, deletedFor: [...(m.deletedFor || []), myUserId] } : m));
-      }
+      setMessages(prev => prev.filter(m => m._id !== messageId));
     };
 
     const restoreForMeHandler = ({ messageId }) => {
@@ -628,7 +620,7 @@ export default function ChatWindow({
       socket.off("message-deleted-for-everyone", deleteForEveryoneHandler);
       socket.off("message-reacted", reactionHandler);
     };
-  }, [selectedChat, myUserId, showDeleted]);
+  }, [selectedChat, myUserId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1110,13 +1102,6 @@ export default function ChatWindow({
                     <UserPlus size={16} /> Add to Contacts
                   </button>
                 )}
-                <div className="h-px bg-white/5 my-1" />
-                <button 
-                  onClick={() => { setShowDeleted(!showDeleted); setShowMenu(false); }}
-                  className={`w-full px-4 py-2.5 flex items-center gap-3 text-left text-sm transition-all ${showDeleted ? 'text-[$theme.primary] bg-[$theme.primary]/5' : 'text-slate-300 hover:bg-white/5 hover:text-[$theme.primary]'}`}
-                >
-                  <Cpu size={16} /> {showDeleted ? "Hide Retracted" : "Reveal Hidden Messages"}
-                </button>
                 <div className="h-px bg-white/5 my-1" />
                 <button 
                   onClick={handleClearChat}

@@ -369,16 +369,6 @@ function initSocket(server) {
         }
       });
 
-      socket.on("restore-for-me", async ({ messageId }) => {
-        try {
-          const msgId = messageId.toString();
-          await Message.findByIdAndUpdate(msgId, { $pull: { deletedFor: socket.userId } });
-          socket.emit("message-restored-for-me", { messageId: msgId });
-        } catch (err) {
-          console.error("Restore for me error:", err);
-        }
-      });
-
       socket.on("delete-for-everyone", async ({ messageId, chatId }) => {
         try {
           const msgId = messageId.toString();
