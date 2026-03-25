@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle, Loader2, Lock, Mail, Phone, Send, User } from "lucide-react";
+import { CheckCircle, Loader2, Lock, Mail, Send, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -68,14 +68,23 @@ export default function PhoneOtpForm({
           exit={{ opacity: 0, x: -24 }}
           className="space-y-4"
         >
-          <Input
-            icon={Phone}
-            type="text"
-            placeholder="Phone (+91987...)"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            disabled={otpSent}
-          />
+          <div className="flex items-center w-full rounded-lg overflow-hidden border border-input bg-card/70 focus-within:ring-2 focus-within:ring-ring transition-all">
+            <span className="px-4 py-2.5 text-sm font-bold text-primary border-r border-input select-none whitespace-nowrap bg-primary/10">+91</span>
+            <input
+              type="tel"
+              inputMode="numeric"
+              placeholder="Enter 10-digit number"
+              value={phone.replace(/^\+91/, "")}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                setPhone("+91" + digits);
+              }}
+              disabled={otpSent}
+              maxLength={10}
+              className="flex-1 bg-transparent px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none tracking-widest"
+            />
+            <span className="px-3 text-xs text-muted-foreground font-bold tabular-nums">{phone.replace(/^\+91/, "").length}/10</span>
+          </div>
 
           <AnimatePresence>
             {otpSent ? (

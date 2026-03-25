@@ -154,6 +154,11 @@ export default function Chat() {
           unreadCount: nextUnread
         };
         const rest = prev.filter((_, i) => i !== chatIdx);
+        
+        if (isActiveChat) {
+          setSelectedChat(updatedChat);
+        }
+
         return [updatedChat, ...rest];
       });
     };
