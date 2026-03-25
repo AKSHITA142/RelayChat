@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle, Loader2, Lock, Mail, Phone, Send, User } from "lucide-react";
+import { CheckCircle, Loader2, Lock, Mail, Send, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -80,19 +80,22 @@ export default function PhoneOtpForm({
           transition={{ duration: 0.3, ease: "easeOut" }}
           className="space-y-5"
         >
-          <div className="surface-inline rounded-[24px] p-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">Quick secure entry</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Enter your phone number and RelayChat will send a one-time security code to verify this device.
-                </p>
-              </div>
-              <div className="feature-pill shrink-0">
-                <Phone size={12} />
-                OTP verified
-              </div>
-            </div>
+          <div className="flex items-center w-full rounded-lg overflow-hidden border border-input bg-card/70 focus-within:ring-2 focus-within:ring-ring transition-all">
+            <span className="px-4 py-2.5 text-sm font-bold text-primary border-r border-input select-none whitespace-nowrap bg-primary/10">+91</span>
+            <input
+              type="tel"
+              inputMode="numeric"
+              placeholder="Enter 10-digit number"
+              value={phone.replace(/^\+91/, "")}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                setPhone("+91" + digits);
+              }}
+              disabled={otpSent}
+              maxLength={10}
+              className="flex-1 bg-transparent px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none tracking-widest"
+            />
+            <span className="px-3 text-xs text-muted-foreground font-bold tabular-nums">{phone.replace(/^\+91/, "").length}/10</span>
           </div>
 
           <div className="grid gap-4">

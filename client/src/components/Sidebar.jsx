@@ -19,13 +19,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { IconButton } from "@/components/ui/icon-button";
 import { SearchField } from "@/components/ui/search-field";
-import {
-  SheetPanel,
-  SheetPanelContent,
-  SheetPanelHeader,
-  SheetPanelTitle,
-  SheetPanelTrigger,
-} from "@/components/ui/sheet-panel";
 import { UserListItem } from "@/components/ui/user-list-item";
 import { cn } from "@/lib/utils";
 import DropdownMenu, { DropdownItem, DropdownSeparator } from "@/components/ui/dropdown-menu";
@@ -549,21 +542,47 @@ export default function Sidebar({
 
   return (
     <>
+      {/* Mobile hamburger trigger */}
       <div className="fixed left-4 top-4 z-40 md:hidden">
-        <SheetPanel open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetPanelTrigger asChild>
-            <IconButton icon={MessageSquare} label="Open chats" variant="primary" className="shadow-button" />
-          </SheetPanelTrigger>
-          <SheetPanelContent side="left" className="w-[92vw] max-w-sm p-0">
-            <SheetPanelHeader className="border-b border-white/10 px-4 py-4">
-              <SheetPanelTitle>Chats</SheetPanelTitle>
-            </SheetPanelHeader>
-            <SidebarContent {...sidebarProps} closeMobile={() => setMobileOpen(false)} />
-          </SheetPanelContent>
-        </SheetPanel>
+        <IconButton icon={MessageSquare} label="Open chats" variant="primary" className="shadow-lg" onClick={() => setMobileOpen(true)} />
       </div>
 
-      <aside className="hidden h-full w-full max-w-sm shrink-0 overflow-hidden rounded-[32px] border border-white/10 bg-card/56 shadow-panel backdrop-blur-2xl md:flex lg:max-w-md">
+      {/* Mobile slide-in drawer (Framer Motion — no Radix) */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="sidebar-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+              onClick={() => setMobileOpen(false)}
+            />
+            {/* Panel */}
+            <motion.div
+              key="sidebar-panel"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="fixed inset-y-0 left-0 z-50 flex w-[92vw] max-w-sm flex-col bg-card/95 backdrop-blur-xl border-r border-border/70 md:hidden"
+            >
+              <div className="flex items-center justify-between border-b border-border/70 px-4 py-4">
+                <span className="text-sm font-bold text-foreground">Chats</span>
+                <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
+              <SidebarContent {...sidebarProps} closeMobile={() => setMobileOpen(false)} />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden h-full w-full max-w-sm shrink-0 border-r border-border/70 bg-card/78 backdrop-blur-xl md:flex lg:max-w-md">
         <SidebarContent {...sidebarProps} />
       </aside>
     </>
