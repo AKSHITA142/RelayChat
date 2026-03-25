@@ -273,8 +273,9 @@
   }
 
   .surface-panel {
-    @apply relative isolate overflow-hidden rounded-[28px] border border-white/10 text-card-foreground shadow-panel backdrop-blur-2xl;
+    @apply relative isolate overflow-hidden rounded-[28px] border border-white/10 text-card-foreground backdrop-blur-2xl;
     background-color: hsl(var(--card) / 0.72);
+    box-shadow: 0 32px 80px -38px rgba(2, 8, 23, 0.92), 0 16px 36px -24px hsl(var(--primary) / 0.32);
   }
 
   .surface-panel::before,

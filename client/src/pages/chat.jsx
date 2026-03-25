@@ -13,7 +13,7 @@ import { Check, X as CloseIcon } from "lucide-react";
 import api from "../services/api";
 import { buildHistorySyncUpdate, ensureE2EERegistration, getCurrentDeviceId, getCurrentDeviceLabel, hydrateDecryptedMessage, markHistorySyncComplete, needsHistorySync } from "../services/e2ee";
 import { getThemeClassName, useChatTheme } from "../hooks/useChatTheme";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 import Background3D from "@/components/ui/3d-background";
 
 export default function Chat() {
@@ -340,7 +340,7 @@ export default function Chat() {
   return (
     <motion.div
       ref={containerRef}
-      className={cn("relative group flex h-full w-full overflow-hidden text-foreground", getThemeClassName(themeName))}
+      className={cn("relative group flex h-screen w-screen overflow-hidden text-foreground", getThemeClassName(themeName))}
       onMouseMove={handleMouseMove}
     >
       {/* Premium 3D Background */}
@@ -366,12 +366,12 @@ export default function Chat() {
         </motion.div>
       )}
 
-      <div className="relative z-10 flex h-full w-full gap-0 p-3 md:gap-3 md:p-4">
+      <div className="relative z-10 flex h-full w-full items-stretch gap-0 overflow-hidden p-3 md:gap-3 md:p-4">
         {/* Mobile-First Sidebar */}
         <motion.div
           data-page-hero
           className={cn(
-            "relative flex h-full",
+            "relative flex h-full shrink-0",
             selectedChat ? "hidden md:flex" : "flex w-full md:w-auto"
           )}
         >
@@ -389,7 +389,7 @@ export default function Chat() {
         <motion.div
           data-page-hero
           className={cn(
-            "relative flex min-w-0 overflow-hidden rounded-[32px] border border-white/10 bg-card/28 shadow-panel backdrop-blur-sm",
+            "relative flex h-full min-w-0 overflow-hidden rounded-[32px] border border-white/10 bg-card/28 shadow-panel backdrop-blur-sm",
             selectedChat ? "flex-1" : "hidden md:flex flex-1"
           )}
         >
