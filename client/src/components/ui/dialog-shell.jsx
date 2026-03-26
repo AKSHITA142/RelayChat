@@ -1,89 +1,92 @@
 import * as React from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const DialogShell = DialogPrimitive.Root;
-const DialogShellTrigger = DialogPrimitive.Trigger;
-const DialogShellClose = DialogPrimitive.Close;
-const DialogShellPortal = DialogPrimitive.Portal;
+export function DialogShell({ children, open, onOpenChange }) {
+  if (!open) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div 
+        className="fixed inset-0 bg-background/70 backdrop-blur-md" 
+        onClick={() => onOpenChange?.(false)}
+      />
+      {children}
+    </div>
+  );
+}
 
-const DialogShellOverlay = React.forwardRef(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay
-    ref={ref}
-    className={cn(
-      "fixed inset-0 z-50 bg-background/70 backdrop-blur-md",
-      "data-[state=open]:animate-in data-[state=closed]:animate-out",
-      "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+export function DialogShellTrigger({ children, asChild }) {
+  return children;
+}
+
+export function DialogShellClose({ children, className, onClick }) {
+  return (
+    <button 
+      type="button" 
+      className={className} 
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function DialogShellContent({ children, className }) {
+  return (
+    <div className={cn(
+      "relative z-50 w-full max-w-2xl mx-auto p-6 surface-panel rounded-2xl shadow-2xl",
       className
-    )}
-    {...props}
-  />
-));
+    )}>
+      {children}
+    </div>
+  );
+}
 
-DialogShellOverlay.displayName = "DialogShellOverlay";
+export function DialogShellHeader({ children, className }) {
+  return (
+    <div className={cn("flex flex-col space-y-2 mb-4", className)}>
+      {children}
+    </div>
+  );
+}
 
-const DialogShellContent = React.forwardRef(
-  ({ className, children, hideClose = false, ...props }, ref) => (
-    <DialogShellPortal>
-      <DialogShellOverlay />
-      <DialogPrimitive.Content
-        ref={ref}
-        className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-[min(calc(100%-2rem),44rem)] -translate-x-1/2 -translate-y-1/2 gap-5",
-          "surface-panel p-6 sm:p-7",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-          className
-        )}
-        {...props}
-      >
-        {children}
-        {hideClose ? null : (
-          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-xl border border-white/10 bg-white/6 p-1.5 text-muted-foreground transition-colors hover:text-foreground">
-            <X className="size-4" />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Content>
-    </DialogShellPortal>
-  )
-);
+export function DialogShellFooter({ children, className }) {
+  return (
+    <div className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end mt-4", className)}>
+      {children}
+    </div>
+  );
+}
 
-DialogShellContent.displayName = "DialogShellContent";
+export function DialogShellTitle({ children, className }) {
+  return (
+    <h2 className={cn("text-xl font-bold text-foreground", className)}>
+      {children}
+    </h2>
+  );
+}
 
-const DialogShellHeader = ({ className, ...props }) => (
-  <div className={cn("flex flex-col space-y-2 text-left", className)} {...props} />
-);
+export function DialogShellDescription({ children, className }) {
+  return (
+    <p className={cn("text-sm text-muted-foreground", className)}>
+      {children}
+    </p>
+  );
+}
 
-const DialogShellFooter = ({ className, ...props }) => (
-  <div className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)} {...props} />
-);
-
-const DialogShellTitle = React.forwardRef(({ className, ...props }, ref) => (
-  <DialogPrimitive.Title ref={ref} className={cn("font-headline text-xl font-bold tracking-tight text-foreground", className)} {...props} />
-));
-
-DialogShellTitle.displayName = "DialogShellTitle";
-
-const DialogShellDescription = React.forwardRef(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description
-    ref={ref}
-    className={cn("text-sm leading-6 text-muted-foreground", className)}
-    {...props}
-  />
-));
-
-DialogShellDescription.displayName = "DialogShellDescription";
-
-export {
-  DialogShell,
-  DialogShellTrigger,
-  DialogShellClose,
-  DialogShellContent,
-  DialogShellHeader,
-  DialogShellFooter,
-  DialogShellTitle,
-  DialogShellDescription,
-};
+export function DialogClose({ children, onClose, className }) {
+  return (
+    <button 
+      type="button"
+      onClick={onClose}
+      className={cn(
+        "absolute right-4 top-4 rounded-xl border border-white/10 bg-white/6 p-1.5 text-muted-foreground transition-colors hover:text-foreground",
+        className
+      )}
+    >
+      <X size={16} />
+      <span className="sr-only">Close</span>
+    </button>
+  );
+}
