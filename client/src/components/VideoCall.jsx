@@ -28,13 +28,16 @@ function startRinger() {
   audio.volume = 1;
   audio.play()
     .then(() => {
+      console.log("[Ringer] Playback started successfully");
       try {
         audio.muted = false;
       } catch {
         void 0;
       }
     })
-    .catch(() => {});
+    .catch((err) => {
+      console.error("[Ringer] Playback failed:", err);
+    });
   window.__ringer = audio;
 }
 
@@ -298,10 +301,9 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   }, []);
 
   useEffect(() => {
+    startRinger();
     if (!isIncoming) {
       startCall();
-    } else {
-      startRinger();
     }
 
     socket.off("call-accepted");
