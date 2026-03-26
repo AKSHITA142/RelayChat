@@ -1,7 +1,6 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { FilePlus, Mic, Paperclip, Send, Smile, X } from "lucide-react";
 import VoiceRecorder from "../VoiceRecorder";
-import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 
 const EMOJIS = ["😊", "😂", "❤️", "👍", "🙏", "🔥", "😭", "😮", "🎉", "✨", "💯", "✅", "🙌", "💀", "🤣", "🤔", "😘", "😎", "👀", "👋"];
@@ -22,136 +21,153 @@ export default function MessageInput({
   onCancelVoice,
   onStartVoice,
 }) {
+  const textareaRef = useRef(null);
+  const emojiPickerRef = useRef(null);
+  const inputContainerRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        emojiPickerRef.current && 
+        !emojiPickerRef.current.contains(event.target) && 
+        inputContainerRef.current && 
+        !inputContainerRef.current.contains(event.target)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [setShowEmojiPicker]);
+
+  const handleEmojiClick = useCallback((emoji) => {
+    const newText = text + emoji;
+    onTextChange(newText);
+    setShowEmojiPicker(false);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [text, onTextChange, setShowEmojiPicker]);
+
+  const handleInputChange = useCallback((e) => {
+    onTextChange(e.target.value);
+  }, [onTextChange]);
+
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      onSend();
+    }
+  }, [onSend]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 144) + "px";
+    }
+  }, [text]);
+
   return (
     <footer className="relative z-10 px-3 pb-3 pt-2 md:px-4 md:pb-4">
-      <AnimatePresence mode="wait">
-        {isVoiceRecording ? (
-          <motion.div
-            key="voice-recorder"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-          >
-            <VoiceRecorder onSend={onVoiceSend} onCancel={onCancelVoice} />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="text-input"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 16 }}
-            className="space-y-4"
-          >
-            <AnimatePresence>
-              {selectedFile ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="surface-inline flex items-center justify-between rounded-[22px] border-secondary/20 bg-secondary/12 px-4 py-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-xl border border-secondary/20 bg-secondary/20 p-2">
-                      <FilePlus size={16} className="text-secondary" />
-                    </div>
-                    <div>
-                      <p className="max-w-xs truncate text-sm font-semibold text-foreground">{selectedFile.name}</p>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Attachment ready</p>
-                    </div>
-                  </div>
-                  <IconButton icon={X} label="Remove attachment" variant="ghost" onClick={onClearSelectedFile} />
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-
-            <div className="surface-panel relative flex items-end gap-3 px-3 py-3 md:px-4">
-              <div className="flex gap-2">
-                <IconButton
-                  icon={Smile}
-                  label="Emoji picker"
-                  variant={showEmojiPicker ? "primary" : "default"}
-                  onClick={() => setShowEmojiPicker((value) => !value)}
-                />
-                <IconButton
-                  icon={Paperclip}
-                  label="Attach file"
-                  variant="default"
-                  onClick={() => fileInputRef.current?.click()}
-                />
-              </div>
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files[0];
-                  if (file) onFilePicked(file);
-                }}
-              />
-
-              <div className="relative flex-1">
-                <div className="rounded-[1.8rem] border border-white/10 bg-white/6 px-5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_20px_60px_-38px_hsl(var(--primary)/0.35)] backdrop-blur-xl">
-                  <textarea
-                    value={text}
-                    onChange={(event) => onTextChange(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        onSend();
-                      }
-                    }}
-                    onPaste={onPaste}
-                    rows={1}
-                    placeholder="Write a message..."
-                    className="max-h-36 min-h-[1.5rem] w-full resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                  />
+      {isVoiceRecording ? (
+        <VoiceRecorder onSend={onVoiceSend} onCancel={onCancelVoice} />
+      ) : (
+        <div className="space-y-3">
+          {selectedFile && (
+            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-primary/20 p-2">
+                  <FilePlus size={16} className="text-primary" />
                 </div>
-
-                <AnimatePresence>
-                  {showEmojiPicker ? (
-                    <motion.div
-                      initial={{ opacity: 0, y: 18, scale: 0.94 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 18, scale: 0.94 }}
-                      className="absolute bottom-[calc(100%+0.85rem)] left-0 z-50 grid grid-cols-5 gap-3 rounded-[24px] border border-white/10 bg-card/88 p-4 shadow-panel backdrop-blur-2xl"
-                    >
-                      {EMOJIS.map((emoji) => (
-                        <motion.button
-                          key={emoji}
-                          whileHover={{ scale: 1.15 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => {
-                            onTextChange(`${text}${emoji}`);
-                            setShowEmojiPicker(false);
-                          }}
-                          className="rounded-xl p-1 text-2xl transition-colors hover:bg-white/8"
-                        >
-                          {emoji}
-                        </motion.button>
-                      ))}
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
+                <span className="max-w-[200px] truncate text-sm font-medium">{selectedFile.name}</span>
               </div>
+              <button
+                onClick={onClearSelectedFile}
+                className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
 
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={text.trim() || selectedFile ? onSend : onStartVoice}
+          <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 md:px-4" ref={inputContainerRef}>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 className={cn(
-                  "flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg transition-all",
-                  text.trim() || selectedFile
-                    ? "border border-primary/30 bg-primary text-primary-foreground shadow-button"
-                    : "border border-white/10 bg-white/6 text-foreground hover:border-primary/25 hover:text-primary"
+                  "flex h-10 w-10 items-center justify-center rounded-xl transition-colors",
+                  showEmojiPicker
+                    ? "bg-primary text-primary-foreground"
+                    : "text-white/60 hover:bg-white/10 hover:text-white"
                 )}
               >
-                {text.trim() || selectedFile ? <Send size={22} /> : <Mic size={22} />}
-              </motion.button>
+                <Smile size={20} />
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <Paperclip size={20} />
+              </button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) onFilePicked(file);
+                e.target.value = "";
+              }}
+            />
+
+            <div className="relative flex-1">
+              {showEmojiPicker && (
+                <div 
+                  ref={emojiPickerRef}
+                  className="absolute bottom-full left-0 mb-2 w-64 rounded-xl border border-white/10 bg-black/95 p-3 shadow-xl backdrop-blur-md"
+                >
+                  <div className="grid grid-cols-5 gap-1">
+                    {EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => handleEmojiClick(emoji)}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg text-xl transition-all hover:bg-white/10 hover:scale-110"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <textarea
+                ref={textareaRef}
+                value={text}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                onPaste={onPaste}
+                rows={1}
+                placeholder="Type a message..."
+                className="max-h-36 w-full resize-none bg-transparent py-2 text-sm text-white outline-none placeholder:text-white/40"
+              />
+            </div>
+
+            <button
+              onClick={text.trim() || selectedFile ? onSend : onStartVoice}
+              className={cn(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all",
+                text.trim() || selectedFile
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-white/10 text-white/80 hover:bg-white/20"
+              )}
+            >
+              {text.trim() || selectedFile ? <Send size={18} /> : <Mic size={18} />}
+            </button>
+          </div>
+        </div>
+      )}
     </footer>
   );
 }

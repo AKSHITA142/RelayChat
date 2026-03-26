@@ -1,7 +1,4 @@
-import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { gsap } from "gsap";
-
+import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
 import socket, { connectSocket } from "../services/socket";
@@ -11,21 +8,12 @@ import Settings from "../components/Settings";
 import { AnimatePresence } from "framer-motion";
 import { Check, X as CloseIcon } from "lucide-react";
 import api from "../services/api";
-import { buildHistorySyncUpdate, ensureE2EERegistration, getCurrentDeviceId, getCurrentDeviceLabel, hydrateDecryptedMessage, markHistorySyncComplete, needsHistorySync } from "../services/e2ee";
+import { ensureE2EERegistration, hydrateDecryptedMessage } from "../services/e2ee";
 import { getThemeClassName, useChatTheme } from "../hooks/useChatTheme";
 import { cn } from "../lib/utils";
-import Background3D from "@/components/ui/3d-background";
 
 export default function Chat() {
   const [themeName] = useChatTheme();
-  const containerRef = useRef(null);
-
-  const handleMouseMove = (e) => {
-    if (!containerRef.current) return;
-    const { left, top } = containerRef.current.getBoundingClientRect();
-    containerRef.current.style.setProperty("--x", `${e.clientX - left}px`);
-    containerRef.current.style.setProperty("--y", `${e.clientY - top}px`);
-  };
 
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
@@ -34,9 +22,7 @@ export default function Chat() {
   const [contacts, setContacts] = useState(() => getLoggedInUser()?.contacts || []);
   const [e2eeUser, setE2eeUser] = useState(() => getLoggedInUser());
   const [pendingHistorySyncApproval, setPendingHistorySyncApproval] = useState(null);
-  const [_historySyncRequesting, setHistorySyncRequesting] = useState(false);
   
-  // Shared UI States for Side Panels
   const [isAddingContact, setIsAddingContact] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [activeVideoCall, setActiveVideoCall] = useState(null);
@@ -45,36 +31,19 @@ export default function Chat() {
   
   const performLogout = async () => {
     try {
-      // If your backend supports logout / token revocation, call it.
-      // (This is safe even if the route is not present; we still clear local session.)
       await api.post("/auth/logout");
-    } catch {
-      // ignore - client-side logout still proceeds
-    }
-
+    } catch {}
     try {
       socket.emit("logout");
-    } catch {
-      // ignore
-    }
-
+    } catch {}
     try {
       socket.disconnect();
-    } catch {
-      // ignore
-    }
-
+    } catch {}
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("session-active");
-
     window.location.href = "/login";
   };
-
-  // Backup Restore Fallback States
-  const [restorePin, _setRestorePin] = useState("");
-  const [_restoringPin, setRestoringPin] = useState(false);
-  const [_restoreError, setRestoreError] = useState("");
 
   useEffect(() => {
     connectSocket();
@@ -87,68 +56,22 @@ export default function Chat() {
             setE2eeUser(updatedUser);
           }
         })
-        .catch((error) => {
-          console.error("Failed to initialize E2EE keys:", error);
-        });
+        .catch((error) => console.error("Failed to initialize E2EE keys:", error));
     }
-    // Kill any rogue ringer audio
-    document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch { /* ignore cleanup errors */ } });
-
-    return () => {
-      socket.disconnect();
-    };
+    document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch {} });
+    return () => socket.disconnect();
   }, []);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    containerRef.current.style.setProperty("--x", "50%");
-    containerRef.current.style.setProperty("--y", "50%");
-  }, []);
-
-  useEffect(() => {
-    if (!containerRef.current) return undefined;
-
-    const ctx = gsap.context(() => {
-      gsap
-        .timeline({ defaults: { ease: "power3.out" } })
-        .fromTo(
-          "[data-page-hero]",
-          { autoAlpha: 0, y: 22, scale: 0.985 },
-          { autoAlpha: 1, y: 0, scale: 1, duration: 0.65, stagger: 0.1 }
-        )
-        .fromTo(
-          "[data-page-glow]",
-          { autoAlpha: 0, scale: 0.9 },
-          { autoAlpha: 1, scale: 1, duration: 0.8 },
-          0.05
-        );
-    }, containerRef);
-
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    socket.on("online-users", users => {
-      setOnlineUsers(users.map(u => u._id));
-    });
-
+    socket.on("online-users", users => setOnlineUsers(users.map(u => u._id)));
     socket.on("user-online", ({ userId }) => {
       setOnlineUsers(prev => [...new Set([...prev, userId])]);
-      setLastSeenMap(prev => {
-        const copy = { ...prev };
-        delete copy[userId];
-        return copy;
-      });
+      setLastSeenMap(prev => { const copy = { ...prev }; delete copy[userId]; return copy; });
     });
-
     socket.on("user-offline", ({ userId, lastSeen }) => {
       setOnlineUsers(prev => prev.filter(id => id !== userId));
-      setLastSeenMap(prev => ({
-        ...prev,
-        [userId]: lastSeen,
-      }));
+      setLastSeenMap(prev => ({ ...prev, [userId]: lastSeen }));
     });
-
     return () => {
       socket.off("online-users");
       socket.off("user-online");
@@ -161,33 +84,20 @@ export default function Chat() {
       const currentUserId = getLoggedInUser()?._id?.toString();
       const msgChatId = (msg.chat?._id || msg.chat)?.toString();
       if (!msgChatId) return;
-
       const hydratedMessage = await hydrateDecryptedMessage(msg, currentUserId);
       const isIncoming = msg.sender && (msg.sender._id || msg.sender)?.toString() !== currentUserId;
       const isActiveChat = selectedChat?._id?.toString() === msgChatId;
-
       if (isActiveChat && isIncoming) {
         socket.emit("open-chat", msgChatId);
         socket.emit("mark-seen", { chatId: msgChatId });
       }
-
       setChats(prev => {
         const chatIdx = prev.findIndex(c => c._id?.toString() === msgChatId);
         if (chatIdx === -1) return prev;
-
-        const currentUnread = prev[chatIdx].unreadCount || 0;
-        const nextUnread = isActiveChat ? 0 : (isIncoming ? currentUnread + 1 : currentUnread);
-
-        const updatedChat = { 
-          ...prev[chatIdx], 
-          lastMessage: hydratedMessage,
-          unreadCount: nextUnread
-        };
-        const rest = prev.filter((_, i) => i !== chatIdx);
-        return [updatedChat, ...rest];
+        const updatedChat = { ...prev[chatIdx], lastMessage: hydratedMessage, unreadCount: isActiveChat ? 0 : (isIncoming ? (prev[chatIdx].unreadCount || 0) + 1 : prev[chatIdx].unreadCount) };
+        return [updatedChat, ...prev.filter((_, i) => i !== chatIdx)];
       });
     };
-
     socket.on("new-message", handler);
     return () => socket.off("new-message", handler);
   }, [selectedChat]);
@@ -195,10 +105,8 @@ export default function Chat() {
   useEffect(() => {
     const newChatHandler = (newChat) => {
       setChats(prev => {
-        if (prev.find(c => c._id?.toString() === newChat._id?.toString())) {
-          return prev;
-        }
-        socket.emit("join-chat", newChat._id); 
+        if (prev.find(c => c._id?.toString() === newChat._id?.toString())) return prev;
+        socket.emit("join-chat", newChat._id);
         return [newChat, ...prev];
       });
     };
@@ -226,32 +134,13 @@ export default function Chat() {
 
   useEffect(() => {
     const avatarUpdateHandler = ({ userId, avatar }) => {
-      setChats(prev => prev.map(chat => ({
-        ...chat,
-        participants: chat.participants.map(p => {
-          const pId = p._id?.toString() || p.toString();
-          if (pId === userId.toString()) {
-            return { ...(typeof p === "object" ? p : {}), _id: pId, avatar };
-          }
-          return p;
-        })
-      })));
-
-      setSelectedChat(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          participants: prev.participants.map(p => {
-            const pId = p._id?.toString() || p.toString();
-            if (pId === userId.toString()) {
-              return { ...(typeof p === "object" ? p : {}), _id: pId, avatar };
-            }
-            return p;
-          })
-        };
+      const updateAvatar = (list) => list.map(p => {
+        const pId = p._id?.toString() || p.toString();
+        return pId === userId.toString() ? { ...(typeof p === "object" ? p : {}), _id: pId, avatar } : p;
       });
+      setChats(prev => prev.map(chat => ({ ...chat, participants: updateAvatar(chat.participants) })));
+      setSelectedChat(prev => prev ? { ...prev, participants: updateAvatar(prev.participants) } : prev);
     };
-
     socket.on("user-avatar-updated", avatarUpdateHandler);
     return () => socket.off("user-avatar-updated", avatarUpdateHandler);
   }, []);
@@ -269,141 +158,30 @@ export default function Chat() {
     chats.forEach(chat => socket.emit("join-chat", chat._id));
   }, [chats]);
 
-  useEffect(() => {
-    const handleHistorySyncRequest = ({ requestId, requesterDeviceId, requesterLabel }) => {
-      if (!requestId || !requesterDeviceId || requesterDeviceId === getCurrentDeviceId()) return;
-      setPendingHistorySyncApproval({ requestId, requesterDeviceId, requesterLabel });
-    };
-    const handleHistorySyncComplete = ({ requesterDeviceId, syncedCount }) => {
-      if (requesterDeviceId !== getCurrentDeviceId()) return;
-      markHistorySyncComplete(getLoggedInUser()?._id);
-      window.alert(`Encrypted history synced (${syncedCount} items). Reloading.`);
-      window.location.reload();
-    };
-    socket.on("history-sync-requested", handleHistorySyncRequest);
-    socket.on("history-sync-complete", handleHistorySyncComplete);
-    return () => {
-      socket.off("history-sync-requested", handleHistorySyncRequest);
-      socket.off("history-sync-complete", handleHistorySyncComplete);
-    };
-  }, []);
-
-  const _requestHistorySync = () => {
-    const currentDeviceId = getCurrentDeviceId();
-    setHistorySyncRequesting(true);
-    socket.emit("request-history-sync", {
-      requesterDeviceId: currentDeviceId,
-      requesterLabel: getCurrentDeviceLabel(),
-    }, (result) => {
-      setHistorySyncRequesting(false);
-      if (result?.ok) {
-        localStorage.setItem(`relaychat-history-sync-requested-${getLoggedInUser()?._id}-${currentDeviceId}`, "true");
-        window.alert(`History sync request sent.`);
-        return;
-      }
-      window.alert(result?.message || "History sync request failed.");
-    });
-  };
-
-  const _handlePINRestore = async () => {
-    if (!restorePin || restorePin.length < 4) return setRestoreError("PIN too short");
-    setRestoringPin(true);
-    try {
-      const { restorePrivateKeyFromCloud } = await import("../services/e2ee");
-      const currentUser = e2eeUser || getLoggedInUser();
-      await restorePrivateKeyFromCloud(api, currentUser._id, restorePin);
-      localStorage.removeItem(`relaychat-history-sync-needed-${currentUser._id}-${getCurrentDeviceId()}`);
-      window.location.reload();
-    } catch (err) {
-      console.error(err);
-      setRestoreError("Invalid PIN or corrupted backup");
-    } finally {
-      setRestoringPin(false);
-    }
-  };
-
-  const approveHistorySync = async () => {
-    if (!pendingHistorySyncApproval) return;
-    const { requestId, requesterDeviceId } = pendingHistorySyncApproval;
-    socket.emit("respond-history-sync", { requestId, approved: true });
-    setPendingHistorySyncApproval(null);
-    try {
-      const refreshedProfile = await api.get("/user/profile");
-      const updatedUser = refreshedProfile.data?.user || getLoggedInUser();
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      setE2eeUser(updatedUser);
-      const targetDevice = (updatedUser.encryptionDevices || []).find((d) => d.deviceId === requesterDeviceId);
-      if (!targetDevice) throw new Error("No target device found");
-      const chatsResponse = await api.get("/chat/my-chats");
-      let syncedCount = 0;
-      for (const chat of chatsResponse.data || []) {
-        const msgs = await api.get(`/message/${chat._id}?includeDeleted=true`);
-        const updates = await Promise.all((msgs.data || []).map(m => buildHistorySyncUpdate({
-          message: m, currentUserId: updatedUser._id, targetUserId: updatedUser._id,
-          targetDeviceId: targetDevice.deviceId, targetPublicKey: targetDevice.publicKey
-        })));
-        // chunked batching handled inline below
-        for (let i = 0; i < updates.length; i += 50) {
-          const chunk = updates.slice(i, i + 50).filter(Boolean);
-          if (chunk.length) await api.post("/message/sync-device-history", { updates: chunk });
-        }
-        syncedCount += updates.length;
-      }
-      socket.emit("history-sync-finished", { requestId, requesterDeviceId, syncedCount });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const _shouldShowHistorySyncBanner = () => {
-    const user = e2eeUser || getLoggedInUser();
-    if (!user?._id || !needsHistorySync(user._id)) return false;
-    const hasOther = (user.encryptionDevices || []).some(d => d.deviceId !== getCurrentDeviceId());
-    return hasOther && !localStorage.getItem(`relaychat-history-sync-requested-${user._id}-${getCurrentDeviceId()}`);
-  };
-
-  if (needsHistorySync(getLoggedInUser()?._id) && (getLoggedInUser()?.encryptionDevices?.length > 1)) {
-     // History Sync Gate content (Omitted for brevity, assume similar to original)
-  }
-
   return (
-    <motion.div
-      ref={containerRef}
-      className={cn("relative group flex h-screen w-screen overflow-hidden text-foreground", getThemeClassName(themeName))}
-      onMouseMove={handleMouseMove}
-    >
-      {/* Premium 3D Background */}
-      <Background3D variant="geometric" className="absolute inset-0 z-0" />
+    <div className={cn("relative flex h-screen w-screen overflow-hidden", getThemeClassName(themeName))}>
+      <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-slate-900/20" />
       
-      {/* Original Background Layers */}
-      <div className="absolute inset-0 chat-canvas" />
-      <div className="absolute inset-0 app-noise opacity-20" />
-      <div data-page-glow className="proximity-glow opacity-0 group-hover:opacity-100" />
-
       {pendingHistorySyncApproval && (
-        <motion.div
-          initial={{ opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -16 }}
-          className="absolute right-4 top-4 z-50 max-w-sm rounded-[24px] border border-secondary/20 bg-card/88 p-4 shadow-panel backdrop-blur-2xl"
-        >
-          <p className="text-sm font-semibold text-foreground">Approve new device</p>
+        <div className="absolute right-4 top-4 z-50 max-w-sm rounded-xl border border-white/10 bg-black/80 p-4 backdrop-blur-md">
+          <p className="text-sm font-medium text-white">Approve new device</p>
           <div className="mt-3 flex gap-2">
-            <button onClick={approveHistorySync} className="flex items-center gap-2 rounded-2xl border border-secondary/20 bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground"><Check size={16} /> Approve</button>
-            <button onClick={() => setPendingHistorySyncApproval(null)} className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/6 px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground"><CloseIcon size={16} /> Decline</button>
+            <button onClick={() => {
+              const { requestId } = pendingHistorySyncApproval;
+              socket.emit("respond-history-sync", { requestId, approved: true });
+              setPendingHistorySyncApproval(null);
+            }} className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm text-white">
+              <Check size={16} /> Approve
+            </button>
+            <button onClick={() => setPendingHistorySyncApproval(null)} className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm text-white/70 hover:text-white">
+              <CloseIcon size={16} /> Decline
+            </button>
           </div>
-        </motion.div>
+        </div>
       )}
 
-      <div className="relative z-10 flex h-full w-full items-stretch gap-0 overflow-hidden p-3 md:gap-3 md:p-4">
-        {/* Mobile-First Sidebar */}
-        <motion.div
-          data-page-hero
-          className={cn(
-            "relative flex h-full shrink-0",
-            selectedChat ? "hidden md:flex" : "flex w-full md:w-auto"
-          )}
-        >
+      <div className="relative z-10 flex h-full w-full p-2 md:p-3">
+        <div className={cn("relative flex h-full", selectedChat ? "hidden md:flex md:w-80 lg:w-96" : "flex w-full md:w-auto")}>
           <Sidebar
             chats={chats} setChats={setChats}
             setSelectedChat={setSelectedChat} selectedChat={selectedChat}
@@ -414,16 +192,17 @@ export default function Chat() {
             setSettingsInitialTab={setSettingsInitialTab}
             onLogout={performLogout}
           />
-        </motion.div>
+        </div>
 
-        {/* Enhanced Chat Window with Mobile Back Button */}
-        <motion.div
-          data-page-hero
-          className={cn(
-            "relative flex h-full min-w-0 overflow-hidden rounded-[32px] border border-white/10 bg-card/28 shadow-panel backdrop-blur-sm",
-            selectedChat ? "flex-1" : "hidden md:flex flex-1"
+        <div className={cn("relative flex h-full flex-1", selectedChat ? "flex" : "hidden md:flex")}>
+          {selectedChat && (
+            <button
+              onClick={() => setSelectedChat(null)}
+              className="absolute left-2 top-2 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-black/50 text-white md:hidden"
+            >
+              <CloseIcon size={16} />
+            </button>
           )}
-        >
           <ChatWindow
             selectedChat={selectedChat} chats={chats}
             setSelectedChat={setSelectedChat} onlineUsers={onlineUsers}
@@ -432,28 +211,13 @@ export default function Chat() {
             setIsAddingContact={setIsAddingContact} setIsCreatingGroup={setIsCreatingGroup}
             setActiveVideoCall={setActiveVideoCall}
           />
-        </motion.div>
-
-        {/* Mobile Back Button */}
-        {selectedChat && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            onClick={() => setSelectedChat(null)}
-            className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/6 backdrop-blur-sm md:hidden"
-          >
-            <CloseIcon size={16} />
-          </motion.button>
-        )}
+        </div>
       </div>
 
-      {/* Global Video Call Overlay */}
       <AnimatePresence mode="wait">
         {activeVideoCall && <VideoCall key={activeVideoCall.callId} {...activeVideoCall} onClose={() => setActiveVideoCall(null)} />}
       </AnimatePresence>
 
-      {/* Settings Overlay */}
       <AnimatePresence>
         {isShowingSettings && (
           <Settings 
@@ -465,6 +229,6 @@ export default function Chat() {
           />
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }

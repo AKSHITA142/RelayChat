@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
   Circle,
@@ -45,14 +44,12 @@ export default function ChatHeader({
   onRequestAddMember,
   onRequestRemoveMember,
   onOpenAddContact,
-  onToggleShowDeleted,
-  showDeleted,
   onClearChat,
   onStartVideoCall,
   menuRef,
 }) {
   return (
-    <div className="z-20 mx-3 mt-3 flex min-h-[5.5rem] items-center justify-between rounded-[28px] border border-white/10 bg-card/72 px-4 py-3 shadow-lifted backdrop-blur-2xl md:mx-4 md:px-5">
+    <div className="z-20 mx-3 mt-3 flex min-h-[5rem] items-center justify-between rounded-2xl border border-white/10 bg-black/50 px-4 py-3 backdrop-blur-md md:mx-4 md:px-5">
       <div className="flex min-w-0 items-center gap-4">
         <div className="relative">
           <Avatar
@@ -62,9 +59,9 @@ export default function ChatHeader({
             size="md"
             className="border-primary/15 bg-primary/10 text-primary"
           />
-          {!selectedChat.isGroup && isOnline ? (
-            <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card bg-secondary shadow-[0_0_16px_hsl(var(--secondary)/0.9)]" />
-          ) : null}
+          {!selectedChat.isGroup && isOnline && (
+            <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500" />
+          )}
         </div>
 
         <div className="min-w-0">
@@ -76,7 +73,7 @@ export default function ChatHeader({
                   value={tempGroupName}
                   onChange={(event) => setTempGroupName(event.target.value)}
                   onKeyDown={(event) => event.key === "Enter" && onRenameSubmit()}
-                  className="h-11 rounded-2xl border border-white/10 bg-white/6 px-4 text-sm text-foreground outline-none ring-0 transition-all focus:border-primary/30"
+                  className="h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none focus:border-primary/30"
                   autoFocus
                 />
                 <IconButton icon={Check} label="Save name" variant="primary" size="sm" onClick={onRenameSubmit} />
@@ -87,7 +84,7 @@ export default function ChatHeader({
                 <button
                   type="button"
                   onClick={() => !selectedChat?.isGroup && onToggleContactInfo()}
-                  className="truncate text-left font-headline text-xl font-bold tracking-[-0.03em] text-foreground transition-colors hover:text-primary"
+                  className="truncate text-left text-xl font-bold text-white hover:text-primary"
                   title={!selectedChat?.isGroup ? "View contact info" : undefined}
                 >
                   {displayName}
@@ -97,7 +94,7 @@ export default function ChatHeader({
                   <button
                     type="button"
                     onClick={onOpenAddContact}
-                    className="rounded-full border border-primary/20 bg-primary/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                    className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-primary hover:bg-primary hover:text-primary-foreground"
                   >
                     Add Contact
                   </button>
@@ -108,21 +105,15 @@ export default function ChatHeader({
 
           <div className="mt-1 flex flex-wrap items-center gap-2">
             {selectedChat?.isGroup ? (
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                Joined • {selectedChat.createdAt ? new Date(selectedChat.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "Recently"}
+              <span className="text-xs text-white/50">
+                Group • {selectedChat.createdAt ? new Date(selectedChat.createdAt).toLocaleDateString([], { month: "short", day: "numeric" }) : "Recent"}
               </span>
             ) : isTyping ? (
-              <StatusBadge
-                status="active"
-                label="Typing"
-                pulse
-                className="gap-2"
-                hideDot={false}
-              />
+              <StatusBadge status="active" label="Typing" pulse className="gap-2" hideDot={false} />
             ) : (
-              <span className={cn("flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.2em]", isOnline ? "text-secondary" : "text-muted-foreground")}>
-                {isOnline ? <Circle size={8} className="fill-secondary text-secondary" /> : null}
-                {isOnline ? "Active now" : lastSeenText}
+              <span className={cn("flex items-center gap-1 text-xs", isOnline ? "text-green-400" : "text-white/50")}>
+                {isOnline && <Circle size={8} className="fill-green-400 text-green-400" />}
+                {isOnline ? "Online" : lastSeenText}
               </span>
             )}
           </div>
@@ -137,14 +128,14 @@ export default function ChatHeader({
             variant={showThemePicker ? "primary" : "default"}
             onClick={() => setShowThemePicker((value) => !value)}
           />
-          {showThemePicker ? (
+          {showThemePicker && (
             <ThemeSelector currentTheme={activeThemeName} onSelect={onThemeSelect} onClose={() => setShowThemePicker(false)} />
-          ) : null}
+          )}
         </div>
 
-        {!selectedChat.isGroup ? (
+        {!selectedChat.isGroup && (
           <IconButton icon={Video} label="Start video call" variant="default" onClick={onStartVideoCall} />
-        ) : null}
+        )}
 
         <IconButton
           icon={MoreHorizontal}
@@ -153,51 +144,44 @@ export default function ChatHeader({
           onClick={() => setShowMenu((value) => !value)}
         />
 
-        <AnimatePresence>
-          {showMenu ? (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className="absolute right-0 top-16 z-50 w-60 rounded-[24px] border border-white/10 bg-card/88 py-2 shadow-panel backdrop-blur-2xl"
-            >
-              <button onClick={onOpenSearch} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8 hover:text-primary">
-                <Search size={16} />
-                Search messages
-              </button>
-              <button onClick={onOpenParticipants} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8 hover:text-primary">
-                <Users size={16} />
-                View participants
-              </button>
-              <button onClick={onStartRename} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8 hover:text-primary">
-                <Edit2 size={16} />
-                Rename {selectedChat.isGroup ? "group" : "chat"}
-              </button>
-              {selectedChat.isGroup ? (
-                <>
-                  <button onClick={onRequestAddMember} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8 hover:text-primary">
-                    <UserPlus size={16} />
-                    Add member
-                  </button>
-                  <button onClick={onRequestRemoveMember} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
-                    <UserMinus size={16} />
-                    Remove member
-                  </button>
-                </>
-              ) : !savedContact && otherUser ? (
-                <button onClick={onOpenAddContact} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8 hover:text-primary">
+        {showMenu && (
+          <div className="absolute right-0 top-14 z-50 w-56 rounded-xl border border-white/10 bg-black/95 py-2 shadow-xl">
+            <button onClick={onOpenSearch} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10">
+              <Search size={16} />
+              Search messages
+            </button>
+            <button onClick={onOpenParticipants} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10">
+              <Users size={16} />
+              View participants
+            </button>
+            <button onClick={onStartRename} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10">
+              <Edit2 size={16} />
+              Rename {selectedChat.isGroup ? "group" : "chat"}
+            </button>
+            {selectedChat.isGroup ? (
+              <>
+                <button onClick={onRequestAddMember} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10">
                   <UserPlus size={16} />
-                  Add to contacts
+                  Add member
                 </button>
-              ) : null}
-              <div className="my-1 h-px bg-white/10" />
-              <button onClick={onClearChat} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
-                <Trash2 size={16} />
-                Clear chat
+                <button onClick={onRequestRemoveMember} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10">
+                  <UserMinus size={16} />
+                  Remove member
+                </button>
+              </>
+            ) : !savedContact && otherUser ? (
+              <button onClick={onOpenAddContact} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10">
+                <UserPlus size={16} />
+                Add to contacts
               </button>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+            ) : null}
+            <div className="my-1 h-px bg-white/10" />
+            <button onClick={onClearChat} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10">
+              <Trash2 size={16} />
+              Clear chat
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

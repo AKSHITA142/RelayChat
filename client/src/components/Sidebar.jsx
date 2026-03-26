@@ -376,56 +376,47 @@ function SidebarContent({
                   onlineUsers.some((userId) => userId?.toString() === otherUser._id.toString());
 
                 return (
-                  <motion.div
+                  <div 
                     key={chat._id}
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ type: "spring", damping: 20, stiffness: 300 }}
+                    className={cn(
+                      "surface-panel rounded-2xl p-4 cursor-pointer hover:bg-white/5",
+                      isSelected && "ring-2 ring-primary/50 shadow-panel"
+                    )}
+                    onClick={() => {
+                      setSelectedChat(chat);
+                      setChats((prev) =>
+                        prev.map((item) => (item._id === chat._id ? { ...item, unreadCount: 0 } : item))
+                      );
+                      closeMobile?.();
+                    }}
                   >
-                    <div 
-                      className={cn(
-                        "surface-panel rounded-2xl p-4 transition-all duration-300 cursor-pointer",
-                        isSelected && "ring-2 ring-primary/50 shadow-panel"
-                      )}
-                      onClick={() => {
-                        setSelectedChat(chat);
-                        setChats((prev) =>
-                          prev.map((item) => (item._id === chat._id ? { ...item, unreadCount: 0 } : item))
-                        );
-                        closeMobile?.();
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div className="surface-panel h-12 w-12 flex items-center justify-center rounded-xl text-sm font-bold">
-                            {chat.isGroup ? "G" : displayName?.[0]}
-                          </div>
-                          {!chat.isGroup && isOnline && (
-                            <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 border-2 border-background" />
-                          )}
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="surface-panel h-12 w-12 flex items-center justify-center rounded-xl text-sm font-bold">
+                          {chat.isGroup ? "G" : displayName?.[0]}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-foreground truncate">{displayName}</h4>
-                            {chat.isGroup && (
-                              <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-primary">
-                                Group
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground truncate mt-1">{getChatPreview(chat)}</p>
-                        </div>
-                        {chat.unreadCount > 0 && (
-                          <span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-black text-secondary-foreground shadow-sm">
-                            {chat.unreadCount}
-                          </span>
+                        {!chat.isGroup && isOnline && (
+                          <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 border-2 border-background" />
                         )}
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-foreground truncate">{displayName}</h4>
+                          {chat.isGroup && (
+                            <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-primary">
+                              Group
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate mt-1">{getChatPreview(chat)}</p>
+                      </div>
+                      {chat.unreadCount > 0 && (
+                        <span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-black text-secondary-foreground shadow-sm">
+                          {chat.unreadCount}
+                        </span>
+                      )}
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })}
             </motion.div>
@@ -435,11 +426,9 @@ function SidebarContent({
 
       {/* Fixed Sign-Out Button at Bottom */}
       <div className="sticky bottom-0 relative z-10 border-t border-white/10 backdrop-blur-sm">
-        <motion.button
+        <button
           onClick={handleLogout}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="surface-panel flex w-full items-center gap-3 px-4 py-4 text-left transition-all duration-300 hover:shadow-panel"
+          className="surface-panel flex w-full items-center gap-3 px-4 py-4 text-left hover:bg-white/5"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/20 text-destructive">
             <LogOut size={18} />
@@ -448,7 +437,7 @@ function SidebarContent({
             <p className="font-semibold text-foreground">Sign Out</p>
             <p className="text-xs text-muted-foreground">End your session securely</p>
           </div>
-        </motion.button>
+        </button>
       </div>
     </div>
   );

@@ -1,171 +1,25 @@
 /* eslint-disable react/prop-types */
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  CheckCircle2,
-  Cloud,
-  Edit3,
-  Eye,
-  Loader2,
-  Lock,
-  LogOut,
-  Palette,
-  Settings2,
-  ShieldAlert,
-  ShieldCheck,
-  Terminal,
-  User,
-} from "lucide-react";
+import { ArrowLeft, Cloud, Edit2, Eye, EyeOff, Loader2, Lock, LogOut, Shield, ShieldCheck, User, X } from "lucide-react";
 import api from "../services/api";
-import { THEME_NAMES, getThemeClassName, useChatTheme } from "../hooks/useChatTheme";
-import { useGsapScrollReveal } from "../hooks/useGsapScrollReveal";
+import { getThemeClassName, useChatTheme } from "../hooks/useChatTheme";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import {
-  DialogShell,
-  DialogShellContent,
-  DialogShellDescription,
-  DialogShellHeader,
-  DialogShellTitle,
-} from "@/components/ui/dialog-shell";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
-const THEME_KEYS = ["stealth_dark", "void", "minimal_dark", "minimal_light"];
-const TAB_ITEMS = [
-  { value: "profile", label: "Profile" },
-  { value: "privacy", label: "Privacy" },
-  { value: "theme", label: "Theme" },
-  { value: "backup", label: "Backup" },
+const TABS = [
+  { id: "profile", label: "Profile", icon: User },
+  { id: "privacy", label: "Privacy", icon: Shield },
+  { id: "backup", label: "Backup", icon: Lock },
 ];
-
-function SectionFrame({ eyebrow, title, description, children }) {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
-      className="space-y-5"
-    >
-      <div className="space-y-2">
-        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary shadow-lg">{eyebrow}</p>
-        <div className="space-y-1">
-          <h3 className="font-headline text-2xl font-black tracking-tight text-gradient">{title}</h3>
-          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
-        </div>
-      </div>
-      {children}
-    </motion.section>
-  );
-}
-
-function StatusBanner({ tone = "success", children }) {
-  const toneClassName = {
-    success: "border-secondary/20 bg-secondary/12 text-secondary",
-    error: "border-destructive/20 bg-destructive/12 text-destructive",
-    info: "border-primary/20 bg-primary/12 text-primary",
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 6 }}
-      className={cn("surface-panel rounded-[22px] border px-4 py-3 text-sm backdrop-blur-xl transition-all duration-300", toneClassName[tone] || toneClassName.info)}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-function PreferenceRow({ icon: Icon, title, description, checked, onCheckedChange }) {
-  return (
-    <Card data-settings-reveal className="surface-panel flex items-center justify-between gap-4 p-5 transition-all duration-300 hover:shadow-panel hover:scale-[1.01]">
-      <div className="flex items-center gap-4">
-        <div
-          className={cn(
-            "surface-panel flex h-12 w-12 items-center justify-center rounded-2xl border transition-all duration-300",
-            checked ? "border-primary/20 bg-primary/12 text-primary shadow-sm" : "border-white/10 bg-white/6 text-muted-foreground hover:border-primary/10"
-          )}
-        >
-          <Icon size={22} />
-        </div>
-        <div className="space-y-1">
-          <p className="text-sm font-semibold text-foreground">{title}</p>
-          <p className="text-xs leading-5 text-muted-foreground">{description}</p>
-        </div>
-      </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
-    </Card>
-  );
-}
-
-function MetricCard({ icon: Icon, label, value }) {
-  return (
-    <Card data-settings-reveal className="surface-panel relative overflow-hidden p-5 transition-all duration-300 hover:shadow-panel hover:scale-[1.02]">
-      <div className="absolute -bottom-3 -right-3 opacity-10">
-        <Icon size={52} />
-      </div>
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Icon size={12} />
-          <p className="text-[10px] font-black uppercase tracking-[0.2em]">{label}</p>
-        </div>
-        <p className="text-2xl font-black tracking-tight text-gradient">{value}</p>
-      </div>
-    </Card>
-  );
-}
-
-function ThemeCard({ themeKey, currentTheme, onSelect }) {
-  const isSelected = currentTheme === themeKey;
-
-  return (
-    <motion.button
-      type="button"
-      onClick={() => onSelect(themeKey)}
-      data-settings-reveal
-      whileHover={{ scale: 1.02, y: -2 }}
-      whileTap={{ scale: 0.98 }}
-      className={cn(
-        "surface-panel relative space-y-4 p-4 text-left transition-all duration-300",
-        isSelected ? "ring-2 ring-primary shadow-panel" : "hover:border-primary/15 hover:shadow-lg"
-      )}
-    >
-      <div className={cn("theme-preview rounded-2xl border border-white/10 p-3", getThemeClassName(themeKey))}>
-        <div className="theme-preview__header" />
-        <div className="mt-3 space-y-2">
-          <div className="theme-preview__bubble theme-preview__bubble--other w-2/3" />
-          <div className="theme-preview__bubble theme-preview__bubble--own ml-auto w-1/2" />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/80">
-          {THEME_NAMES[themeKey] || themeKey}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {themeKey === "minimal_light" ? "Bright, minimal workspace." : "Dark ambient chat canvas."}
-        </p>
-      </div>
-
-      {isSelected ? (
-        <div className="absolute right-3 top-3 text-primary">
-          <CheckCircle2 size={16} fill="currentColor" />
-        </div>
-      ) : null}
-    </motion.button>
-  );
-}
 
 export default function Settings({ user, onUpdate, onClose, onLogout, initialTab = "profile" }) {
   const [, setTheme] = useChatTheme();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [name, setName] = useState(user?.name || "");
-  const [status, setStatus] = useState(user?.status || "Hey there! I'm using RelayChat.");
+  const [status, setStatus] = useState(user?.status || "");
   const [signalVisibility, setSignalVisibility] = useState(user?.signalVisibility ?? true);
   const [vaultProtocol, setVaultProtocol] = useState(user?.vaultProtocol ?? false);
   const [currentTheme, setCurrentTheme] = useState(user?.globalTheme || "stealth_dark");
@@ -181,19 +35,12 @@ export default function Settings({ user, onUpdate, onClose, onLogout, initialTab
   const [verifyPhone, setVerifyPhone] = useState("");
   const [backupStatus, setBackupStatus] = useState("");
   const [isBackingUp, setIsBackingUp] = useState(false);
-  const mainRef = useRef(null);
-  const revealScopeRef = useRef(null);
-
-  useGsapScrollReveal({
-    scopeRef: revealScopeRef,
-    scrollerRef: mainRef,
-    selector: "[data-settings-reveal]",
-    deps: [activeTab],
-  });
+  const [showPin, setShowPin] = useState(false);
+  const [showOldPin, setShowOldPin] = useState(false);
 
   useEffect(() => {
     setName(user?.name || "");
-    setStatus(user?.status || "Hey there! I'm using RelayChat.");
+    setStatus(user?.status || "");
     setSignalVisibility(user?.signalVisibility ?? true);
     setVaultProtocol(user?.vaultProtocol ?? false);
     setCurrentTheme(user?.globalTheme || "stealth_dark");
@@ -215,74 +62,43 @@ export default function Settings({ user, onUpdate, onClose, onLogout, initialTab
         setVaultProtocol(userData.vaultProtocol ?? false);
         setCurrentTheme(userData.globalTheme || "stealth_dark");
         setAvatar(userData.avatar || "");
-
         if (userData) {
           localStorage.setItem("user", JSON.stringify(userData));
           onUpdate?.(userData);
         }
       } catch (error) {
-        console.error("Failed to fetch fresh profile:", error);
+        console.error("Failed to fetch profile:", error);
       }
     };
-
     fetchProfile();
   }, []);
 
-  const handleUpdate = async (overrides = {}) => {
-    const payload = {
-      name: overrides.name !== undefined ? overrides.name : name,
-      status: overrides.status !== undefined ? overrides.status : status,
-      signalVisibility: overrides.signalVisibility !== undefined ? overrides.signalVisibility : signalVisibility,
-      vaultProtocol: overrides.vaultProtocol !== undefined ? overrides.vaultProtocol : vaultProtocol,
-      globalTheme: overrides.globalTheme !== undefined ? overrides.globalTheme : currentTheme,
-    };
-
-    if (!payload.name.trim()) {
-      setMessage("Identity error: Name cannot be empty.");
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setMessage("Name is required");
       return;
     }
-
     setLoading(true);
     setMessage("");
     try {
-      const response = await api.put("/user/profile", payload);
+      const response = await api.put("/user/profile", { name, status, signalVisibility, vaultProtocol, globalTheme: currentTheme });
       const updatedUser = response.data.user;
       localStorage.setItem("user", JSON.stringify(updatedUser));
       onUpdate(updatedUser);
-
-      if (overrides.globalTheme) {
-        setTheme(overrides.globalTheme);
-      }
-
-      setMessage("System synchronized successfully.");
-      window.setTimeout(() => setMessage(""), 3000);
+      setMessage("Saved successfully!");
+      setTimeout(() => setMessage(""), 2000);
     } catch (error) {
-      console.error(error);
-      setMessage(error.response?.data?.message || "System error: Synchronization failed.");
+      setMessage(error.response?.data?.message || "Failed to save");
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleSignalVisibility = () => {
-    const nextValue = !signalVisibility;
-    setSignalVisibility(nextValue);
-    handleUpdate({ signalVisibility: nextValue });
-  };
-
-  const toggleVaultProtocol = () => {
-    const nextValue = !vaultProtocol;
-    setVaultProtocol(nextValue);
-    handleUpdate({ vaultProtocol: nextValue });
-  };
-
   const handleAvatarChange = async (event) => {
-    const file = event.target.files[0];
+    const file = event.target.files?.[0];
     if (!file) return;
-
     const formData = new FormData();
     formData.append("file", file);
-
     setLoading(true);
     try {
       const response = await api.post("/user/profile/avatar", formData, {
@@ -292,426 +108,461 @@ export default function Settings({ user, onUpdate, onClose, onLogout, initialTab
       setAvatar(updatedUser.avatar);
       localStorage.setItem("user", JSON.stringify(updatedUser));
       onUpdate(updatedUser);
-      setMessage("Avatar enhanced successfully.");
-      window.setTimeout(() => setMessage(""), 3000);
+      setMessage("Avatar updated!");
+      setTimeout(() => setMessage(""), 2000);
     } catch (error) {
-      console.error(error);
-      setMessage("System error: Avatar upload failed.");
+      setMessage("Failed to upload avatar");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLeave = () => {
-    if (window.confirm("Terminate connection? This will log you out of the terminal.")) {
-      onLogout();
-    }
-  };
-
-  const handleBackupKey = async () => {
+  const handleBackup = async () => {
     if (!backupPin || backupPin.length < 4) {
-      setBackupStatus("Error: PIN must be at least 4 digits.");
+      setBackupStatus("PIN must be at least 4 digits");
       return;
     }
-
     if (user?.encryptedBackupKey && !isResetMode && !isVerifyingOldPin) {
       setIsVerifyingOldPin(true);
-      setBackupStatus("Security Check: Previous PIN required.");
+      setBackupStatus("Enter current PIN first");
       return;
     }
-
     setIsBackingUp(true);
     setBackupStatus("");
     try {
       const { backupPrivateKeyToCloud, restorePrivateKeyFromCloud } = await import("../services/e2ee");
-
       if (isVerifyingOldPin) {
         try {
           await restorePrivateKeyFromCloud(api, user?._id || user?.id, oldPin);
         } catch {
-          setBackupStatus("Verification failed: Incorrect previous PIN.");
+          setBackupStatus("Incorrect current PIN");
           setIsBackingUp(false);
           return;
         }
       }
-
       await backupPrivateKeyToCloud(api, user?._id || user?.id, backupPin);
-      setBackupStatus("Secure Backup Successfully Reset.");
+      setBackupStatus("Backup saved successfully!");
       setBackupPin("");
       setOldPin("");
       setIsVerifyingOldPin(false);
       setIsResetMode(false);
-
       const refreshed = await api.get("/user/profile");
       if (refreshed.data?.user) {
         localStorage.setItem("user", JSON.stringify(refreshed.data.user));
         onUpdate(refreshed.data.user);
       }
-
-      window.setTimeout(() => setBackupStatus(""), 4000);
+      setTimeout(() => setBackupStatus(""), 3000);
     } catch (error) {
-      console.error(error);
-      setBackupStatus(error.message || "Backup failed: Internal system error.");
+      setBackupStatus(error.message || "Backup failed");
     } finally {
       setIsBackingUp(false);
     }
   };
 
-  const handleForgotPinReset = async () => {
+  const handleVerifyReset = async () => {
     if (!verifyPhone) {
-      setBackupStatus("Security Note: Enter mobile for identity proof.");
+      setBackupStatus("Enter phone number");
       return;
     }
-
     setIsBackingUp(true);
     try {
       await api.post("/user/verify-reset", { phoneNumber: verifyPhone });
       setIsResetMode(true);
       setIsVerifyingOldPin(false);
-      setBackupStatus("Mobile Verified. Override permission granted.");
+      setBackupStatus("Verified! Enter new PIN");
     } catch (error) {
-      setBackupStatus(error.response?.data?.message || "Identity theft protection: Phone mismatch.");
+      setBackupStatus(error.response?.data?.message || "Verification failed");
     } finally {
       setIsBackingUp(false);
     }
   };
 
-  const isMessageError = message.includes("Error") || message.includes("failed");
-  const isBackupError = backupStatus.includes("Error") || backupStatus.includes("failed") || backupStatus.includes("mismatch");
+  const isError = (msg) => msg.includes("Failed") || msg.includes("Incorrect") || msg.includes("required") || msg.includes("must");
 
   return (
-    <DialogShell open onOpenChange={(open) => !open && onClose()}>
-      <DialogShellContent className="h-[92vh] w-[min(calc(100%-1rem),72rem)] max-w-none overflow-hidden p-0">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className={cn("relative", getThemeClassName(currentTheme))}>
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute inset-0 chat-canvas opacity-90" />
-            <div className="absolute inset-0 app-noise opacity-30" />
-            <div className="absolute left-[-12%] top-[-16%] h-[34rem] w-[34rem] rounded-full bg-primary/15 blur-[140px]" />
-            <div className="absolute bottom-[-16%] right-[-12%] h-[34rem] w-[34rem] rounded-full bg-secondary/12 blur-[160px]" />
-            <div className="absolute inset-0 bg-background/45" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className={cn(
+        "relative flex max-h-[95vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/20 shadow-2xl",
+        getThemeClassName(currentTheme)
+      )}>
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/5" />
+        
+        <div className="relative z-10 flex items-center gap-4 border-b border-white/10 bg-black/40 px-5 py-4">
+          <button
+            onClick={onClose}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-all hover:bg-white/10 hover:text-white"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="flex-1">
+            <h2 className="text-xl font-bold text-white">Settings</h2>
+            <p className="text-xs text-white/50">Manage your account</p>
           </div>
+          <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full text-white/70 hover:bg-white/5 hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
 
-          <div className="relative grid h-full min-h-0 overflow-hidden lg:grid-cols-[280px,1fr]">
-            <aside className="overflow-y-auto border-b border-white/10 bg-card/70 p-4 backdrop-blur-2xl lg:border-b-0 lg:border-r lg:p-6">
-              <DialogShellHeader className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">Relaychat Control</p>
-                <DialogShellTitle className="font-headline text-3xl font-black tracking-tight">Settings</DialogShellTitle>
-                <DialogShellDescription>
-                  Update your identity, privacy posture, visual theme, and recovery key setup.
-                </DialogShellDescription>
-              </DialogShellHeader>
+        <div className="relative z-10 flex flex-1 overflow-hidden">
+          <nav className="hidden w-56 flex-col border-r border-white/10 bg-black/20 p-4 sm:flex">
+            <div className="mb-6 flex flex-col items-center gap-3 text-center">
+              <div className="relative">
+                <Avatar
+                  src={avatar ? `http://localhost:5002${avatar}` : undefined}
+                  alt={name || "User"}
+                  fallback={name?.[0] || "?"}
+                  size="2xl"
+                  className="h-20 w-20 rounded-full border-2 border-primary/50 shadow-lg"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md"
+                >
+                  <Edit2 size={12} />
+                </button>
+                <input type="file" ref={fileInputRef} onChange={handleAvatarChange} className="hidden" accept="image/*" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">{name || "User"}</p>
+                <p className="text-xs text-white/50 line-clamp-1">{status || "Hey there!"}</p>
+              </div>
+            </div>
 
-              <div className="mt-6 space-y-5">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <Avatar
-                      src={avatar ? `http://localhost:5002${avatar}` : undefined}
-                      alt={name || "Profile"}
-                      fallback={name?.[0] || "?"}
-                      size="xl"
-                      className="border-primary/20 shadow-[0_0_32px_hsl(var(--primary)/0.2)]"
-                    />
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleAvatarChange}
-                      className="hidden"
-                      accept="image/*"
-                    />
-                    <Button
-                      size="icon"
-                      type="button"
-                      className="absolute -bottom-1 -right-1 rounded-full"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Edit3 size={14} />
-                    </Button>
-                  </div>
-                  <div className="space-y-1">
-                    <h2 className="font-headline text-lg font-black tracking-tight text-foreground">{name || "Identity_Null"}</h2>
-                    <p className="text-xs text-muted-foreground">{status || "No status broadcast set."}</p>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                      {signalVisibility ? "Visible Node" : "Ghost Protocol"}
-                    </p>
+            <div className="mt-4 space-y-1">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all",
+                    activeTab === tab.id
+                      ? "bg-primary text-primary-foreground shadow-lg"
+                      : "text-white/70 hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  <tab.icon size={18} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => onLogout()}
+              className="mt-auto flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-red-400 transition-all hover:bg-red-500/10"
+            >
+              <LogOut size={18} />
+              Logout
+            </button>
+          </nav>
+
+          <main className="flex-1 overflow-y-auto p-5 sm:p-6">
+            {message && (
+              <div className={cn(
+                "mb-4 rounded-xl px-4 py-3 text-sm font-medium",
+                isError(message) ? "bg-red-500/20 text-red-300 border border-red-500/30" : "bg-green-500/20 text-green-300 border border-green-500/30"
+              )}>
+                {message}
+              </div>
+            )}
+
+            {activeTab === "profile" && (
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <Avatar
+                        src={avatar ? `http://localhost:5002${avatar}` : undefined}
+                        alt={name || "User"}
+                        fallback={name?.[0] || "?"}
+                        size="2xl"
+                        className="h-24 w-24 rounded-full border-4 border-background shadow-xl"
+                      />
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-white">{name || "Your Name"}</h3>
+                      <p className="text-white/60">{status || "No status set"}</p>
+                    </div>
                   </div>
                 </div>
 
-                <Card className="space-y-3 p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Quick state</span>
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-                      {THEME_NAMES[currentTheme] || currentTheme}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="surface-inline rounded-[18px] px-3 py-2">
-                      <p className="text-muted-foreground">Visibility</p>
-                      <p className="mt-1 font-semibold text-foreground">{signalVisibility ? "Enabled" : "Hidden"}</p>
+                <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+                  <h4 className="font-semibold text-white">Edit Profile</h4>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/70">Name</label>
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Enter your name"
+                        className="flex h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-white placeholder:text-white/30 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      />
                     </div>
-                    <div className="surface-inline rounded-[18px] px-3 py-2">
-                      <p className="text-muted-foreground">Vault</p>
-                      <p className="mt-1 font-semibold text-foreground">{vaultProtocol ? "Masked" : "Standard"}</p>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/70">Status</label>
+                      <input
+                        type="text"
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                        placeholder="What's on your mind?"
+                        className="flex h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-white placeholder:text-white/30 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      />
                     </div>
-                  </div>
-                </Card>
-
-                <TabsList className="grid w-full grid-cols-2 gap-2 rounded-2xl bg-transparent p-0 lg:grid-cols-1 lg:border-0 lg:bg-transparent">
-                  {TAB_ITEMS.map((item) => (
-                    <TabsTrigger
-                      key={item.value}
-                      value={item.value}
-                      className="justify-start rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-left data-[state=active]:border-primary/20 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    <button
+                      onClick={handleSave}
+                      disabled={loading}
+                      className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-medium text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-50"
                     >
-                      {item.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+                      {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving... </> : "Save Changes"}
+                    </button>
+                  </div>
+                </div>
 
-                <Button variant="destructive" className="w-full justify-center gap-2 rounded-2xl" onClick={handleLeave}>
-                  <LogOut size={16} />
-                  Termination Sequence
-                </Button>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-xl bg-white/5 p-4 text-center">
+                    <p className="text-xl font-bold text-primary">AES-256</p>
+                    <p className="text-xs text-white/50">Encryption</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-4 text-center">
+                    <p className="text-xl font-bold text-green-400">Active</p>
+                    <p className="text-xs text-white/50">E2EE</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-4 text-center">
+                    <p className="text-xl font-bold text-white">{signalVisibility ? "On" : "Off"}</p>
+                    <p className="text-xs text-white/50">Online</p>
+                  </div>
+                </div>
               </div>
-            </aside>
+            )}
 
-            <main ref={mainRef} className="min-h-0 overflow-y-auto bg-background/20 p-4 lg:p-6">
-              <div ref={revealScopeRef} className="space-y-6">
-                <AnimatePresence mode="wait">
-                  {message ? (
-                    <StatusBanner key={message} tone={isMessageError ? "error" : "success"}>
-                      {message}
-                    </StatusBanner>
-                  ) : null}
-                </AnimatePresence>
-
-                <TabsContent value="profile">
-                  <SectionFrame
-                    eyebrow="Identity"
-                    title="Profile settings"
-                    description="Manage the public label and status that appear across Relaychat."
-                  >
-                    <div className="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
-                      <Card data-settings-reveal className="space-y-5 p-6">
-                        <div className="grid gap-5 md:grid-cols-2">
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-                              Archive label
-                            </label>
-                            <Input
-                              value={name}
-                              onChange={(event) => setName(event.target.value)}
-                              placeholder="Your identity name..."
-                              icon={User}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-                              System frequency
-                            </label>
-                            <Input
-                              value={status}
-                              onChange={(event) => setStatus(event.target.value)}
-                              placeholder="Status broadcast..."
-                              icon={Terminal}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-3">
-                          <Button onClick={() => handleUpdate()} disabled={loading}>
-                            {loading ? (
-                              <>
-                                <Loader2 className="animate-spin" />
-                                Synchronizing
-                              </>
-                            ) : (
-                              "Submit to ledger"
-                            )}
-                          </Button>
-                          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                            Update avatar
-                          </Button>
-                        </div>
-                      </Card>
-
-                      <Card data-settings-reveal className="space-y-4 p-6">
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
-                          Identity preview
-                        </p>
-                        <div className="surface-inline rounded-3xl p-5">
-                          <div className="flex items-center gap-4">
-                            <Avatar
-                              src={avatar ? `http://localhost:5002${avatar}` : undefined}
-                              alt={name || "Profile"}
-                              fallback={name?.[0] || "?"}
-                              size="lg"
-                              className="border-primary/20"
-                            />
-                            <div className="space-y-1">
-                              <p className="font-semibold text-foreground">{name || "Identity_Null"}</p>
-                              <p className="text-sm text-muted-foreground">{status || "No status broadcast set."}</p>
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-xs leading-6 text-muted-foreground">
-                          These values are saved to your profile and reused across conversations, presence, and future device sessions.
-                        </p>
-                      </Card>
-                    </div>
-                  </SectionFrame>
-                </TabsContent>
-
-                <TabsContent value="privacy">
-                  <SectionFrame
-                    eyebrow="Protection"
-                    title="Privacy controls"
-                    description="Control presence visibility and identity masking without changing your account flows."
-                  >
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      <PreferenceRow
-                        icon={Eye}
-                        title="Signal visibility"
-                        description="Sync your online status to other users."
-                        checked={signalVisibility}
-                        onCheckedChange={toggleSignalVisibility}
-                      />
-                      <PreferenceRow
-                        icon={Lock}
-                        title="Vault protocol"
-                        description="Mask your identity in higher privacy mode."
-                        checked={vaultProtocol}
-                        onCheckedChange={toggleVaultProtocol}
-                      />
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <MetricCard icon={Lock} label="Encryption" value="AES-256-GCM" />
-                      <MetricCard icon={Cloud} label="E2EE storage" value="Enabled" />
-                      <MetricCard icon={ShieldCheck} label="Profile state" value={vaultProtocol ? "Masked" : "Standard"} />
-                    </div>
-                  </SectionFrame>
-                </TabsContent>
-
-                <TabsContent value="theme">
-                  <SectionFrame
-                    eyebrow="Appearance"
-                    title="Theme studio"
-                    description="Preview and apply the global chat theme used across Relaychat."
-                  >
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                      {THEME_KEYS.map((themeKey) => (
-                        <ThemeCard
-                          key={themeKey}
-                          themeKey={themeKey}
-                          currentTheme={currentTheme}
-                          onSelect={(nextTheme) => {
-                            setCurrentTheme(nextTheme);
-                            handleUpdate({ globalTheme: nextTheme });
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </SectionFrame>
-                </TabsContent>
-
-                <TabsContent value="backup">
-                  <SectionFrame
-                    eyebrow="Recovery"
-                    title="Backup and restore"
-                    description="Protect your encrypted key material with a cloud backup PIN and verification fallback."
-                  >
-                    <Card data-settings-reveal className="space-y-5 p-6">
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-foreground">Cloud key backup</p>
-                          <p className="text-sm leading-6 text-muted-foreground">
-                            This PIN encrypts your private keys before upload. Keep it safe for multi-device synchronization.
-                          </p>
-                        </div>
-                        <AnimatePresence mode="wait">
-                          {backupStatus ? (
-                            <StatusBanner key={backupStatus} tone={isBackupError ? "error" : "info"}>
-                              {backupStatus}
-                            </StatusBanner>
-                          ) : null}
-                        </AnimatePresence>
+            {activeTab === "privacy" && (
+              <div className="space-y-5">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/20">
+                        <Eye size={22} className="text-blue-400" />
                       </div>
+                      <div>
+                        <p className="font-medium text-white">Online Status</p>
+                        <p className="text-xs text-white/50">Show when you're online</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSignalVisibility(!signalVisibility)}
+                      className={cn(
+                        "relative h-6 w-11 rounded-full transition-colors",
+                        signalVisibility ? "bg-green-500" : "bg-white/20"
+                      )}
+                    >
+                      <span className={cn(
+                        "absolute top-1 h-4 w-4 rounded-full bg-white transition-all",
+                        signalVisibility ? "left-6" : "left-1"
+                      )} />
+                    </button>
+                  </div>
 
-                      {user?.encryptedBackupKey && !isResetMode ? (
-                        <Card data-settings-reveal className="space-y-4 border-destructive/15 bg-destructive/8 p-5">
-                          <div className="flex items-center gap-2 text-destructive">
-                            <ShieldAlert size={16} />
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">
-                              Previous identification required
-                            </p>
-                          </div>
+                  <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/20">
+                        <Lock size={22} className="text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">Privacy Mode</p>
+                        <p className="text-xs text-white/50">Enhanced privacy</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setVaultProtocol(!vaultProtocol)}
+                      className={cn(
+                        "relative h-6 w-11 rounded-full transition-colors",
+                        vaultProtocol ? "bg-green-500" : "bg-white/20"
+                      )}
+                    >
+                      <span className={cn(
+                        "absolute top-1 h-4 w-4 rounded-full bg-white transition-all",
+                        vaultProtocol ? "left-6" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+                </div>
 
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <Input
-                              type="password"
-                              placeholder="Current security PIN"
-                              value={oldPin}
-                              onChange={(event) => setOldPin(event.target.value)}
-                              icon={Lock}
-                            />
-                            <div className="flex gap-2">
-                              <Input
-                                type="text"
-                                placeholder="Registered mobile number"
-                                value={verifyPhone}
-                                onChange={(event) => setVerifyPhone(event.target.value)}
-                                className="flex-1"
-                              />
-                              <Button variant="outline" onClick={handleForgotPinReset}>
-                                Verify
-                              </Button>
-                            </div>
-                          </div>
+                <button
+                  onClick={handleSave}
+                  disabled={loading}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-medium text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving... </> : "Save Privacy Settings"}
+                </button>
 
-                          <p className="text-xs leading-6 text-muted-foreground">
-                            Forgot your PIN? Verify your mobile number to bypass the previous encryption checkpoint.
-                          </p>
-                        </Card>
-                      ) : null}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-xl bg-green-500/10 p-4 text-center">
+                    <ShieldCheck size={28} className="mx-auto mb-2 text-green-400" />
+                    <p className="text-sm font-medium text-white">Protected</p>
+                  </div>
+                  <div className="rounded-xl bg-blue-500/10 p-4 text-center">
+                    <Lock size={28} className="mx-auto mb-2 text-blue-400" />
+                    <p className="text-sm font-medium text-white">Encrypted</p>
+                  </div>
+                  <div className="rounded-xl bg-purple-500/10 p-4 text-center">
+                    <Shield size={28} className="mx-auto mb-2 text-purple-400" />
+                    <p className="text-sm font-medium text-white">Secured</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
-                      <div className="grid gap-4 md:grid-cols-[1fr,auto]">
-                        <Input
-                          type="password"
-                          placeholder={
-                            user?.encryptedBackupKey ? "Enter new security PIN" : "Enter security PIN (4+ digits)"
-                          }
+            {activeTab === "backup" && (
+              <div className="space-y-5">
+                {backupStatus && (
+                  <div className={cn(
+                    "rounded-xl px-4 py-3 text-sm font-medium border",
+                    isError(backupStatus) ? "bg-red-500/20 text-red-300 border-red-500/30" : "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                  )}>
+                    {backupStatus}
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                  <div className="mb-4 flex items-center gap-4">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow-500/20 shadow-lg">
+                      <Lock size={28} className="text-yellow-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Encryption Key Backup</h3>
+                      <p className="text-sm text-white/60">
+                        {user?.encryptedBackupKey ? "Backup configured - You can reset it" : "No backup - Create one now"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {user?.encryptedBackupKey && !isResetMode && (
+                    <div className="mb-4 space-y-3 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+                      <p className="flex items-center gap-2 text-sm font-medium text-red-400">
+                        <ShieldCheck size={16} />
+                        Reset Backup Requires Verification
+                      </p>
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <input
+                            type={showOldPin ? "text" : "password"}
+                            placeholder="Enter current PIN"
+                            value={oldPin}
+                            onChange={(e) => setOldPin(e.target.value)}
+                            className="flex h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 pr-12 text-white placeholder:text-white/30 focus:border-primary/50 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowOldPin(!showOldPin)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-1"
+                          >
+                            {showOldPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Your phone number"
+                          value={verifyPhone}
+                          onChange={(e) => setVerifyPhone(e.target.value)}
+                          className="flex h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-white placeholder:text-white/30 focus:border-primary/50 focus:outline-none"
+                        />
+                        <button
+                          onClick={handleVerifyReset}
+                          disabled={isBackingUp}
+                          className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 text-sm font-medium text-white/70 transition-all hover:bg-white/5 disabled:opacity-50"
+                        >
+                          {isBackingUp ? "Verifying..." : "Verify & Reset"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/70">
+                        {user?.encryptedBackupKey && !isResetMode ? "New PIN" : "Create PIN (enter 4+ digits)"}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPin ? "text" : "password"}
+                          placeholder="Enter PIN here..."
                           value={backupPin}
-                          onChange={(event) => setBackupPin(event.target.value)}
-                          icon={Lock}
-                          className="font-mono"
+                          onChange={(e) => setBackupPin(e.target.value)}
+                          maxLength={8}
+                          className="flex h-14 w-full rounded-xl border border-white/10 bg-white/5 px-4 pr-12 text-lg text-white placeholder:text-white/30 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
-                        <Button onClick={handleBackupKey} disabled={isBackingUp || !backupPin} className="min-w-[11rem]">
-                          {isBackingUp ? (
-                            <>
-                              <Loader2 className="animate-spin" />
-                              Validating
-                            </>
-                          ) : user?.encryptedBackupKey ? (
-                            "Reset key"
-                          ) : (
-                            "Save backup"
-                          )}
-                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => setShowPin(!showPin)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-1"
+                        >
+                          {showPin ? <EyeOff size={22} /> : <Eye size={22} />}
+                        </button>
                       </div>
-                    </Card>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <MetricCard icon={Cloud} label="Backup state" value={user?.encryptedBackupKey ? "Configured" : "Not set"} />
-                      <MetricCard icon={Settings2} label="Version" value="RP-2.0.4" />
                     </div>
-                  </SectionFrame>
-                </TabsContent>
+                    
+                    {backupPin && (
+                      <div className="flex gap-1.5">
+                        {[...Array(8)].map((_, i) => (
+                          <div
+                            key={i}
+                            className={cn(
+                              "h-2 flex-1 rounded-full transition-all",
+                              i < backupPin.length ? "bg-yellow-400" : "bg-white/10"
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleBackup}
+                      disabled={isBackingUp || backupPin.length < 4}
+                      className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-yellow-500 font-semibold text-black transition-all hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isBackingUp ? (
+                        <><Loader2 className="h-5 w-5 animate-spin" /> Processing... </>
+                      ) : user?.encryptedBackupKey ? (
+                        "Reset Backup"
+                      ) : (
+                        "Save Backup"
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-white/5 p-4 text-center">
+                    <div className="mb-2 flex items-center justify-center gap-2 text-white/50">
+                      <Cloud size={18} />
+                      <span className="text-xs font-medium uppercase">Status</span>
+                    </div>
+                    <p className={cn(
+                      "text-lg font-bold",
+                      user?.encryptedBackupKey ? "text-green-400" : "text-white/50"
+                    )}>
+                      {user?.encryptedBackupKey ? "Active" : "None"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-4 text-center">
+                    <div className="mb-2 flex items-center justify-center gap-2 text-white/50">
+                      <ShieldCheck size={18} />
+                      <span className="text-xs font-medium uppercase">Security</span>
+                    </div>
+                    <p className="text-lg font-bold text-green-400">Protected</p>
+                  </div>
+                </div>
               </div>
-            </main>
-          </div>
-        </Tabs>
-      </DialogShellContent>
-    </DialogShell>
+            )}
+          </main>
+        </div>
+      </div>
+    </div>
   );
 }
