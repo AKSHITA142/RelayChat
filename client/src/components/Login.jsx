@@ -67,8 +67,8 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   const handleLoginSuccess = async (res) => {
     localStorage.setItem("token", res.data.token);
     localStorage.setItem("user", JSON.stringify(res.data.user));
-    localStorage.setItem("session-active", "true");
-
+    // DONT set session-active here — wait for verification completion
+    
     // Always show PIN/Device verification as the mandatory second step
     setRestoreAuthData(res.data);
     setShowRestorePrompt(true);
@@ -90,6 +90,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       }
       
       setShowRestorePrompt(false);
+      localStorage.setItem("session-active", "true");
       connectSocket();
       onLogin();
     } catch (err) {
@@ -138,20 +139,34 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
             setSyncStatus("Approval request sent! Please check your other trusted device.");
           } else {
             setSyncStatus("No other devices online. You can log in without history sync.");
-            setTimeout(() => { setShowRestorePrompt(false); onLogin(); }, 5000);
+            setTimeout(() => { 
+              setShowRestorePrompt(false); 
+              localStorage.setItem("session-active", "true");
+              onLogin(); 
+            }, 5000);
           }
         });
 
         socket.on("history-sync-complete", (data) => {
           if (data.requesterDeviceId === deviceId) {
             setSyncStatus("Approved! Syncing your encrypted keys...");
-            setTimeout(() => { setShowRestorePrompt(false); onLogin(); window.location.reload(); }, 2500);
+            setTimeout(() => { 
+              setShowRestorePrompt(false); 
+              localStorage.setItem("session-active", "true");
+              onLogin(); 
+              window.location.reload(); 
+            }, 2500);
           }
         });
       } else {
         // No other devices — just let them in
         setSyncStatus("No trusted devices found. Logging in without history sync.");
-        setTimeout(() => { setShowRestorePrompt(false); connectSocket(); onLogin(); }, 3000);
+        setTimeout(() => { 
+          setShowRestorePrompt(false); 
+          localStorage.setItem("session-active", "true");
+          connectSocket(); 
+          onLogin(); 
+        }, 3000);
       }
     } catch (keyError) {
       console.error("Device verification error:", keyError);

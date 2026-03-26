@@ -48,9 +48,10 @@ export default function RestoreSessionUI({
                   <h3 className="font-headline text-3xl font-bold tracking-tight text-foreground">Waiting for approval</h3>
                   <p className="mx-auto max-w-md text-sm leading-7 text-muted-foreground">{syncStatus}</p>
                 </div>
-                <Button variant="outline" onClick={onContinueWithoutHistory} className="mt-8 w-full sm:w-auto">
-                  Continue without synced history
-                </Button>
+                <div className="mt-8 flex items-center justify-center gap-2 text-sm font-medium text-secondary animate-pulse">
+                  <ShieldCheck size={16} />
+                  Awaiting security confirmation...
+                </div>
               </div>
             </Card>
           </motion.div>
