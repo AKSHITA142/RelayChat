@@ -63,12 +63,10 @@ export default function AuthShell({
                 <div className="flex items-center gap-4">
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/40 to-secondary/40 p-1 shadow-lg">
                     <img 
-                      src="/relaychat-logo.svg" 
+                      src="/logo.png" 
                       alt="RelayChat" 
                       className="h-full w-full object-contain"
-                      onError={(e) => { e.target.style.display = 'none'; }}
                     />
-                    <span className="text-2xl font-bold text-primary">R</span>
                   </div>
                   <div>
                     <p className="font-headline text-3xl font-bold tracking-tight text-gradient">RelayChat</p>
@@ -124,12 +122,10 @@ export default function AuthShell({
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/40 to-secondary/40 p-0.5 shadow-md">
                       <img 
-                        src="/relaychat-logo.svg" 
+                        src="/logo.png" 
                         alt="RelayChat" 
                         className="h-full w-full object-contain"
-                        onError={(e) => { e.target.style.display = 'none'; }}
                       />
-                      <span className="text-xl font-bold text-primary">R</span>
                     </div>
                     <div className="section-badge shadow-lg">
                       <Sparkles size={12} />
