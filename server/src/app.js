@@ -30,6 +30,7 @@ app.use(cors({
       "http://localhost:3001",
       "http://localhost:8080",
       "http://127.0.0.1:5173",
+      "https://relay-chat-am.vercel.app",
       process.env.BASE_URL,
       process.env.CORS_ORIGIN
     ];
@@ -37,7 +38,7 @@ app.use(cors({
     // Production frontend URL from environment variable
     const prodOrigin = process.env.CORS_ORIGIN;
     
-    if (allowedDevOrigins.includes(origin) || origin === prodOrigin) {
+    if (allowedDevOrigins.includes(origin) || origin === prodOrigin || origin.endsWith(".vercel.app")) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
