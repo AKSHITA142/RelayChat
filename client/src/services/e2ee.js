@@ -1,3 +1,5 @@
+import { config } from "../config";
+
 const RSA_ALGORITHM = {
   name: "RSA-OAEP",
   modulusLength: 2048,
@@ -479,7 +481,7 @@ const decryptWrappedKeyForUser = async (encryptedKeys, currentUserId) => {
 export const getDecryptedAttachmentData = async (message, currentUserId) => {
   if (!message?.encryptedFile?.iv || !message?.fileUrl) {
     return message?.fileUrl ? {
-      url: `http://localhost:5002${message.fileUrl}`,
+      url: config.endpoints.files(message.fileUrl),
       fileName: message.fileName || "Attachment",
       mimeType: message.fileType || "application/octet-stream",
     } : null;
@@ -492,7 +494,7 @@ export const getDecryptedAttachmentData = async (message, currentUserId) => {
 
   const rawAesKey = await decryptWrappedKeyForUser(message.encryptedFile.encryptedKeys, currentUserId);
   const aesKey = await importAesKey(rawAesKey, ["decrypt"]);
-  const response = await fetch(`http://localhost:5002${message.fileUrl}`);
+  const response = await fetch(config.endpoints.files(message.fileUrl));
   const encryptedFileBuffer = await response.arrayBuffer();
   const decryptedFileBuffer = await window.crypto.subtle.decrypt(
     { name: AES_ALGORITHM, iv: new Uint8Array(fromBase64(message.encryptedFile.iv)) },

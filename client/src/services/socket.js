@@ -1,7 +1,8 @@
 import { io } from "socket.io-client";
 import { getCurrentDeviceId } from "./e2ee";
+import { config } from "../config";
 
-const socket = io("http://localhost:5002", {
+const socket = io(config.socketUrl, {
   autoConnect: false,
 });
 

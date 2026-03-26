@@ -18,6 +18,8 @@ const PC_CONFIG = {
 
 const RINGER_URL = "https://assets.mixkit.co/active_storage/sfx/1350/1350-preview.mp3";
 
+import { config } from "../config";
+
 function startRinger() {
   stopRinger();
   const audio = new Audio(RINGER_URL);

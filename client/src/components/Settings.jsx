@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { config } from "../config";
 
 const TABS = [
   { id: "profile", label: "Profile", icon: User },
@@ -208,7 +209,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout, initialTab
             <div className="mb-6 flex flex-col items-center gap-3 text-center">
               <div className="relative">
                 <Avatar
-                  src={avatar ? `http://localhost:5002${avatar}` : undefined}
+                  src={avatar ? config.endpoints.files(avatar) : undefined}
                   alt={name || "User"}
                   fallback={name?.[0] || "?"}
                   size="2xl"
@@ -271,7 +272,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout, initialTab
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <Avatar
-                        src={avatar ? `http://localhost:5002${avatar}` : undefined}
+                        src={avatar ? config.endpoints.files(avatar) : undefined}
                         alt={name || "User"}
                         fallback={name?.[0] || "?"}
                         size="2xl"

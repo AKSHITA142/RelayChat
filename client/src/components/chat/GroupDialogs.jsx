@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/search-field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { UserListItem } from "@/components/ui/user-list-item";
+import { config } from "../../config";
 
 const getEntityId = (value) => {
   if (!value) return null;
@@ -129,7 +130,7 @@ export default function GroupDialogs({
                             key={user._id || user}
                             title={user.name || user.phoneNumber}
                             subtitle={isAlreadyIn ? "Already in group" : "Recent chat"}
-                            avatarSrc={user.avatar ? `http://localhost:5002${user.avatar}` : undefined}
+                            avatarSrc={user.avatar ? config.endpoints.files(user.avatar) : undefined}
                             avatarFallback={user.name?.[0] || user.phoneNumber?.slice(-2) || "?"}
                             rightContent={
                               isAlreadyIn ? (
@@ -209,7 +210,7 @@ export default function GroupDialogs({
                       key={participant._id || participant}
                       title={participant.name || "Member"}
                       subtitle={participant.phoneNumber || "Participant"}
-                      avatarSrc={participant.avatar ? `http://localhost:5002${participant.avatar}` : undefined}
+                      avatarSrc={participant.avatar ? config.endpoints.files(participant.avatar) : undefined}
                       avatarFallback={participant.name?.[0] || "?"}
                       rightContent={
                         <Button variant="destructive" size="sm" onClick={() => onRemoveMemberFromGroup(participant._id || participant)}>
@@ -241,7 +242,7 @@ export default function GroupDialogs({
                       key={participant._id || participant}
                       title={participant.name || "Member"}
                       subtitle={participant.phoneNumber || "Participant"}
-                      avatarSrc={participant.avatar ? `http://localhost:5002${participant.avatar}` : undefined}
+                      avatarSrc={participant.avatar ? config.endpoints.files(participant.avatar) : undefined}
                       avatarFallback={(participant.name?.[0] || "?").toUpperCase()}
                       badge={isAdmin ? <StatusBadge status="active" label="Admin" /> : null}
                       rightContent={

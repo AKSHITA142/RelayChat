@@ -14,6 +14,7 @@ import {
 import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
 import { hydrateChatPreview } from "../services/e2ee";
+import { config } from "../config";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { IconButton } from "@/components/ui/icon-button";
@@ -256,7 +257,7 @@ function SidebarContent({
                             key={user._id}
                             title={name}
                             subtitle={user.phoneNumber || "Recent chat"}
-                            avatarSrc={user.avatar ? `http://localhost:5002${user.avatar}` : undefined}
+                            avatarSrc={user.avatar ? config.endpoints.files(user.avatar) : undefined}
                             avatarFallback={name?.[0]}
                             selected={isSelected}
                             interactive

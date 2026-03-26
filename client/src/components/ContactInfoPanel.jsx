@@ -1,6 +1,7 @@
 import { X, Lock, Video, Phone, Search, AlertTriangle, Trash2, Shield } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { config } from "../config";
 
 const actionStyles = {
   Video: "border-primary/20 bg-primary/10 text-primary hover:bg-primary/15",
@@ -19,7 +20,7 @@ export default function ContactInfoPanel({
 }) {
   if (!user) return null;
 
-  const avatarUrl = user.avatar ? `http://localhost:5002${user.avatar}` : null;
+  const avatarUrl = user.avatar ? config.endpoints.files(user.avatar) : null;
   const phone = user.phoneNumber || "";
   const status = user.status || "Hey there!";
 

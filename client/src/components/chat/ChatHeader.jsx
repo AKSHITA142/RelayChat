@@ -12,6 +12,7 @@ import {
   Video,
   X,
 } from "lucide-react";
+import { config } from "../../config";
 import ThemeSelector from "../ThemeSelector";
 import { Avatar } from "@/components/ui/avatar";
 import { IconButton } from "@/components/ui/icon-button";
@@ -53,7 +54,7 @@ export default function ChatHeader({
       <div className="flex min-w-0 items-center gap-4">
         <div className="relative">
           <Avatar
-            src={!selectedChat.isGroup && otherUser?.avatar ? `http://localhost:5002${otherUser.avatar}` : undefined}
+            src={!selectedChat.isGroup && otherUser?.avatar ? config.endpoints.files(otherUser.avatar) : undefined}
             alt={displayName}
             fallback={selectedChat.isGroup ? "G" : displayName?.[0]}
             size="md"
