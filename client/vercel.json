@@ -7,10 +7,5 @@
     "env": {
       "NODE_ENV": "production"
     }
-  },
-  "functions": {
-    "dist/server.js": {
-      "runtime": "nodejs18.x"
-    }
   }
 }
