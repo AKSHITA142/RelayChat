@@ -2,14 +2,7 @@ const Message = require("../models/Message");
 
 exports.getMessagesByChat = async (req, res) => {
   const { chatId } = req.params;
-  const { includeDeleted } = req.query;
-
-  const query = { chat: chatId };
-  
-  // If includeDeleted is not true, filter out messages deleted for the current user
-  if (includeDeleted !== "true") {
-    query.deletedFor = { $ne: req.user.id };
-  }
+  const query = { chat: chatId, deletedFor: { $ne: req.user.id } };
 
   const messages = await Message.find(query)
     .populate("sender", "_id name phoneNumber")
@@ -66,27 +59,6 @@ exports.deleteMessageForEveryone = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Error deleting message", error: error.message });
-  }
-};
-
-exports.restoreMessageForMe = async (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const userId = req.user.id;
-
-    const message = await Message.findById(messageId);
-    if (!message) {
-      return res.status(404).json({ message: "Message not found" });
-    }
-
-    if (message.deletedFor.includes(userId)) {
-      message.deletedFor = message.deletedFor.filter(id => id.toString() !== userId);
-      await message.save();
-    }
-
-    res.status(200).json({ message: "Message restored", message });
-  } catch (error) {
-    res.status(500).json({ message: "Error restoring message", error: error.message });
   }
 };
 

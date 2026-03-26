@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -7,9 +7,9 @@ void motion;
 
 export default function WaveformPlayer({
   url,
-  accentColor = "hsl(var(--primary))",
-  trackColor = "hsl(var(--foreground))",
-  playIconColor = "hsl(var(--primary-foreground))",
+  accentColor = "#25D366",   // played-bar + button colour
+  trackColor  = "#000000",   // unplayed bar + timestamp colour
+  playIconColor = "#ffffff", // icon inside the button
 }) {
   const [isPlaying, setIsPlaying]   = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -17,8 +17,6 @@ export default function WaveformPlayer({
   const [waveform, setWaveform]     = useState([]);
 
   const audioRef = useRef(null);
-  const containerRef = useRef(null);
-  const barRefs = useRef([]);
 
   // Stable pseudo-random waveform seeded from URL
   useEffect(() => {
@@ -32,14 +30,6 @@ export default function WaveformPlayer({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setWaveform(bars);
   }, [url]);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    containerRef.current.style.setProperty("--wave-accent", accentColor);
-    containerRef.current.style.setProperty("--wave-track", trackColor);
-    containerRef.current.style.setProperty("--wave-icon", playIconColor);
-  }, [accentColor, trackColor, playIconColor]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -63,21 +53,19 @@ export default function WaveformPlayer({
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  useEffect(() => {
-    barRefs.current.forEach((bar, index) => {
-      if (!bar) return;
-      const value = waveform[index] ?? 0.35;
-      const isPlayed = progress > (index / Math.max(waveform.length, 1)) * 100;
-      bar.style.setProperty("--bar-height", `${value * 100}%`);
-      bar.style.setProperty(
-        "--bar-color",
-        isPlayed ? "var(--wave-accent)" : "color-mix(in srgb, var(--wave-track) 40%, transparent)"
-      );
-    });
-  }, [progress, waveform]);
+  // Derive readable colors from props
+  const unplayedColor = `${trackColor}66`; // ~40% opacity
+  const timeColor     = `${trackColor}b3`; // ~70% opacity
+  const iconColor     = `${trackColor}a1`; // ~63% opacity
 
   return (
-    <div ref={containerRef} className="waveform-player flex min-w-[240px] items-center gap-3 rounded-2xl border p-3">
+    <div
+      className="flex items-center gap-3 p-3 rounded-2xl min-w-[240px]"
+      style={{
+        background: "rgba(0,0,0,0.07)",
+        border: `1px solid ${trackColor}20`,
+      }}
+    >
       <audio
         ref={audioRef}
         src={url}
@@ -93,7 +81,8 @@ export default function WaveformPlayer({
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={togglePlay}
-        className="waveform-player__toggle h-10 w-10 shrink-0 rounded-full shadow-md"
+        className="w-10 h-10 flex items-center justify-center rounded-full shadow-md flex-shrink-0"
+        style={{ background: accentColor, color: playIconColor }}
       >
         {isPlaying
           ? <Pause size={20} fill="currentColor" />
@@ -104,27 +93,33 @@ export default function WaveformPlayer({
         {/* Waveform bars */}
         <div className="flex items-end gap-[2px] h-8 px-1">
           {waveform.map((val, i) => {
+            const isPlayed = progress > (i / waveform.length) * 100;
             return (
               <div
                 key={i}
-                ref={(element) => {
-                  barRefs.current[i] = element;
+                style={{
+                  height: `${val * 100}%`,
+                  background: isPlayed ? accentColor : unplayedColor,
+                  transition: "background 0.1s",
                 }}
-                className="waveform-player__bar w-[3px] rounded-full"
+                className="w-[3px] rounded-full"
               />
             );
           })}
         </div>
 
         {/* Timestamps */}
-        <div className="waveform-player__time flex justify-between text-[10px] font-mono">
+        <div
+          className="flex justify-between text-[10px] font-mono"
+          style={{ color: timeColor }}
+        >
           <span>{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>
         </div>
       </div>
 
       {/* Volume icon */}
-      <div className="waveform-player__volume">
+      <div style={{ color: iconColor }}>
         <Volume2 size={14} />
       </div>
     </div>
