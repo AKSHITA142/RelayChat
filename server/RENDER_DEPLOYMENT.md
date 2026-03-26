@@ -15,7 +15,7 @@
 3. Connect your GitHub repository
 4. **Configure:**
    - **Name**: `relaychat-backend`
-   - **Root Directory**: `server`
+   - **Root Directory**: `.` (root directory)
    - **Runtime**: `Node`
    - **Build Command**: `npm install`
    - **Start Command**: `npm start`

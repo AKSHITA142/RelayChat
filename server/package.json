@@ -4,7 +4,8 @@
   "description": "",
   "scripts": {
     "dev": "npx -y kill-port 5002 && nodemon",
-    "start": "node src/server.js"
+    "start": "node server.js",
+    "build": "echo 'No build step required'"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +17,7 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.3.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.1.2",
