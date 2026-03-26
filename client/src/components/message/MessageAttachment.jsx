@@ -1,8 +1,9 @@
+import { memo } from "react";
 import { ExternalLink, FileText } from "lucide-react";
 import WaveformPlayer from "../WaveformPlayer";
 import { cn } from "@/lib/utils";
 
-export default function MessageAttachment({
+const MessageAttachment = memo(function MessageAttachment({
   message,
   isOwn,
   attachmentUrl,
@@ -103,4 +104,6 @@ export default function MessageAttachment({
         Loading attachment...
     </div>
   );
-}
+});
+
+export default MessageAttachment;

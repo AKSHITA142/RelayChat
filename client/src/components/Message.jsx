@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState, useCallback } from "react";
 import { Check, CheckCheck, ShieldAlert } from "lucide-react";
 import MessageActions from "./message/MessageActions";
 import MessageAttachment from "./message/MessageAttachment";
@@ -20,7 +20,7 @@ const getEntityId = (value) => {
   return value?.toString?.() || null;
 };
 
-export default function Message({
+const Message = memo(function Message({
   id,
   message,
   isOwn,
@@ -263,4 +263,6 @@ export default function Message({
       )}
     </MessageBubble>
   );
-}
+});
+
+export default Message;

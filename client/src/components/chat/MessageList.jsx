@@ -1,7 +1,7 @@
-import { FilePlus, UserPlus } from "lucide-react";
+import { memo, useMemo } from "react";
 import Message from "../Message";
 
-export default function MessageList({
+const MessageList = memo(function MessageList({
   messages,
   myUserId,
   selectedChat,
@@ -25,6 +25,13 @@ export default function MessageList({
     );
   }
 
+  const participantIds = useMemo(() => 
+    (selectedChat?.participants || []).map((participant) =>
+      typeof participant === "string" ? participant : (participant?._id || participant)?.toString()
+    ), [selectedChat?.participants]);
+
+  const isGroupChat = Boolean(selectedChat?.isGroup);
+
   return (
     <div className="relative flex-1 overflow-y-auto px-1 pb-24 pt-5 md:px-2">
       {messages.map((message, index) => {
@@ -36,10 +43,8 @@ export default function MessageList({
             id={`msg-${message._id}`}
             message={message}
             isOwn={(message.sender?._id || message.sender)?.toString() === myUserId?.toString()}
-            participantIds={(selectedChat?.participants || []).map((participant) =>
-              typeof participant === "string" ? participant : (participant?._id || participant)?.toString()
-            )}
-            isGroupChat={Boolean(selectedChat?.isGroup)}
+            participantIds={participantIds}
+            isGroupChat={isGroupChat}
             onDeleteMe={onDeleteMe}
             onDeleteEveryone={onDeleteEveryone}
             onShowMessageInfo={onShowMessageInfo}
@@ -51,4 +56,6 @@ export default function MessageList({
       <div ref={messagesEndRef} />
     </div>
   );
-}
+});
+
+export default MessageList;
