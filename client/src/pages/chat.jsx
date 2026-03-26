@@ -1,42 +1,18 @@
-import { useState, useEffect, useRef } from "react";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-
-// Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
-void motion;
-
+import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
 import socket, { connectSocket } from "../services/socket";
 import { getLoggedInUser } from "../utils/auth";
 import VideoCall from "../components/VideoCall";
 import Settings from "../components/Settings";
-import { AnimatePresence } from "framer-motion";
 import { Check, X as CloseIcon } from "lucide-react";
 import api from "../services/api";
-import { buildHistorySyncUpdate, ensureE2EERegistration, getCurrentDeviceId, getCurrentDeviceLabel, hydrateDecryptedMessage, markHistorySyncComplete, needsHistorySync } from "../services/e2ee";
-import { useChatTheme, THEMES } from "../hooks/useChatTheme";
+import { ensureE2EERegistration, hydrateDecryptedMessage } from "../services/e2ee";
+import { getThemeClassName, useChatTheme } from "../hooks/useChatTheme";
+import { cn } from "../lib/utils";
 
 export default function Chat() {
   const [themeName] = useChatTheme();
-  const theme = THEMES[themeName] || THEMES.stealth_dark;
-  const containerRef = useRef(null);
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  // Smooth the mouse movement
-  const springConfig = { damping: 20, stiffness: 150 };
-  const smoothX = useSpring(mouseX, springConfig);
-  const smoothY = useSpring(mouseY, springConfig);
-
-  const x = useTransform(smoothX, (v) => `${v}px`);
-  const y = useTransform(smoothY, (v) => `${v}px`);
-
-  const handleMouseMove = (e) => {
-    if (!containerRef.current) return;
-    const { left, top } = containerRef.current.getBoundingClientRect();
-    mouseX.set(e.clientX - left);
-    mouseY.set(e.clientY - top);
-  };
 
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
@@ -45,18 +21,28 @@ export default function Chat() {
   const [contacts, setContacts] = useState(() => getLoggedInUser()?.contacts || []);
   const [e2eeUser, setE2eeUser] = useState(() => getLoggedInUser());
   const [pendingHistorySyncApproval, setPendingHistorySyncApproval] = useState(null);
-  const [historySyncRequesting, setHistorySyncRequesting] = useState(false);
   
-  // Shared UI States for Side Panels
   const [isAddingContact, setIsAddingContact] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [activeVideoCall, setActiveVideoCall] = useState(null);
   const [isShowingSettings, setIsShowingSettings] = useState(false);
-
-  // Backup Restore Fallback States
-  const [restorePin, setRestorePin] = useState("");
-  const [restoringPin, setRestoringPin] = useState(false);
-  const [restoreError, setRestoreError] = useState("");
+  const [settingsInitialTab, setSettingsInitialTab] = useState("profile");
+  
+  const performLogout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch {}
+    try {
+      socket.emit("logout");
+    } catch {}
+    try {
+      socket.disconnect();
+    } catch {}
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("session-active");
+    window.location.href = "/login";
+  };
 
   useEffect(() => {
     connectSocket();
@@ -69,40 +55,22 @@ export default function Chat() {
             setE2eeUser(updatedUser);
           }
         })
-        .catch((error) => {
-          console.error("Failed to initialize E2EE keys:", error);
-        });
+        .catch((error) => console.error("Failed to initialize E2EE keys:", error));
     }
-    // Kill any rogue ringer audio
     document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch {} });
-
-    return () => {
-      socket.disconnect();
-    };
+    return () => socket.disconnect();
   }, []);
 
   useEffect(() => {
-    socket.on("online-users", users => {
-      setOnlineUsers(users.map(u => u._id));
-    });
-
+    socket.on("online-users", users => setOnlineUsers(users.map(u => u._id)));
     socket.on("user-online", ({ userId }) => {
       setOnlineUsers(prev => [...new Set([...prev, userId])]);
-      setLastSeenMap(prev => {
-        const copy = { ...prev };
-        delete copy[userId];
-        return copy;
-      });
+      setLastSeenMap(prev => { const copy = { ...prev }; delete copy[userId]; return copy; });
     });
-
     socket.on("user-offline", ({ userId, lastSeen }) => {
       setOnlineUsers(prev => prev.filter(id => id !== userId));
-      setLastSeenMap(prev => ({
-        ...prev,
-        [userId]: lastSeen,
-      }));
+      setLastSeenMap(prev => ({ ...prev, [userId]: lastSeen }));
     });
-
     return () => {
       socket.off("online-users");
       socket.off("user-online");
@@ -115,33 +83,20 @@ export default function Chat() {
       const currentUserId = getLoggedInUser()?._id?.toString();
       const msgChatId = (msg.chat?._id || msg.chat)?.toString();
       if (!msgChatId) return;
-
       const hydratedMessage = await hydrateDecryptedMessage(msg, currentUserId);
       const isIncoming = msg.sender && (msg.sender._id || msg.sender)?.toString() !== currentUserId;
       const isActiveChat = selectedChat?._id?.toString() === msgChatId;
-
       if (isActiveChat && isIncoming) {
         socket.emit("open-chat", msgChatId);
         socket.emit("mark-seen", { chatId: msgChatId });
       }
-
       setChats(prev => {
         const chatIdx = prev.findIndex(c => c._id?.toString() === msgChatId);
         if (chatIdx === -1) return prev;
-
-        const currentUnread = prev[chatIdx].unreadCount || 0;
-        const nextUnread = isActiveChat ? 0 : (isIncoming ? currentUnread + 1 : currentUnread);
-
-        const updatedChat = { 
-          ...prev[chatIdx], 
-          lastMessage: hydratedMessage,
-          unreadCount: nextUnread
-        };
-        const rest = prev.filter((_, i) => i !== chatIdx);
-        return [updatedChat, ...rest];
+        const updatedChat = { ...prev[chatIdx], lastMessage: hydratedMessage, unreadCount: isActiveChat ? 0 : (isIncoming ? (prev[chatIdx].unreadCount || 0) + 1 : prev[chatIdx].unreadCount) };
+        return [updatedChat, ...prev.filter((_, i) => i !== chatIdx)];
       });
     };
-
     socket.on("new-message", handler);
     return () => socket.off("new-message", handler);
   }, [selectedChat]);
@@ -149,10 +104,8 @@ export default function Chat() {
   useEffect(() => {
     const newChatHandler = (newChat) => {
       setChats(prev => {
-        if (prev.find(c => c._id?.toString() === newChat._id?.toString())) {
-          return prev;
-        }
-        socket.emit("join-chat", newChat._id); 
+        if (prev.find(c => c._id?.toString() === newChat._id?.toString())) return prev;
+        socket.emit("join-chat", newChat._id);
         return [newChat, ...prev];
       });
     };
@@ -180,32 +133,13 @@ export default function Chat() {
 
   useEffect(() => {
     const avatarUpdateHandler = ({ userId, avatar }) => {
-      setChats(prev => prev.map(chat => ({
-        ...chat,
-        participants: chat.participants.map(p => {
-          const pId = p._id?.toString() || p.toString();
-          if (pId === userId.toString()) {
-            return { ...(typeof p === "object" ? p : {}), _id: pId, avatar };
-          }
-          return p;
-        })
-      })));
-
-      setSelectedChat(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          participants: prev.participants.map(p => {
-            const pId = p._id?.toString() || p.toString();
-            if (pId === userId.toString()) {
-              return { ...(typeof p === "object" ? p : {}), _id: pId, avatar };
-            }
-            return p;
-          })
-        };
+      const updateAvatar = (list) => list.map(p => {
+        const pId = p._id?.toString() || p.toString();
+        return pId === userId.toString() ? { ...(typeof p === "object" ? p : {}), _id: pId, avatar } : p;
       });
+      setChats(prev => prev.map(chat => ({ ...chat, participants: updateAvatar(chat.participants) })));
+      setSelectedChat(prev => prev ? { ...prev, participants: updateAvatar(prev.participants) } : prev);
     };
-
     socket.on("user-avatar-updated", avatarUpdateHandler);
     return () => socket.off("user-avatar-updated", avatarUpdateHandler);
   }, []);
@@ -219,170 +153,109 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
+    const handleHistorySyncRequested = (data) => {
+      setPendingHistorySyncApproval(data);
+    };
+    socket.on("history-sync-requested", handleHistorySyncRequested);
+    return () => socket.off("history-sync-requested", handleHistorySyncRequested);
+  }, []);
+
+  useEffect(() => {
     if (!chats.length) return;
     chats.forEach(chat => socket.emit("join-chat", chat._id));
   }, [chats]);
 
-  useEffect(() => {
-    const handleHistorySyncRequest = ({ requestId, requesterDeviceId, requesterLabel }) => {
-      if (!requestId || !requesterDeviceId || requesterDeviceId === getCurrentDeviceId()) return;
-      setPendingHistorySyncApproval({ requestId, requesterDeviceId, requesterLabel });
-    };
-    const handleHistorySyncComplete = ({ requesterDeviceId, syncedCount }) => {
-      if (requesterDeviceId !== getCurrentDeviceId()) return;
-      markHistorySyncComplete(getLoggedInUser()?._id);
-      window.alert(`Encrypted history synced (${syncedCount} items). Reloading.`);
-      window.location.reload();
-    };
-    socket.on("history-sync-requested", handleHistorySyncRequest);
-    socket.on("history-sync-complete", handleHistorySyncComplete);
-    return () => {
-      socket.off("history-sync-requested", handleHistorySyncRequest);
-      socket.off("history-sync-complete", handleHistorySyncComplete);
-    };
-  }, []);
-
-  const requestHistorySync = () => {
-    const currentDeviceId = getCurrentDeviceId();
-    setHistorySyncRequesting(true);
-    socket.emit("request-history-sync", {
-      requesterDeviceId: currentDeviceId,
-      requesterLabel: getCurrentDeviceLabel(),
-    }, (result) => {
-      setHistorySyncRequesting(false);
-      if (result?.ok) {
-        localStorage.setItem(`relaychat-history-sync-requested-${getLoggedInUser()?._id}-${currentDeviceId}`, "true");
-        window.alert(`History sync request sent.`);
-        return;
-      }
-      window.alert(result?.message || "History sync request failed.");
-    });
-  };
-
-  const handlePINRestore = async () => {
-    if (!restorePin || restorePin.length < 4) return setRestoreError("PIN too short");
-    setRestoringPin(true);
-    try {
-      const { restorePrivateKeyFromCloud } = await import("../services/e2ee");
-      const currentUser = e2eeUser || getLoggedInUser();
-      await restorePrivateKeyFromCloud(api, currentUser._id, restorePin);
-      localStorage.removeItem(`relaychat-history-sync-needed-${currentUser._id}-${getCurrentDeviceId()}`);
-      window.location.reload();
-    } catch (err) {
-      console.error(err);
-      setRestoreError("Invalid PIN or corrupted backup");
-    } finally {
-      setRestoringPin(false);
-    }
-  };
-
-  const approveHistorySync = async () => {
-    if (!pendingHistorySyncApproval) return;
-    const { requestId, requesterDeviceId } = pendingHistorySyncApproval;
-    socket.emit("respond-history-sync", { requestId, approved: true });
-    setPendingHistorySyncApproval(null);
-    try {
-      const refreshedProfile = await api.get("/user/profile");
-      const updatedUser = refreshedProfile.data?.user || getLoggedInUser();
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      setE2eeUser(updatedUser);
-      const targetDevice = (updatedUser.encryptionDevices || []).find((d) => d.deviceId === requesterDeviceId);
-      if (!targetDevice) throw new Error("No target device found");
-      const chatsResponse = await api.get("/chat/my-chats");
-      let syncedCount = 0;
-      for (const chat of chatsResponse.data || []) {
-        const msgs = await api.get(`/message/${chat._id}?includeDeleted=true`);
-        const updates = await Promise.all((msgs.data || []).map(m => buildHistorySyncUpdate({
-          message: m, currentUserId: updatedUser._id, targetUserId: updatedUser._id,
-          targetDeviceId: targetDevice.deviceId, targetPublicKey: targetDevice.publicKey
-        })));
-        const chunked = [];
-        for (let i = 0; i < updates.length; i += 50) {
-          const chunk = updates.slice(i, i + 50).filter(Boolean);
-          if (chunk.length) await api.post("/message/sync-device-history", { updates: chunk });
-        }
-        syncedCount += updates.length;
-      }
-      socket.emit("history-sync-finished", { requestId, requesterDeviceId, syncedCount });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const shouldShowHistorySyncBanner = () => {
-    const user = e2eeUser || getLoggedInUser();
-    if (!user?._id || !needsHistorySync(user._id)) return false;
-    const hasOther = (user.encryptionDevices || []).some(d => d.deviceId !== getCurrentDeviceId());
-    return hasOther && !localStorage.getItem(`relaychat-history-sync-requested-${user._id}-${getCurrentDeviceId()}`);
-  };
-
-  if (needsHistorySync(getLoggedInUser()?._id) && (getLoggedInUser()?.encryptionDevices?.length > 1)) {
-     // History Sync Gate content (Omitted for brevity, assume similar to original)
-  }
-
   return (
-    <motion.div
-      ref={containerRef}
-      onMouseMove={handleMouseMove}
-      style={{ 
-        "--x": x, 
-        "--y": y,
-        background: theme.background,
-        backgroundImage: theme.pattern,
-        backgroundSize: theme.patternSize
-      }}
-      className="relative flex h-screen overflow-hidden group"
-    >
-      <div className="proximity-glow opacity-0 group-hover:opacity-100" />
-
+    <div className={cn("relative flex h-screen w-screen overflow-hidden", getThemeClassName(themeName))}>
+      <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-slate-900/20" />
+      
       {pendingHistorySyncApproval && (
-        <div className="absolute top-4 right-4 z-50 max-w-sm rounded-2xl border border-emerald-400/20 bg-slate-900/95 p-4 shadow-2xl backdrop-blur">
-          <p className="text-sm font-semibold text-white">Approve new device</p>
-          <div className="mt-3 flex gap-2">
-            <button onClick={approveHistorySync} className="flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white"><Check size={16} /> Approve</button>
-            <button onClick={() => setPendingHistorySyncApproval(null)} className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300"><CloseIcon size={16} /> Decline</button>
+        <div className="absolute right-4 top-4 z-[100] max-w-sm rounded-2xl border border-primary/30 bg-black/90 p-5 shadow-2xl backdrop-blur-xl">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-bold text-white">Device Approval Request</p>
+              <p className="mt-1 text-xs text-white/60">
+                "{pendingHistorySyncApproval.requesterLabel}" wants to sync history
+              </p>
+            </div>
+            <button 
+              onClick={() => setPendingHistorySyncApproval(null)} 
+              className="rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-white"
+              aria-label="Dismiss"
+            >
+              <CloseIcon size={18} />
+            </button>
+          </div>
+          <div className="mt-4 flex gap-3">
+            <button 
+              onClick={() => {
+                const { requestId } = pendingHistorySyncApproval;
+                socket.emit("respond-history-sync", { requestId, approved: true });
+                setPendingHistorySyncApproval(null);
+              }} 
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-500"
+            >
+              <Check size={16} /> Approve
+            </button>
+            <button 
+              onClick={() => {
+                const { requestId } = pendingHistorySyncApproval;
+                socket.emit("respond-history-sync", { requestId, approved: false });
+                setPendingHistorySyncApproval(null);
+              }} 
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white/70 transition-colors hover:bg-white/20 hover:text-white"
+            >
+              <CloseIcon size={16} /> Decline
+            </button>
           </div>
         </div>
       )}
 
-      <Sidebar
-        chats={chats} setChats={setChats}
-        setSelectedChat={setSelectedChat} selectedChat={selectedChat}
-        onlineUsers={onlineUsers} contacts={contacts}
-        isAddingContact={isAddingContact} setIsAddingContact={setIsAddingContact}
-        isCreatingGroup={isCreatingGroup} setIsCreatingGroup={setIsCreatingGroup}
-        setIsShowingSettings={setIsShowingSettings}
-      />
-
-      <ChatWindow
-        selectedChat={selectedChat} chats={chats}
-        setSelectedChat={setSelectedChat} onlineUsers={onlineUsers}
-        lastSeenMap={lastSeenMap} contacts={contacts}
-        setContacts={setContacts} setChats={setChats}
-        setIsAddingContact={setIsAddingContact} setIsCreatingGroup={setIsCreatingGroup}
-        setActiveVideoCall={setActiveVideoCall}
-      />
-
-      {/* Global Video Call Overlay */}
-      <AnimatePresence mode="wait">
-        {activeVideoCall && <VideoCall key={activeVideoCall.callId} {...activeVideoCall} onClose={() => setActiveVideoCall(null)} />}
-      </AnimatePresence>
-
-      {/* Settings Overlay */}
-      <AnimatePresence>
-        {isShowingSettings && (
-          <Settings 
-            user={e2eeUser || getLoggedInUser()} 
-            onUpdate={(u) => setE2eeUser(u)}
-            onClose={() => setIsShowingSettings(false)}
-            onLogout={() => { 
-                socket.emit("logout");
-                localStorage.clear();
-                window.location.reload(); 
-            }}
+      <div className="relative z-10 flex h-full w-full p-2 md:p-3">
+        <div className={cn("relative flex h-full", selectedChat ? "hidden md:flex md:w-80 lg:w-96" : "flex w-full md:w-auto")}>
+          <Sidebar
+            chats={chats} setChats={setChats}
+            setSelectedChat={setSelectedChat} selectedChat={selectedChat}
+            onlineUsers={onlineUsers} contacts={contacts}
+            isAddingContact={isAddingContact} setIsAddingContact={setIsAddingContact}
+            isCreatingGroup={isCreatingGroup} setIsCreatingGroup={setIsCreatingGroup}
+            setIsShowingSettings={setIsShowingSettings}
+            setSettingsInitialTab={setSettingsInitialTab}
+            onLogout={performLogout}
           />
-        )}
-      </AnimatePresence>
-    </motion.div>
+        </div>
+
+        <div className={cn("relative flex h-full flex-1", selectedChat ? "flex" : "hidden md:flex")}>
+          {selectedChat && (
+            <button
+              onClick={() => setSelectedChat(null)}
+              className="absolute left-2 top-2 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-black/50 text-white md:hidden"
+            >
+              <CloseIcon size={16} />
+            </button>
+          )}
+          <ChatWindow
+            selectedChat={selectedChat} chats={chats}
+            setSelectedChat={setSelectedChat} onlineUsers={onlineUsers}
+            lastSeenMap={lastSeenMap} contacts={contacts}
+            setContacts={setContacts} setChats={setChats}
+            setIsAddingContact={setIsAddingContact} setIsCreatingGroup={setIsCreatingGroup}
+            setActiveVideoCall={setActiveVideoCall}
+          />
+        </div>
+      </div>
+
+      {activeVideoCall && <VideoCall key={activeVideoCall.callId} {...activeVideoCall} onClose={() => setActiveVideoCall(null)} />}
+
+      {isShowingSettings && (
+        <Settings 
+          user={e2eeUser || getLoggedInUser()} 
+          onUpdate={(u) => setE2eeUser(u)}
+          initialTab={settingsInitialTab}
+          onClose={() => setIsShowingSettings(false)}
+          onLogout={performLogout}
+        />
+      )}
+    </div>
   );
 }

@@ -13,9 +13,20 @@ api.interceptors.request.use(config => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const requestUrl = error.config?.url || "";
+    const isAuthEndpoint =
+      requestUrl.startsWith("/auth/login") ||
+      requestUrl.startsWith("/auth/send-otp") ||
+      requestUrl.startsWith("/auth/verify-otp") ||
+      requestUrl.startsWith("/auth/complete-registration");
+
+    // Don't force session-expired redirect for auth endpoints:
+    // those can legitimately return 401/400 (e.g. invalid credentials/OTP).
+    if (status === 401 && !isAuthEndpoint) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+      localStorage.removeItem("session-active");
       window.location.href = "/login?session_expired=true";
     }
     return Promise.reject(error);

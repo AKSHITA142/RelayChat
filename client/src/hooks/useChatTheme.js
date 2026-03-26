@@ -71,6 +71,10 @@ export const THEME_NAMES = {
   minimal_light:  "Minimal Light",
 };
 
+export function getThemeClassName(themeName) {
+  return themeName ? `theme-chat-${themeName}` : "theme-chat-stealth_dark";
+}
+
 export function useChatTheme(chatId) {
   const [theme, setInternalTheme] = useState(() => {
     let saved = "stealth_dark";

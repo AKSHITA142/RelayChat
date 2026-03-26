@@ -1,9 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Mic, X, Send, Square } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Send, X } from "lucide-react";
+import { motion } from "framer-motion";
 
-// Ensure `motion` is treated as used by the linter (used in JSX via <motion.* />)
-void motion;
 
 export default function VoiceRecorder({ onSend, onCancel }) {
   const [isRecording, setIsRecording] = useState(false);
@@ -104,35 +102,34 @@ export default function VoiceRecorder({ onSend, onCancel }) {
   };
 
   return (
-    <div className="flex items-center gap-4 bg-whatsapp-sidebar-dark/80 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-2xl w-full animate-slide-up">
+    <div className="animate-slide-up surface-panel flex w-full items-center gap-4 px-4 py-3">
       <motion.button
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={cancelRecording}
-        className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-full transition-colors"
+        className="rounded-full p-2 text-destructive transition-colors hover:bg-destructive/10"
       >
         <X size={20} />
       </motion.button>
 
-      <div className="flex-1 flex items-center gap-3">
-        <div className="flex items-center gap-1 min-w-[45px]">
+      <div className="flex flex-1 items-center gap-3">
+        <div className="flex min-w-[45px] items-center gap-1">
           <motion.div
             animate={{ opacity: [1, 0.5, 1] }}
             transition={{ repeat: Infinity, duration: 1.5 }}
-            className="w-2 h-2 bg-rose-500 rounded-full"
+            className="h-2 w-2 rounded-full bg-destructive"
           />
-          <span className="text-xs font-mono text-white/70">{formatTime(recordingTime)}</span>
+          <span className="text-xs font-mono text-muted-foreground">{formatTime(recordingTime)}</span>
         </div>
 
-        {/* Real-time Waveform Visualizer */}
-        <div className="flex-1 flex items-center justify-center gap-[3px] h-8">
+        <div className="flex h-8 flex-1 items-center justify-center gap-[3px]">
           {visualizerData.map((val, i) => (
             <motion.div
               key={i}
               initial={{ height: 4 }}
               animate={{ height: Math.max(4, val * 32) }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className="w-[3px] bg-[#12f1ff] rounded-full opacity-80"
+              className="w-[3px] rounded-full bg-primary opacity-80"
             />
           ))}
         </div>
@@ -142,7 +139,7 @@ export default function VoiceRecorder({ onSend, onCancel }) {
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={stopRecording}
-        className="p-3 bg-[#12f1ff] text-[#0b0e14] rounded-full shadow-lg shadow-[#12f1ff]/20 transition-all"
+        className="rounded-full border border-primary/30 bg-primary p-3 text-primary-foreground shadow-button transition-all"
       >
         <Send size={20} />
       </motion.button>

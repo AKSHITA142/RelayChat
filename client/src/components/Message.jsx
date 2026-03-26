@@ -1,17 +1,9 @@
-import React, { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Check,
-  CheckCheck,
-  Trash2,
-  ShieldAlert,
-  FileText,
-  ExternalLink,
-  MoreVertical,
-  Info
-} from "lucide-react";
-import ReactionPicker from "./ReactionPicker";
-import WaveformPlayer from "./WaveformPlayer";
+import { memo, useEffect, useRef, useState, useCallback } from "react";
+import { Check, CheckCheck, ShieldAlert } from "lucide-react";
+import MessageActions from "./message/MessageActions";
+import MessageAttachment from "./message/MessageAttachment";
+import MessageBubble from "./message/MessageBubble";
+import MessageReactions from "./message/MessageReactions";
 import { getLoggedInUser } from "../utils/auth";
 import socket from "../services/socket";
 import api from "../services/api";
@@ -28,9 +20,7 @@ const getEntityId = (value) => {
   return value?.toString?.() || null;
 };
 
-void motion;
-
-export default function Message({
+const Message = memo(function Message({
   id,
   message,
   isOwn,
@@ -39,19 +29,9 @@ export default function Message({
   onShowMessageInfo,
   searchQuery = "",
   isHighlighted = false,
-  theme = null,
   participantIds = [],
-  isGroupChat = false
+  isGroupChat = false,
 }) {
-  const ownBg = theme?.bubbleOwn || "#25D366";
-  const otherBg = theme?.bubbleOther || "rgba(255,255,255,0.1)";
-  const ownText = theme?.textOwn || "#0d1117";
-  const otherText = theme?.textOther || "#e2e8f0";
-  const primary = theme?.primary || "#25D366";
-
-  const isDarkTheme = theme?.background === "#121212";
-  const waveformAccent = isOwn ? "#ffffff" : primary;
-  const waveformTrack = isOwn ? "#ffffff" : (isDarkTheme ? "#ffffff" : "#000000");
   const [showMenu, setShowMenu] = useState(false);
   const [menuIsUpwards, setMenuIsUpwards] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
@@ -65,6 +45,8 @@ export default function Message({
   const isMe = isOwn;
   const effectiveFileName = attachmentMeta?.fileName || msg.fileName || "Attachment";
   const effectiveFileType = attachmentMeta?.mimeType || msg.fileType || "application/octet-stream";
+  const isDeletedForMe = msg.deletedFor?.includes(myId);
+  const hasReactions = Array.isArray(msg.reactions) && msg.reactions.length > 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -101,17 +83,24 @@ export default function Message({
     };
   }, [msg, myId]);
 
+  useEffect(() => {
+    return () => clearTimeout(pressTimerRef.current);
+  }, []);
+
   const renderContentWithHighlights = (content) => {
     if (!searchQuery.trim()) return content;
     const parts = content.split(new RegExp(`(${searchQuery})`, "gi"));
+
     return (
       <>
         {parts.map((part, index) =>
           part.toLowerCase() === searchQuery.toLowerCase() ? (
-            <mark key={index} className="bg-amber-400/40 text-inherit rounded-sm px-0.5 border-b border-amber-500/50">
+            <mark key={`${part}-${index}`} className="rounded-sm border-b border-amber-500/50 bg-amber-400/40 px-0.5 text-inherit">
               {part}
             </mark>
-          ) : part
+          ) : (
+            part
+          )
         )}
       </>
     );
@@ -133,6 +122,10 @@ export default function Message({
     setShowMenu(false);
   };
 
+  const handleRestoreForMe = () => {
+    socket.emit("restore-for-me", { messageId: msg._id });
+    setShowMenu(false);
+  };
 
   const handleDeleteForEveryone = () => {
     if (window.confirm("Permanently delete this message for all participants?")) {
@@ -145,8 +138,8 @@ export default function Message({
     try {
       await api.patch(`/message/${msg._id}/react`, { emoji });
       setShowReactions(false);
-    } catch (err) {
-      console.error("Failed to react:", err);
+    } catch (error) {
+      console.error("Failed to react:", error);
     }
   };
 
@@ -173,260 +166,103 @@ export default function Message({
         otherParticipantIds.length > 0 &&
         otherParticipantIds.every((participantId) => seenByIds.includes(participantId));
 
-      if (hasAllReads) {
-        return <CheckCheck className="text-sky-400" size={14} />;
-      }
-
+      if (hasAllReads) return <CheckCheck className="text-sky-400" size={14} />;
       if (msg?.status === "delivered" || msg?.status === "seen" || seenByIds.length > 0) {
-        return <CheckCheck className="text-slate-500" size={14} />;
+        return <CheckCheck className="text-muted-foreground" size={14} />;
       }
-
-      return <Check className="text-slate-500" size={14} />;
+      return <Check className="text-muted-foreground" size={14} />;
     }
 
-    if (seenByIds.length > 0) {
-      return <CheckCheck className="text-sky-400" size={14} />;
-    }
+    if (seenByIds.length > 0) return <CheckCheck className="text-sky-400" size={14} />;
 
     switch (msg?.status) {
       case "seen":
         return <CheckCheck className="text-sky-400" size={14} />;
       case "delivered":
-        return <CheckCheck className="text-slate-500" size={14} />;
+        return <CheckCheck className="text-muted-foreground" size={14} />;
       default:
-        return <Check className="text-slate-500" size={14} />;
+        return <Check className="text-muted-foreground" size={14} />;
     }
-  };
-
-  const bubbleVariants = {
-    hidden: { opacity: 0, y: 10, scale: 0.95 },
-    visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", damping: 20, stiffness: 300 } }
   };
 
   if (msg.isDeleted) {
     return (
-      <motion.div
-        variants={bubbleVariants}
-        initial="hidden"
-        animate="visible"
-        className={`flex ${isMe ? "justify-end" : "justify-start"} mb-2 px-4`}
-      >
-        <div className="px-4 py-2 rounded-2xl text-xs flex items-center gap-2 border italic bg-white/5 border-[#45484f]/30 text-slate-500">
+      <MessageBubble id={id} isOwn={isMe} isDeleted>
+        <div className="flex items-center gap-2 text-xs italic text-muted-foreground">
           <ShieldAlert size={14} />
           This message was retracted
           <span className="ml-2 text-[10px] opacity-60">{formatTime(msg.createdAt)}</span>
         </div>
-      </motion.div>
+      </MessageBubble>
     );
   }
 
   return (
-    <motion.div
+    <MessageBubble
       id={id}
-      variants={bubbleVariants}
-      initial="hidden"
-      animate="visible"
-      className={`group flex ${isMe ? "justify-end" : "justify-start"} mb-3 px-4 relative`}
-    >
-      <div
-        className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-sm transition-all relative ${
-          isHighlighted
-            ? "ring-4 ring-amber-400/50 scale-[1.02]"
-            : ""
-        }`}
-        style={{
-          background: isHighlighted ? "#fef3c7" : (isOwn ? ownBg : otherBg),
-          color: isHighlighted ? "#1a1a1a" : (isOwn ? ownText : otherText),
-          borderRadius: isOwn ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-          border: isOwn ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(255,255,255,0.03)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          boxShadow: isOwn ? "0 4px 15px rgba(0,0,0,0.1)" : "none",
-          transition: "background 0.4s ease, color 0.3s ease",
-        }}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          setShowMenu(true);
-        }}
-        onTouchStart={startPress}
-        onTouchEnd={endPress}
-        onMouseDown={startPress}
-        onMouseUp={endPress}
-      >
-        <ReactionPicker
-          isVisible={showReactions}
-          onSelect={handleReact}
-          position={isMe ? "top" : "top"}
-        />
-
-        {msg?.fileUrl ? (
-          <div className="space-y-2 mb-1">
-            {attachmentError ? (
-              <div className={`p-3 rounded-xl border text-sm ${isMe ? "bg-black/10 border-black/10" : "bg-white/5 border-[#45484f]/30"}`}>
-                Unable to decrypt attachment
-              </div>
-            ) : effectiveFileType.startsWith("image/") && attachmentUrl ? (
-              <div className="relative overflow-hidden rounded-xl border border-black/10">
-                <img
-                  src={attachmentUrl}
-                  alt={effectiveFileName}
-                  className="max-h-72 w-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
-                  onClick={() => window.open(attachmentUrl, "_blank")}
-                />
-              </div>
-            ) : effectiveFileType.startsWith("audio/") && attachmentUrl ? (
-              <div className="py-1">
-                <WaveformPlayer
-                  url={attachmentUrl}
-                  accentColor={waveformAccent}
-                  trackColor={waveformTrack}
-                  playIconColor={isOwn ? primary : "#ffffff"}
-                />
-                {msg.content && msg.content !== "Voice Message" && (
-                  <p className="text-sm px-1 mt-2 leading-relaxed italic opacity-80">{msg.content}</p>
-                )}
-              </div>
-            ) : attachmentUrl ? (
-              <a
-                href={attachmentUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-                  isMe ? "bg-black/10 border-black/10 hover:bg-black/20" : "bg-white/5 border-[#45484f]/30 hover:bg-white/10"
-                }`}
-              >
-                <div className="p-2 rounded-lg" style={{ backgroundColor: `${primary}33` }}>
-                  <FileText style={{ color: primary }} size={20} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold truncate">{effectiveFileName}</p>
-                  <p className="text-[10px] opacity-60 uppercase font-bold tracking-wider">File Attachment</p>
-                </div>
-                <ExternalLink size={14} className="opacity-40" />
-              </a>
-            ) : (
-              <div className={`p-3 rounded-xl border text-sm ${isMe ? "bg-black/10 border-black/10" : "bg-white/5 border-[#45484f]/30"}`}>
-                Loading attachment...
-              </div>
-            )}
-
-            {msg.content && !effectiveFileType.startsWith("audio/") && msg.content !== effectiveFileName && (
-              <p className="text-sm px-1 leading-relaxed">
-                {renderContentWithHighlights(msg.content)}
-              </p>
-            )}
-          </div>
-        ) : (
-          <p
-            className="text-[15px] leading-relaxed break-words"
-            style={{ color: isOwn ? ownText : otherText }}
-          >
-            {renderContentWithHighlights(msg.content)}
-          </p>
-        )}
-
-        <div className={`flex items-center justify-end gap-1.5 mt-1 ${isMe ? "opacity-70" : "opacity-50"}`}>
-          <span className="text-[10px] font-bold uppercase tracking-tighter">
-            {formatTime(msg.createdAt)}
-          </span>
+      isOwn={isMe}
+      isHighlighted={isHighlighted}
+      isDimmed={isDeletedForMe}
+      hasReactions={hasReactions}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setShowMenu(true);
+      }}
+      onPressStart={startPress}
+      onPressEnd={endPress}
+      footer={
+        <>
+          <span className="text-[10px] font-bold uppercase tracking-tighter">{formatTime(msg.createdAt)}</span>
           {renderStatus()}
-        </div>
-
-        {msg.reactions && msg.reactions.length > 0 && (
-          <div className={`absolute -bottom-3 ${isMe ? "right-2" : "left-2"} flex flex-wrap gap-0.5 z-10`}>
-            {Object.entries(
-              (Array.isArray(msg.reactions) ? msg.reactions : []).reduce((acc, reaction) => {
-                if (reaction && reaction.emoji) {
-                  acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
-                }
-                return acc;
-              }, {})
-            ).map(([emoji, count]) => (
-              <motion.div
-                key={emoji}
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                whileHover={{ scale: 1.1 }}
-                className="flex items-center gap-1 bg-[#10131a]/90 backdrop-blur-md border border-white/20 rounded-full px-1.5 py-0.5 shadow-lg group/reaction cursor-pointer"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleReact(emoji);
-                }}
-              >
-                <span className="text-sm">{emoji}</span>
-                {count > 1 && <span className="text-[10px] text-white/70 font-bold">{count}</span>}
-              </motion.div>
-            ))}
-          </div>
-        )}
-
-        <button
-          onClick={(event) => {
+        </>
+      }
+      reactions={
+        <MessageReactions
+          reactions={msg.reactions}
+          pickerVisible={showReactions}
+          isOwn={isMe}
+          onSelect={handleReact}
+        />
+      }
+      actions={
+        <MessageActions
+          isOwn={isMe}
+          isOpen={showMenu}
+          menuIsUpwards={menuIsUpwards}
+          isDeletedForMe={isDeletedForMe}
+          isDeleted={Boolean(msg.isDeleted)}
+          onToggle={(event) => {
             event.stopPropagation();
             const rect = event.currentTarget.getBoundingClientRect();
-            // If the element is too close to the bottom of the window (within 200px), force the dropdown to open upwards
             setMenuIsUpwards(rect.bottom + 200 > window.innerHeight);
             setShowMenu(true);
           }}
-          style={{ color: isMe ? '#94a3b8' : '#64748b' }}
-          whileHover={{ color: primary, opacity: 1 }}
-          className="absolute top-2 -right-8 p-1 opacity-60 transition-opacity"
-        >
-          <MoreVertical size={16} />
-        </button>
-      </div>
-
-      <AnimatePresence>
-        {showMenu && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100]"
-              onClick={() => setShowMenu(false)}
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: menuIsUpwards ? 10 : -10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: menuIsUpwards ? 10 : -10 }}
-              className={`absolute z-[101] min-w-[160px] bg-[#111b21]/95 backdrop-blur-2xl overflow-hidden py-1.5 border border-white/10 shadow-2xl rounded-xl ${isMe ? "right-4" : "left-4"} ${menuIsUpwards ? "bottom-[calc(100%-8px)]" : "top-[calc(100%-8px)]"}`}
-            >
-              {isMe && (
-                <>
-                  <button
-                    onClick={() => {
-                      onShowMessageInfo(msg);
-                      setShowMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-sky-400 hover:bg-sky-500/10 hover:text-sky-300 transition-colors"
-                  >
-                    <Info size={16} className="text-sky-400" />
-                    View Info
-                  </button>
-                  <div className="h-px bg-white/10" />
-                </>
-              )}
-              <button
-                onClick={handleDeleteForMe}
-                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-              >
-                <Trash2 size={16} className="text-slate-500" />
-                Remove for me
-              </button>
-              {isMe && !msg.isDeleted && (
-                <button
-                  onClick={handleDeleteForEveryone}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
-                >
-                  <Trash2 size={16} className="text-rose-500" />
-                  Discard for all
-                </button>
-              )}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          onClose={() => setShowMenu(false)}
+          onRestore={handleRestoreForMe}
+          onDeleteMe={handleDeleteForMe}
+          onDeleteEveryone={handleDeleteForEveryone}
+          onViewInfo={() => {
+            onShowMessageInfo(msg);
+            setShowMenu(false);
+          }}
+        />
+      }
+    >
+      {msg?.fileUrl ? (
+        <MessageAttachment
+          message={msg}
+          isOwn={isMe}
+          attachmentUrl={attachmentUrl}
+          attachmentError={attachmentError}
+          effectiveFileName={effectiveFileName}
+          effectiveFileType={effectiveFileType}
+          renderContent={renderContentWithHighlights}
+        />
+      ) : (
+        <p className="break-words text-[15px] leading-relaxed">{renderContentWithHighlights(msg.content)}</p>
+      )}
+    </MessageBubble>
   );
-}
+});
+
+export default Message;
