@@ -161,9 +161,9 @@ function ThemeCard({ themeKey, currentTheme, onSelect }) {
   );
 }
 
-export default function Settings({ user, onUpdate, onClose, onLogout }) {
+export default function Settings({ user, onUpdate, onClose, onLogout, initialTab = "profile" }) {
   const [, setTheme] = useChatTheme();
-  const [activeTab, setActiveTab] = useState("profile");
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [name, setName] = useState(user?.name || "");
   const [status, setStatus] = useState(user?.status || "Hey there! I'm using RelayChat.");
   const [signalVisibility, setSignalVisibility] = useState(user?.signalVisibility ?? true);
@@ -192,6 +192,19 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
   });
 
   useEffect(() => {
+    setName(user?.name || "");
+    setStatus(user?.status || "Hey there! I'm using RelayChat.");
+    setSignalVisibility(user?.signalVisibility ?? true);
+    setVaultProtocol(user?.vaultProtocol ?? false);
+    setCurrentTheme(user?.globalTheme || "stealth_dark");
+    setAvatar(user?.avatar || "");
+  }, [user?._id]);
+
+  useEffect(() => {
+    setActiveTab(initialTab || "profile");
+  }, [initialTab]);
+
+  useEffect(() => {
     const fetchProfile = async () => {
       try {
         const response = await api.get("/user/profile");
@@ -202,6 +215,11 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
         setVaultProtocol(userData.vaultProtocol ?? false);
         setCurrentTheme(userData.globalTheme || "stealth_dark");
         setAvatar(userData.avatar || "");
+
+        if (userData) {
+          localStorage.setItem("user", JSON.stringify(userData));
+          onUpdate?.(userData);
+        }
       } catch (error) {
         console.error("Failed to fetch fresh profile:", error);
       }
@@ -363,7 +381,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
 
   return (
     <DialogShell open onOpenChange={(open) => !open && onClose()}>
-      <DialogShellContent className="max-w-6xl overflow-hidden p-0">
+      <DialogShellContent className="h-[92vh] w-[min(calc(100%-1rem),72rem)] max-w-none overflow-hidden p-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className={cn("relative", getThemeClassName(currentTheme))}>
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute inset-0 chat-canvas opacity-90" />
@@ -373,8 +391,8 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
             <div className="absolute inset-0 bg-background/45" />
           </div>
 
-          <div className="relative grid max-h-[90vh] overflow-hidden lg:grid-cols-[280px,1fr]">
-            <aside className="border-b border-white/10 bg-card/70 p-6 backdrop-blur-2xl lg:border-b-0 lg:border-r lg:p-8">
+          <div className="relative grid h-full min-h-0 overflow-hidden lg:grid-cols-[280px,1fr]">
+            <aside className="overflow-y-auto border-b border-white/10 bg-card/70 p-4 backdrop-blur-2xl lg:border-b-0 lg:border-r lg:p-6">
               <DialogShellHeader className="space-y-2">
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">Relaychat Control</p>
                 <DialogShellTitle className="font-headline text-3xl font-black tracking-tight">Settings</DialogShellTitle>
@@ -383,7 +401,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
                 </DialogShellDescription>
               </DialogShellHeader>
 
-              <div className="mt-8 space-y-6">
+              <div className="mt-6 space-y-5">
                 <div className="flex items-center gap-4">
                   <div className="relative">
                     <Avatar
@@ -410,7 +428,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
                     </Button>
                   </div>
                   <div className="space-y-1">
-                    <h2 className="font-headline text-xl font-black tracking-tight text-foreground">{name || "Identity_Null"}</h2>
+                    <h2 className="font-headline text-lg font-black tracking-tight text-foreground">{name || "Identity_Null"}</h2>
                     <p className="text-xs text-muted-foreground">{status || "No status broadcast set."}</p>
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
                       {signalVisibility ? "Visible Node" : "Ghost Protocol"}
@@ -456,7 +474,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout }) {
               </div>
             </aside>
 
-            <main ref={mainRef} className="overflow-y-auto bg-background/20 p-6 lg:p-8">
+            <main ref={mainRef} className="min-h-0 overflow-y-auto bg-background/20 p-4 lg:p-6">
               <div ref={revealScopeRef} className="space-y-6">
                 <AnimatePresence mode="wait">
                   {message ? (

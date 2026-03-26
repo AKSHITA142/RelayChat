@@ -7,6 +7,11 @@ gsap.registerPlugin(ScrollTrigger);
 export function useGsapScrollReveal({ scopeRef, scrollerRef, selector = "[data-reveal]", deps = [] }) {
   useLayoutEffect(() => {
     if (!scopeRef.current) return undefined;
+    if (typeof window !== "undefined") {
+      const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+      // Skip heavy scroll-triggered animations on smaller screens / low-motion mode.
+      if (prefersReducedMotion || window.innerWidth < 1024) return undefined;
+    }
 
     const ctx = gsap.context(() => {
       const targets = gsap.utils.toArray(selector);

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle, Loader2, Lock, Mail, Send, User } from "lucide-react";
+import { CheckCircle, Loader2, Lock, Mail, Phone, Send, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 

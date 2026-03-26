@@ -22,7 +22,19 @@ function startRinger() {
   stopRinger();
   const audio = new Audio(RINGER_URL);
   audio.loop = true;
-  audio.play().catch(() => {});
+  // Some browsers block unmuted autoplay without a user gesture.
+  // Try muted-first, then unmute after playback starts.
+  audio.muted = true;
+  audio.volume = 1;
+  audio.play()
+    .then(() => {
+      try {
+        audio.muted = false;
+      } catch {
+        void 0;
+      }
+    })
+    .catch(() => {});
   window.__ringer = audio;
 }
 
@@ -45,9 +57,11 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   const [status, setStatus] = useState(isIncoming ? "incoming" : "calling");
   const [isMuted, setIsMuted] = useState(false);
   const [vidOff, setVidOff] = useState(false);
+  const [remoteAudioBlocked, setRemoteAudioBlocked] = useState(false);
 
   const localRef = useRef(null);
   const remoteRef = useRef(null);
+  const remoteAudioRef = useRef(null);
   const pcRef = useRef(null);
   const lsRef = useRef(null);
   const remoteStream = useRef(new MediaStream());
@@ -132,10 +146,6 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
   const buildPC = useCallback(() => {
     const pc = new RTCPeerConnection(PC_CONFIG);
 
-    // Ensure we always have transceivers for both audio and video
-    pc.addTransceiver("audio", { direction: "sendrecv" });
-    pc.addTransceiver("video", { direction: "sendrecv" });
-
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) socket.emit("ice-candidate", { to, candidate });
     };
@@ -169,7 +179,25 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
       if (remoteRef.current) {
         remoteRef.current.srcObject = null;
         remoteRef.current.srcObject = remoteStream.current;
+        remoteRef.current.muted = false;
+        remoteRef.current.volume = 1;
         remoteRef.current.play().catch(e => log("Remote play error", e));
+      }
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = remoteStream.current;
+        // Muted-first attempt to satisfy autoplay policies.
+        remoteAudioRef.current.muted = true;
+        remoteAudioRef.current.volume = 1;
+        remoteAudioRef.current
+          .play()
+          .then(() => {
+            setRemoteAudioBlocked(false);
+            remoteAudioRef.current && (remoteAudioRef.current.muted = false);
+          })
+          .catch((e) => {
+            log("Remote audio play blocked:", e);
+            setRemoteAudioBlocked(true);
+          });
       }
       setStatus("connected");
     };
@@ -183,9 +211,9 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
     try {
       const stream = await getMedia();
       const pc = buildPC();
-      
+
       stream.getTracks().forEach((track) => {
-        const sender = pc.getSenders().find(s => s.track?.kind === track.kind || (s.track === null && pc.getTransceivers().find(t => t.sender === s && t.receiver.track.kind === track.kind)));
+        const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
         if (sender) sender.replaceTrack(track);
         else pc.addTrack(track, stream);
       });
@@ -211,7 +239,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
       const pc = buildPC();
 
       stream.getTracks().forEach((track) => {
-        const sender = pc.getSenders().find(s => s.track?.kind === track.kind || (s.track === null && pc.getTransceivers().find(t => t.sender === s && t.receiver.track.kind === track.kind)));
+        const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
         if (sender) sender.replaceTrack(track);
         else pc.addTrack(track, stream);
       });
@@ -236,10 +264,38 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
       if (remoteRef.current.srcObject !== remoteStream.current) {
         log("Force-syncing remote video element...");
         remoteRef.current.srcObject = remoteStream.current;
+        remoteRef.current.muted = false;
+        remoteRef.current.volume = 1;
         remoteRef.current.play().catch(e => log("Remote play error in useEffect", e));
       }
     }
+    if (status === "connected" && remoteAudioRef.current && remoteStream.current) {
+      if (remoteAudioRef.current.srcObject !== remoteStream.current) {
+        remoteAudioRef.current.srcObject = remoteStream.current;
+      }
+      remoteAudioRef.current.muted = true;
+      remoteAudioRef.current.volume = 1;
+      remoteAudioRef.current
+        .play()
+        .then(() => {
+          setRemoteAudioBlocked(false);
+          remoteAudioRef.current && (remoteAudioRef.current.muted = false);
+        })
+        .catch((e) => {
+          log("Remote audio play blocked in useEffect:", e);
+          setRemoteAudioBlocked(true);
+        });
+    }
   }, [status]);
+
+  const enableRemoteAudio = useCallback(() => {
+    if (!remoteAudioRef.current) return;
+    remoteAudioRef.current.muted = false;
+    remoteAudioRef.current
+      .play()
+      .then(() => setRemoteAudioBlocked(false))
+      .catch((e) => log("Enable remote audio failed:", e));
+  }, []);
 
   useEffect(() => {
     if (!isIncoming) {
@@ -382,6 +438,12 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
               playsInline
               className="w-full h-full object-cover"
             />
+            <audio
+              ref={remoteAudioRef}
+              autoPlay
+              playsInline
+              className="absolute -left-[9999px] top-0 h-1 w-1 opacity-0"
+            />
 
             {status !== "connected" && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center space-y-4 bg-card/95 backdrop-blur-xl">
@@ -400,6 +462,18 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
                     {status === "connecting" && <><Loader2 className="animate-spin" size={14} /> Connecting...</>}
                   </p>
                 </div>
+              </div>
+            )}
+
+            {remoteAudioBlocked && status === "connected" && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/30 backdrop-blur-sm">
+                <button
+                  type="button"
+                  onClick={enableRemoteAudio}
+                  className="rounded-2xl border border-white/10 bg-white/10 px-5 py-3 text-sm font-semibold text-foreground backdrop-blur-xl hover:bg-white/15"
+                >
+                  Enable call sound
+                </button>
               </div>
             )}
 

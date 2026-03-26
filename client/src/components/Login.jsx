@@ -163,6 +163,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
 
   const handleEmailLogin = async () => {
     if (!email || !password) return setError("Please enter email and password");
+    onAction?.();
     setLoading(true);
     setError("");
     try {
@@ -203,6 +204,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
 
   const handleVerifyOtp = async () => {
     if (!phone || !otp) return setError("Please enter phone and OTP");
+    onAction?.();
     setLoading(true);
     setError("");
     try {

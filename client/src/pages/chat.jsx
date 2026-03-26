@@ -41,6 +41,35 @@ export default function Chat() {
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [activeVideoCall, setActiveVideoCall] = useState(null);
   const [isShowingSettings, setIsShowingSettings] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState("profile");
+  
+  const performLogout = async () => {
+    try {
+      // If your backend supports logout / token revocation, call it.
+      // (This is safe even if the route is not present; we still clear local session.)
+      await api.post("/auth/logout");
+    } catch {
+      // ignore - client-side logout still proceeds
+    }
+
+    try {
+      socket.emit("logout");
+    } catch {
+      // ignore
+    }
+
+    try {
+      socket.disconnect();
+    } catch {
+      // ignore
+    }
+
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("session-active");
+
+    window.location.href = "/login";
+  };
 
   // Backup Restore Fallback States
   const [restorePin, _setRestorePin] = useState("");
@@ -382,6 +411,8 @@ export default function Chat() {
             isAddingContact={isAddingContact} setIsAddingContact={setIsAddingContact}
             isCreatingGroup={isCreatingGroup} setIsCreatingGroup={setIsCreatingGroup}
             setIsShowingSettings={setIsShowingSettings}
+            setSettingsInitialTab={setSettingsInitialTab}
+            onLogout={performLogout}
           />
         </motion.div>
 
@@ -428,12 +459,9 @@ export default function Chat() {
           <Settings 
             user={e2eeUser || getLoggedInUser()} 
             onUpdate={(u) => setE2eeUser(u)}
+            initialTab={settingsInitialTab}
             onClose={() => setIsShowingSettings(false)}
-            onLogout={() => { 
-                socket.emit("logout");
-                localStorage.clear();
-                window.location.reload(); 
-            }}
+            onLogout={performLogout}
           />
         )}
       </AnimatePresence>

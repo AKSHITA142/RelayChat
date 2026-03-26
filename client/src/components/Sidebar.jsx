@@ -48,6 +48,7 @@ function SidebarContent({
   isCreatingGroup,
   setIsCreatingGroup,
   setIsShowingSettings,
+  setSettingsInitialTab,
   contactPhone,
   setContactPhone,
   groupName,
@@ -99,7 +100,7 @@ function SidebarContent({
   }, [search, chats, contacts, myUserId]);
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div className="relative flex h-full min-h-0 flex-col overflow-y-auto">
       {/* Premium Background Effects */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
       <div className="pointer-events-none absolute inset-0 z-0">
@@ -152,6 +153,7 @@ function SidebarContent({
               <DropdownItem 
                 icon={Settings}
                 onClick={() => {
+                  setSettingsInitialTab?.("profile");
                   setIsShowingSettings(true);
                   setIsCreatingGroup(false);
                   setIsAddingContact(false);
@@ -166,8 +168,12 @@ function SidebarContent({
                 icon={ShieldCheck}
                 variant="success"
                 onClick={() => {
-                  // Add security/privacy options
-                  console.log("Security options");
+                  setSettingsInitialTab?.("privacy");
+                  setIsShowingSettings(true);
+                  setIsCreatingGroup(false);
+                  setIsAddingContact(false);
+                  setContactError("");
+                  closeMobile?.();
                 }}
               >
                 Privacy & Security
@@ -202,7 +208,7 @@ function SidebarContent({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden px-4 pt-4"
+            className="shrink-0 overflow-hidden px-4 pt-4"
           >
             <Card className="space-y-5 p-5">
               {isAddingContact ? (
@@ -219,6 +225,17 @@ function SidebarContent({
                   />
                   <Button onClick={handleStartChat} disabled={contactLoading} className="w-full">
                     {contactLoading ? <Loader2 className="animate-spin" /> : "Initialize Chat"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setIsAddingContact(false);
+                      setContactPhone("");
+                      setContactError("");
+                    }}
+                  >
+                    Cancel
                   </Button>
                 </>
               ) : null}
@@ -294,6 +311,18 @@ function SidebarContent({
                   >
                     {contactLoading ? "Synchronizing Collective..." : "Initialize Group"}
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setIsCreatingGroup(false);
+                      setGroupName("");
+                      setSelectedGroupUsers([]);
+                      setContactError("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
                 </>
               ) : null}
 
@@ -303,7 +332,7 @@ function SidebarContent({
         ) : null}
       </AnimatePresence>
 
-      <div className="relative z-10 flex-1 overflow-y-auto px-4 py-4">
+      <div className="relative z-10 px-4 py-4">
         <AnimatePresence mode="wait">
           {filteredChats.length === 0 ? (
             <motion.div
@@ -405,7 +434,7 @@ function SidebarContent({
       </div>
 
       {/* Fixed Sign-Out Button at Bottom */}
-      <div className="relative z-10 border-t border-white/10 backdrop-blur-sm">
+      <div className="sticky bottom-0 relative z-10 border-t border-white/10 backdrop-blur-sm">
         <motion.button
           onClick={handleLogout}
           whileHover={{ scale: 1.02 }}
@@ -437,6 +466,8 @@ export default function Sidebar({
   isCreatingGroup,
   setIsCreatingGroup,
   setIsShowingSettings,
+  setSettingsInitialTab,
+  onLogout,
 }) {
   const myUserId = getLoggedInUser()?._id;
   const [contactPhone, setContactPhone] = useState("");
@@ -447,8 +478,16 @@ export default function Sidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = () => {
+    if (typeof onLogout === "function") {
+      onLogout();
+      return;
+    }
+
+    // Fallback: keep previous behavior if handler isn't provided
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     localStorage.removeItem("session-active");
-    window.location.reload();
+    window.location.href = "/login";
   };
 
   useEffect(() => {
@@ -525,6 +564,7 @@ export default function Sidebar({
     isCreatingGroup,
     setIsCreatingGroup,
     setIsShowingSettings,
+    setSettingsInitialTab,
     contactPhone,
     setContactPhone,
     groupName,

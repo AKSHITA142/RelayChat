@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, MoreVertical } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +50,7 @@ export default function DropdownMenu({
   };
 
   return (
-    <div ref={dropdownRef} className={cn("relative inline-block", className)}>
+    <div ref={dropdownRef} className="relative inline-block">
       {/* Trigger */}
       <button
         onClick={handleToggle}
@@ -68,10 +68,16 @@ export default function DropdownMenu({
             animate="visible"
             exit="exit"
             transition={{ duration: 0.2, ease: "easeOut" }}
+            onClick={(event) => {
+              if (event.target.closest("button[data-dropdown-item='true']")) {
+                setIsOpen(false);
+              }
+            }}
             className={cn(
               "absolute z-50 min-w-[200px] overflow-hidden rounded-2xl border border-white/10 bg-card/95 backdrop-blur-2xl shadow-panel",
               getPositionClasses(),
-              align === "end" && "text-right"
+              align === "end" && "text-right",
+              className
             )}
           >
             <div className="py-2">
@@ -104,6 +110,7 @@ export function DropdownItem({
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
       disabled={disabled}
+      data-dropdown-item="true"
       className={cn(
         "flex w-full items-center gap-3 px-4 py-3 text-sm transition-all duration-200",
         variantStyles[variant],
