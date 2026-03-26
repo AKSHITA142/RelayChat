@@ -56,8 +56,18 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   const handleLoginSuccess = async (res) => {
     localStorage.setItem("token", res.data.token);
     localStorage.setItem("user", JSON.stringify(res.data.user));
-    setRestoreAuthData(res.data);
-    setShowRestorePrompt(true);
+
+    try {
+      await ensureE2EERegistration(api, res.data.user);
+      localStorage.setItem("session-active", "true");
+      connectSocket();
+      setShowRestorePrompt(false);
+      onLogin();
+    } catch (err) {
+      console.warn("E2EE restore required:", err);
+      setRestoreAuthData(res.data);
+      setShowRestorePrompt(true);
+    }
   };
 
   const handleRestoreBackup = async () => {
