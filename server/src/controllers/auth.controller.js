@@ -4,6 +4,32 @@ const jwt = require("jsonwebtoken");
 const redisClient = require("../config/redis");
 const { sendSms } = require("../utils/sms");
 
+// Helper function to set secure cookies
+const setAuthCookie = (res, token) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: isProduction, // Only send over HTTPS in production
+    sameSite: isProduction ? 'None' : 'Lax', // None for cross-site in production
+    maxAge: 2 * 60 * 60 * 1000, // 2 hours
+    path: '/'
+  });
+};
+
+// Helper function to clear cookies
+const clearAuthCookie = (res) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  res.cookie('token', '', {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'None' : 'Lax',
+    expires: new Date(0), // Immediately expire
+    path: '/'
+  });
+};
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -28,9 +54,12 @@ exports.login = async (req, res) => {
       { expiresIn: "5h" }
     );
 
+    // Set secure cookie
+    setAuthCookie(res, token);
+
     res.json({
       message: "Login successful",
-      token,
+      token, // Still send token for client-side storage
       user: {
         _id: user._id,
         name: user.name,
@@ -145,9 +174,12 @@ exports.verifyOtp = async (req, res) => {
       { expiresIn: "2h" }
     );
 
+    // Set secure cookie
+    setAuthCookie(res, token);
+
     res.status(200).json({
       message: "Login successful",
-      token,
+      token, // Still send token for client-side storage
       user: {
         _id: user._id,
         name: user.name,
@@ -207,9 +239,12 @@ exports.completeRegistration = async (req, res) => {
       { expiresIn: "2h" }
     );
 
+    // Set secure cookie
+    setAuthCookie(res, token);
+
     res.status(201).json({
       message: "Registration complete",
-      token,
+      token, // Still send token for client-side storage
       user: {
         _id: user._id,
         name: user.name,
@@ -224,5 +259,20 @@ exports.completeRegistration = async (req, res) => {
   } catch (error) {
     console.error("completeRegistration error:", error);
     res.status(500).json({ message: "Failed to complete registration" });
+  }
+};
+
+// Logout function to clear cookies
+exports.logout = async (req, res) => {
+  try {
+    // Clear the auth cookie
+    clearAuthCookie(res);
+    
+    res.status(200).json({
+      message: "Logout successful"
+    });
+  } catch (error) {
+    console.error("logout error:", error);
+    res.status(500).json({ message: "Failed to logout" });
   }
 };

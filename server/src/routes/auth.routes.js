@@ -1,6 +1,6 @@
 const express = require("express");
 
-const { login, sendOtp, verifyOtp, completeRegistration } = require("../controllers/auth.controller");
+const { login, sendOtp, verifyOtp, completeRegistration, logout } = require("../controllers/auth.controller");
 
 const router = express.Router();
 
@@ -8,5 +8,6 @@ router.post("/login",login)
 router.post("/send-otp", sendOtp);
 router.post("/verify-otp", verifyOtp);
 router.post("/complete-registration", completeRegistration);
+router.post("/logout", logout);
 
 module.exports = router;

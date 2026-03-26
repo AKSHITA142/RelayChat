@@ -1,34 +1,72 @@
 const express = require("express");
 const cors = require("cors");
-
+const cookieParser = require("cookie-parser");
 
 const app = express();
 
+// Cookie parser middleware (must be before cors)
+app.use(cookieParser());
+
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176","http://localhost:5177","http://localhost:5178","http://localhost:5179","http://localhost:5180"],
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allowed origins for development
+    const allowedDevOrigins = [
+      "http://localhost:5173",
+      "http://localhost:5174", 
+      "http://localhost:5175",
+      "http://localhost:5176",
+      "http://localhost:5177",
+      "http://localhost:5178",
+      "http://localhost:5179",
+      "http://localhost:5180"
+    ];
+    
+    // Production frontend URL from environment variable
+    const prodOrigin = process.env.CORS_ORIGIN;
+    
+    if (allowedDevOrigins.includes(origin) || origin === prodOrigin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // helmet is used to add header for security purpose
 const helmet = require("helmet");
+
+// Dynamic CSP configuration for dev/prod
+const getCspDirectives = () => {
+  const isDev = process.env.NODE_ENV === 'development';
+  const baseUrl = isDev ? 'http://localhost:5002' : process.env.BASE_URL || 'https://relaychat-backend.onrender.com';
+  
+  return {
+    ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+    // Allow STUN servers for WebRTC ICE negotiation
+    "connect-src": [
+      "'self'",
+      baseUrl,
+      baseUrl.replace('http', 'ws'), // WebSocket version
+      "stun:stun.l.google.com:19302",
+      "stun:stun1.l.google.com:19302",
+      "stun:stun2.l.google.com:19302",
+    ],
+    // Allow browser to capture and play media (microphone/camera/speakers)
+    "media-src": ["'self'", "blob:", "mediastream:"],
+    "img-src": ["'self'", "data:", baseUrl],
+  };
+};
+
 app.use(
   helmet({
     contentSecurityPolicy: {
-      directives: {
-        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        // Allow STUN servers for WebRTC ICE negotiation
-        "connect-src": [
-          "'self'",
-          "http://localhost:5002",
-          "ws://localhost:5002",
-          "stun:stun.l.google.com:19302",
-          "stun:stun1.l.google.com:19302",
-          "stun:stun2.l.google.com:19302",
-        ],
-        // Allow browser to capture and play media (microphone/camera/speakers)
-        "media-src": ["'self'", "blob:", "mediastream:"],
-        "img-src":   ["'self'", "data:", "http://localhost:5002"],
-      },
+      directives: getCspDirectives(),
     },
     crossOriginResourcePolicy:     { policy: "cross-origin" },
     crossOriginOpenerPolicy:       { policy: "unsafe-none" },   // needed for SharedArrayBuffer + WebRTC on some browsers
