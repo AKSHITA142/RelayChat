@@ -31,8 +31,8 @@
       radial-gradient(circle at 85% 12%, hsl(var(--secondary) / 0.12), transparent 26%),
       linear-gradient(180deg, #080b16 0%, #090d18 48%, #070a13 100%);
     --chat-pattern:
-      linear-gradient(to right, rgba(255, 255, 255, 0.032) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.032) 1px, transparent 1px);
+      linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
     --chat-pattern-size: 30px 30px;
     --chat-bubble-own: linear-gradient(135deg, rgba(164, 116, 255, 0.78), rgba(99, 102, 241, 0.88));
     --chat-bubble-own-foreground: #ffffff;
@@ -175,8 +175,8 @@
       radial-gradient(circle at 15% 16%, rgba(57, 156, 150, 0.18), transparent 26%),
       linear-gradient(180deg, #05070a 0%, #07090e 100%);
     --chat-pattern:
-      linear-gradient(to right, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px);
+      linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
     --chat-pattern-size: 26px 26px;
     --chat-bubble-own: linear-gradient(135deg, rgba(77, 154, 148, 0.76), rgba(39, 86, 83, 0.86));
     --chat-bubble-own-foreground: #ffffff;
@@ -205,8 +205,8 @@
       radial-gradient(circle at 82% 18%, rgba(83, 200, 255, 0.12), transparent 22%),
       linear-gradient(180deg, #05060b 0%, #06070d 48%, #04050a 100%);
     --chat-pattern:
-      linear-gradient(to right, rgba(182, 160, 255, 0.06) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(182, 160, 255, 0.06) 1px, transparent 1px);
+      linear-gradient(to right, rgba(182, 160, 255, 0.12) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(182, 160, 255, 0.12) 1px, transparent 1px);
     --chat-pattern-size: 32px 32px;
     --chat-bubble-own: linear-gradient(135deg, rgba(197, 154, 255, 0.16), rgba(139, 92, 246, 0.08));
     --chat-bubble-own-foreground: #ffffff;

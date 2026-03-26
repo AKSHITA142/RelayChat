@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { Cpu, FilePlus, UserPlus } from "lucide-react";
 import ContactInfoPanel from "./ContactInfoPanel";
 import ChatHeader from "./chat/ChatHeader";
@@ -20,7 +19,6 @@ import {
   hydrateDecryptedMessage,
 } from "../services/e2ee";
 import { cn } from "@/lib/utils";
-import Background3D from "@/components/ui/neural-network-bg";
 
 const getEntityId = (value) => {
   if (!value) return null;
@@ -891,49 +889,36 @@ export default function ChatWindow({
   if (!selectedChat) {
     return (
       <div className="flex h-full flex-1 items-center justify-center px-4 py-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="grid max-w-5xl grid-cols-1 gap-6 px-2 md:grid-cols-3"
-        >
+        <div className="grid max-w-5xl grid-cols-1 gap-6 px-2 md:grid-cols-3">
           {[
             { icon: <FilePlus className="text-secondary" />, title: "Collaborate", desc: "Share documents, images, voice notes, and encrypted attachments without leaving the thread." },
             { icon: <UserPlus className="text-primary" />, title: "Expand Network", desc: "Start a private chat or build a group space the moment you need one." },
             { icon: <Cpu className="text-foreground" />, title: "Premium Focus", desc: "A glass-driven workspace keeps search, motion, and message context easy to track." },
           ].map((card) => (
-            <motion.div
+            <div
               key={card.title}
-              whileHover={{ y: -5 }}
-              className="glass-card group flex cursor-pointer flex-col items-center p-6 text-center"
+              className="glass-card group flex cursor-pointer flex-col items-center p-6 text-center transition-transform hover:-translate-y-1"
             >
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/6 transition-colors group-hover:bg-white/10">
                 {card.icon}
               </div>
               <h3 className="mb-2 font-headline text-xl font-bold tracking-tight text-foreground">{card.title}</h3>
               <p className="text-sm leading-relaxed text-muted-foreground">{card.desc}</p>
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={cn("relative flex h-full flex-1 flex-col overflow-hidden text-foreground", chatThemeClassName)}>
-      {/* Premium Advanced 3D Background Layers */}
-      <Background3D className="absolute inset-0 z-0" />
+    <div className={cn("relative flex h-full flex-1 flex-col overflow-hidden text-foreground chat-canvas", chatThemeClassName)}>
 
       {/* Enhanced Content Container */}
       <div className="relative z-10 flex min-h-0 flex-1 flex-col backdrop-blur-sm">
-        {/* Contact Info Panel - Enhanced with Glass */}
-        {showContactInfo && !selectedChat?.isGroup ? (
-          <motion.div
-            initial={{ opacity: 0, x: 300 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 300 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="absolute inset-0 z-20"
-          >
+        {/* Contact Info Panel */}
+        {showContactInfo && !selectedChat?.isGroup && (
+          <div className="absolute inset-0 z-20 transition-opacity duration-200">
             <div className="surface-panel h-full backdrop-blur-2xl border-l border-white/10">
               <ContactInfoPanel
                 user={otherUser}
@@ -956,8 +941,8 @@ export default function ChatWindow({
                 }}
               />
             </div>
-          </motion.div>
-        ) : null}
+          </div>
+        )}
         <ChatHeader
           selectedChat={selectedChat}
           displayName={displayName}

@@ -5,7 +5,6 @@ import socket, { connectSocket } from "../services/socket";
 import { getLoggedInUser } from "../utils/auth";
 import VideoCall from "../components/VideoCall";
 import Settings from "../components/Settings";
-import { AnimatePresence } from "framer-motion";
 import { Check, X as CloseIcon } from "lucide-react";
 import api from "../services/api";
 import { ensureE2EERegistration, hydrateDecryptedMessage } from "../services/e2ee";
@@ -154,6 +153,14 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
+    const handleHistorySyncRequested = (data) => {
+      setPendingHistorySyncApproval(data);
+    };
+    socket.on("history-sync-requested", handleHistorySyncRequested);
+    return () => socket.off("history-sync-requested", handleHistorySyncRequested);
+  }, []);
+
+  useEffect(() => {
     if (!chats.length) return;
     chats.forEach(chat => socket.emit("join-chat", chat._id));
   }, [chats]);
@@ -163,17 +170,41 @@ export default function Chat() {
       <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-slate-900/20" />
       
       {pendingHistorySyncApproval && (
-        <div className="absolute right-4 top-4 z-50 max-w-sm rounded-xl border border-white/10 bg-black/80 p-4 backdrop-blur-md">
-          <p className="text-sm font-medium text-white">Approve new device</p>
-          <div className="mt-3 flex gap-2">
-            <button onClick={() => {
-              const { requestId } = pendingHistorySyncApproval;
-              socket.emit("respond-history-sync", { requestId, approved: true });
-              setPendingHistorySyncApproval(null);
-            }} className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm text-white">
+        <div className="absolute right-4 top-4 z-[100] max-w-sm rounded-2xl border border-primary/30 bg-black/90 p-5 shadow-2xl backdrop-blur-xl">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-bold text-white">Device Approval Request</p>
+              <p className="mt-1 text-xs text-white/60">
+                "{pendingHistorySyncApproval.requesterLabel}" wants to sync history
+              </p>
+            </div>
+            <button 
+              onClick={() => setPendingHistorySyncApproval(null)} 
+              className="rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-white"
+              aria-label="Dismiss"
+            >
+              <CloseIcon size={18} />
+            </button>
+          </div>
+          <div className="mt-4 flex gap-3">
+            <button 
+              onClick={() => {
+                const { requestId } = pendingHistorySyncApproval;
+                socket.emit("respond-history-sync", { requestId, approved: true });
+                setPendingHistorySyncApproval(null);
+              }} 
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-500"
+            >
               <Check size={16} /> Approve
             </button>
-            <button onClick={() => setPendingHistorySyncApproval(null)} className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm text-white/70 hover:text-white">
+            <button 
+              onClick={() => {
+                const { requestId } = pendingHistorySyncApproval;
+                socket.emit("respond-history-sync", { requestId, approved: false });
+                setPendingHistorySyncApproval(null);
+              }} 
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white/70 transition-colors hover:bg-white/20 hover:text-white"
+            >
               <CloseIcon size={16} /> Decline
             </button>
           </div>
@@ -214,21 +245,17 @@ export default function Chat() {
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        {activeVideoCall && <VideoCall key={activeVideoCall.callId} {...activeVideoCall} onClose={() => setActiveVideoCall(null)} />}
-      </AnimatePresence>
+      {activeVideoCall && <VideoCall key={activeVideoCall.callId} {...activeVideoCall} onClose={() => setActiveVideoCall(null)} />}
 
-      <AnimatePresence>
-        {isShowingSettings && (
-          <Settings 
-            user={e2eeUser || getLoggedInUser()} 
-            onUpdate={(u) => setE2eeUser(u)}
-            initialTab={settingsInitialTab}
-            onClose={() => setIsShowingSettings(false)}
-            onLogout={performLogout}
-          />
-        )}
-      </AnimatePresence>
+      {isShowingSettings && (
+        <Settings 
+          user={e2eeUser || getLoggedInUser()} 
+          onUpdate={(u) => setE2eeUser(u)}
+          initialTab={settingsInitialTab}
+          onClose={() => setIsShowingSettings(false)}
+          onLogout={performLogout}
+        />
+      )}
     </div>
   );
 }

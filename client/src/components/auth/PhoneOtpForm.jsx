@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle, Loader2, Lock, Mail, Phone, Send, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,16 +26,9 @@ export default function PhoneOtpForm({
   onCancelRegistration,
 }) {
   return (
-    <AnimatePresence mode="wait">
+    <div className="space-y-5">
       {isRegistering ? (
-        <motion.div
-          key="register-profile"
-          initial={{ opacity: 0, x: 24 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -24 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          className="space-y-5"
-        >
+        <div className="space-y-5">
           <div className="surface-inline rounded-[24px] p-4">
             <div className="section-badge">
               <CheckCircle size={12} />
@@ -70,18 +62,11 @@ export default function PhoneOtpForm({
               Start over
             </Button>
           </div>
-        </motion.div>
+        </div>
       ) : (
-        <motion.div
-          key="phone-otp"
-          initial={{ opacity: 0, x: 24 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -24 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          className="space-y-5"
-        >
-          <div className="flex items-center w-full rounded-lg overflow-hidden border border-input bg-card/70 focus-within:ring-2 focus-within:ring-ring transition-all">
-            <span className="px-4 py-2.5 text-sm font-bold text-primary border-r border-input select-none whitespace-nowrap bg-primary/10">+91</span>
+        <div className="space-y-5">
+          <div className="flex w-full items-center overflow-hidden rounded-lg border border-input bg-card/70 transition-all focus-within:ring-2 focus-within:ring-ring">
+            <span className="border-r border-input bg-primary/10 px-4 py-2.5 text-sm font-bold text-primary select-none whitespace-nowrap">+91</span>
             <input
               type="tel"
               inputMode="numeric"
@@ -95,7 +80,7 @@ export default function PhoneOtpForm({
               maxLength={10}
               className="flex-1 bg-transparent px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none tracking-widest"
             />
-            <span className="px-3 text-xs text-muted-foreground font-bold tabular-nums">{phone.replace(/^\+91/, "").length}/10</span>
+            <span className="px-3 text-xs font-bold text-muted-foreground tabular-nums">{phone.replace(/^\+91/, "").length}/10</span>
           </div>
 
           <div className="grid gap-4">
@@ -108,26 +93,19 @@ export default function PhoneOtpForm({
               disabled={otpSent}
             />
 
-            <AnimatePresence>
-              {otpSent ? (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <Input
-                    icon={Send}
-                    type="text"
-                    placeholder="6-digit security code"
-                    value={otp}
-                    onChange={(event) => setOtp(event.target.value)}
-                    maxLength={6}
-                    className="text-center text-base tracking-[0.4em]"
-                  />
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
+            {otpSent && (
+              <div className="overflow-hidden">
+                <Input
+                  icon={Send}
+                  type="text"
+                  placeholder="6-digit security code"
+                  value={otp}
+                  onChange={(event) => setOtp(event.target.value)}
+                  maxLength={6}
+                  className="text-center text-base tracking-[0.4em]"
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid gap-3">
@@ -162,8 +140,8 @@ export default function PhoneOtpForm({
           >
             Prefer email and password instead?
           </button>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </div>
   );
 }

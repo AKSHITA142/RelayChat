@@ -1,7 +1,4 @@
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-
-
 import { AlertCircle, CheckCircle, Mail, Phone, ShieldCheck } from "lucide-react";
 import api from "../services/api";
 import { connectSocket } from "../services/socket";
@@ -14,30 +11,24 @@ import PhoneOtpForm from "@/components/auth/PhoneOtpForm";
 import EmailLoginForm from "@/components/auth/EmailLoginForm";
 import RestoreSessionUI from "@/components/auth/RestoreSessionUI";
 import { cn } from "@/lib/utils";
-import Advanced3DBackground from "@/components/ui/advanced-3d-bg";
-import AuthCard3D, { AuthInput3D, AuthButton3D } from "@/components/ui/3d-auth-card";
 
 export default function Login({ onLogin, onSignup, canResume = false, sessionExpired = false, onAction }) {
-  const [loginMethod, setLoginMethod] = useState("phone"); // Default to Phone OTP
+  const [loginMethod, setLoginMethod] = useState("phone");
   
-  // Email state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   
-  // Phone OTP state
   const [phone, setPhone] = useState("+91");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [canResendAt, setCanResendAt] = useState(0);
   
-  // Registration Flow state (for new phone users)
   const [isRegistering, setIsRegistering] = useState(false);
   const [name, setName] = useState("");
   
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Restore Backup state
   const [showRestorePrompt, setShowRestorePrompt] = useState(false);
   const [restoreAuthData, setRestoreAuthData] = useState(null);
   const [restorePin, setRestorePin] = useState("");
@@ -45,7 +36,6 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
   const [syncStatus, setSyncStatus] = useState("Initializing device...");
 
-  // Surface an immediate prompt when the stored token is missing/invalid
   useEffect(() => {
     if (sessionExpired) {
       const storedUser = JSON.parse(localStorage.getItem("user") || "null");
@@ -53,7 +43,6 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       setOtpSent(false);
       setIsRegistering(false);
       if (storedUser) {
-        // Skip phone entry — jump directly to PIN/Device verification
         setRestoreAuthData({ user: storedUser });
         setShowRestorePrompt(true);
         setError("Session expired. Please verify your identity to continue.");
@@ -67,9 +56,6 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   const handleLoginSuccess = async (res) => {
     localStorage.setItem("token", res.data.token);
     localStorage.setItem("user", JSON.stringify(res.data.user));
-    // DONT set session-active here — wait for verification completion
-    
-    // Always show PIN/Device verification as the mandatory second step
     setRestoreAuthData(res.data);
     setShowRestorePrompt(true);
   };
@@ -114,10 +100,8 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       const userId = restoreAuthData.user._id;
       const deviceId = getCurrentDeviceId();
 
-      // Generate a fresh key pair for this device (no existing key needed)
       const { publicKey } = await ensureIdentityKeyPair(userId);
 
-      // Register the new device key on the server
       await api.post("/user/encryption-key", {
         publicKey,
         deviceId,
@@ -128,45 +112,70 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
         .filter(d => d.deviceId !== deviceId);
 
       setIsWaitingForApproval(true);
-      connectSocket();
-
+      
       if (otherDevices.length > 0) {
-        socket.emit("request-history-sync", {
-          requesterDeviceId: deviceId,
-          requesterLabel: getCurrentDeviceLabel(),
-        }, (result) => {
-          if (result?.ok) {
-            setSyncStatus("Approval request sent! Please check your other trusted device.");
-          } else {
-            setSyncStatus("No other devices online. You can log in without history sync.");
-            setTimeout(() => { 
-              setShowRestorePrompt(false); 
-              localStorage.setItem("session-active", "true");
-              onLogin(); 
-            }, 5000);
+        const sendHistorySyncRequest = () => {
+          if (!socket.connected) {
+            setTimeout(sendHistorySyncRequest, 100);
+            return;
           }
-        });
+          
+          socket.emit("request-history-sync", {
+            requesterDeviceId: deviceId,
+            requesterLabel: getCurrentDeviceLabel(),
+          }, (result) => {
+            if (result?.ok) {
+              setSyncStatus("Approval request sent! Please check your other trusted device.");
+            } else {
+              setSyncStatus(result?.message || "No other devices online. Logging in without history sync...");
+              setTimeout(() => { 
+                setShowRestorePrompt(false); 
+                localStorage.setItem("session-active", "true");
+                connectSocket();
+                onLogin(); 
+              }, 3000);
+            }
+          });
 
-        socket.on("history-sync-complete", (data) => {
-          if (data.requesterDeviceId === deviceId) {
-            setSyncStatus("Approved! Syncing your encrypted keys...");
-            setTimeout(() => { 
-              setShowRestorePrompt(false); 
-              localStorage.setItem("session-active", "true");
-              onLogin(); 
-              window.location.reload(); 
-            }, 2500);
-          }
-        });
+          socket.on("history-sync-response", (data) => {
+            if (data.requesterDeviceId === deviceId && data.approved) {
+              setSyncStatus("Approved! Completing setup...");
+              
+              socket.emit("history-sync-finished", {
+                requesterDeviceId: deviceId,
+                syncedCount: 0,
+              });
+              
+              setTimeout(() => { 
+                setShowRestorePrompt(false); 
+                localStorage.setItem("session-active", "true");
+                onLogin(); 
+              }, 1500);
+            }
+          });
+
+          socket.on("history-sync-complete", (data) => {
+            if (data.requesterDeviceId === deviceId) {
+              setSyncStatus("Synced! Entering chat...");
+              setTimeout(() => { 
+                setShowRestorePrompt(false); 
+                localStorage.setItem("session-active", "true");
+                onLogin(); 
+              }, 1000);
+            }
+          });
+        };
+        
+        connectSocket();
+        sendHistorySyncRequest();
       } else {
-        // No other devices — just let them in
+        connectSocket();
         setSyncStatus("No trusted devices found. Logging in without history sync.");
         setTimeout(() => { 
           setShowRestorePrompt(false); 
           localStorage.setItem("session-active", "true");
-          connectSocket(); 
           onLogin(); 
-        }, 3000);
+        }, 2000);
       }
     } catch (keyError) {
       console.error("Device verification error:", keyError);
@@ -285,16 +294,6 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
     }
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, staggerChildren: 0.1 } }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, x: -10 },
-    visible: { opacity: 1, x: 0 }
-  };
-
   const authSteps = showRestorePrompt
     ? ["Authenticate", "Verify device", "Restore access"]
     : isRegistering
@@ -304,11 +303,9 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
         : ["Enter credentials", "Secure device check", "Restore access"];
 
   const authNotice = error ? (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className={`mb-6 flex w-full items-center gap-3 rounded-[22px] border px-4 py-3 text-sm font-medium backdrop-blur-xl ${
+    <div
+      role="alert"
+      className={`mb-6 flex w-full items-center gap-3 rounded-[22px] border px-4 py-3 text-sm font-medium backdrop-blur-xl transition-all ${
         error.startsWith("Success")
           ? "border-secondary/20 bg-secondary/12 text-secondary"
           : "border-destructive/20 bg-destructive/12 text-destructive"
@@ -316,7 +313,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
     >
       {error.startsWith("Success") ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
       {error.replace("Success: ", "")}
-    </motion.div>
+    </div>
   ) : null;
 
   if (showRestorePrompt) {
@@ -337,6 +334,10 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
           loading={loading}
           onRestoreBackup={handleRestoreBackup}
           onDeviceVerification={handleDeviceVerification}
+          onGoToPIN={() => {
+            setIsWaitingForApproval(false);
+            setSyncStatus("");
+          }}
           onSkipRestore={handleSkipRestore}
           onContinueWithoutHistory={() => {
             setShowRestorePrompt(false);
@@ -366,16 +367,16 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       }
       footer={
         !isRegistering ? (
-          <motion.p variants={itemVariants} className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Don't have an account?{" "}
             <span onClick={onSignup} className="cursor-pointer font-bold text-secondary transition-colors hover:text-foreground">
               Sign up for free
             </span>
-          </motion.p>
+          </p>
         ) : null
       }
     >
-      <motion.div variants={itemVariants} initial="hidden" animate="visible" className="mb-6 flex flex-col gap-4">
+      <div className="mb-6 flex flex-col gap-4">
         <div className="grid gap-2 sm:grid-cols-3">
           {authSteps.map((step, index) => (
             <div key={step} className="surface-inline rounded-[20px] px-4 py-3">
@@ -417,62 +418,60 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
             })}
           </div>
         ) : null}
-      </motion.div>
+      </div>
 
       {authNotice}
 
-      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full">
-        <AnimatePresence mode="wait">
-          {loginMethod === "phone" ? (
-            <PhoneOtpForm
-              key="phone-flow"
-              phone={phone}
-              setPhone={setPhone}
-              otp={otp}
-              setOtp={setOtp}
-              otpSent={otpSent}
-              canResume={canResume}
-              canResendAt={canResendAt}
-              loading={loading}
-              onPrimaryAction={!otpSent ? handleSendOtp : handleVerifyOtp}
-              onResumeSession={handleResumeSession}
-              onResend={handleResendOtp}
-              onSwitchMethod={() => {
-                setLoginMethod("email");
-                setError("");
-              }}
-              isRegistering={isRegistering}
-              name={name}
-              setName={setName}
-              email={email}
-              setEmail={setEmail}
-              password={password}
-              setPassword={setPassword}
-              onCompleteRegistration={handleCompleteRegistration}
-              onCancelRegistration={() => {
-                setIsRegistering(false);
-                setOtpSent(false);
-                setOtp("");
-                setError("");
-              }}
-            />
-          ) : (
-            <EmailLoginForm
-              key="email-flow"
-              email={email}
-              setEmail={setEmail}
-              password={password}
-              setPassword={setPassword}
-              loading={loading}
-              onSubmit={handleEmailLogin}
-              onBack={() => {
-                setLoginMethod("phone");
-                setError("");
-              }}
-            />
-          )}
-        </AnimatePresence>
-      </motion.div>
+      <div className="w-full">
+        {loginMethod === "phone" ? (
+          <PhoneOtpForm
+            key="phone-flow"
+            phone={phone}
+            setPhone={setPhone}
+            otp={otp}
+            setOtp={setOtp}
+            otpSent={otpSent}
+            canResume={canResume}
+            canResendAt={canResendAt}
+            loading={loading}
+            onPrimaryAction={!otpSent ? handleSendOtp : handleVerifyOtp}
+            onResumeSession={handleResumeSession}
+            onResend={handleResendOtp}
+            onSwitchMethod={() => {
+              setLoginMethod("email");
+              setError("");
+            }}
+            isRegistering={isRegistering}
+            name={name}
+            setName={setName}
+            email={email}
+            setEmail={setEmail}
+            password={password}
+            setPassword={setPassword}
+            onCompleteRegistration={handleCompleteRegistration}
+            onCancelRegistration={() => {
+              setIsRegistering(false);
+              setOtpSent(false);
+              setOtp("");
+              setError("");
+            }}
+          />
+        ) : (
+          <EmailLoginForm
+            key="email-flow"
+            email={email}
+            setEmail={setEmail}
+            password={password}
+            setPassword={setPassword}
+            loading={loading}
+            onSubmit={handleEmailLogin}
+            onBack={() => {
+              setLoginMethod("phone");
+              setError("");
+            }}
+          />
+        )}
+      </div>
     </AuthShell>
   );
 }

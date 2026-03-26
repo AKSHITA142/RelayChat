@@ -49,7 +49,7 @@ export default function ChatHeader({
   menuRef,
 }) {
   return (
-    <div className="z-20 mx-3 mt-3 flex min-h-[5rem] items-center justify-between rounded-2xl border border-white/10 bg-black/50 px-4 py-3 backdrop-blur-md md:mx-4 md:px-5">
+    <header className="z-20 mx-3 mt-3 flex min-h-[5rem] items-center justify-between rounded-2xl border border-white/10 bg-black/50 px-4 py-3 backdrop-blur-md md:mx-4 md:px-5" role="banner">
       <div className="flex min-w-0 items-center gap-4">
         <div className="relative">
           <Avatar
@@ -60,7 +60,11 @@ export default function ChatHeader({
             className="border-primary/15 bg-primary/10 text-primary"
           />
           {!selectedChat.isGroup && isOnline && (
-            <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500" />
+            <span 
+              className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-green-500" 
+              role="status"
+              aria-label="Online"
+            />
           )}
         </div>
 
@@ -75,6 +79,7 @@ export default function ChatHeader({
                   onKeyDown={(event) => event.key === "Enter" && onRenameSubmit()}
                   className="h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none focus:border-primary/30"
                   autoFocus
+                  aria-label="New chat name"
                 />
                 <IconButton icon={Check} label="Save name" variant="primary" size="sm" onClick={onRenameSubmit} />
                 <IconButton icon={X} label="Cancel rename" variant="destructive" size="sm" onClick={onCancelRename} />
@@ -86,6 +91,7 @@ export default function ChatHeader({
                   onClick={() => !selectedChat?.isGroup && onToggleContactInfo()}
                   className="truncate text-left text-xl font-bold text-white hover:text-primary"
                   title={!selectedChat?.isGroup ? "View contact info" : undefined}
+                  aria-label={!selectedChat?.isGroup ? "View contact info" : undefined}
                 >
                   {displayName}
                 </button>
@@ -103,7 +109,7 @@ export default function ChatHeader({
             )}
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-2">
+          <div className="mt-1 flex flex-wrap items-center gap-2" role="status" aria-live="polite">
             {selectedChat?.isGroup ? (
               <span className="text-xs text-white/50">
                 Group • {selectedChat.createdAt ? new Date(selectedChat.createdAt).toLocaleDateString([], { month: "short", day: "numeric" }) : "Recent"}
@@ -112,7 +118,7 @@ export default function ChatHeader({
               <StatusBadge status="active" label="Typing" pulse className="gap-2" hideDot={false} />
             ) : (
               <span className={cn("flex items-center gap-1 text-xs", isOnline ? "text-green-400" : "text-white/50")}>
-                {isOnline && <Circle size={8} className="fill-green-400 text-green-400" />}
+                {isOnline && <Circle size={8} className="fill-green-400 text-green-400" aria-hidden="true" />}
                 {isOnline ? "Online" : lastSeenText}
               </span>
             )}
@@ -127,6 +133,8 @@ export default function ChatHeader({
             label="Change theme"
             variant={showThemePicker ? "primary" : "default"}
             onClick={() => setShowThemePicker((value) => !value)}
+            aria-expanded={showThemePicker}
+            aria-haspopup="dialog"
           />
           {showThemePicker && (
             <ThemeSelector currentTheme={activeThemeName} onSelect={onThemeSelect} onClose={() => setShowThemePicker(false)} />
@@ -134,7 +142,7 @@ export default function ChatHeader({
         </div>
 
         {!selectedChat.isGroup && (
-          <IconButton icon={Video} label="Start video call" variant="default" onClick={onStartVideoCall} />
+          <IconButton icon={Video} label="Start video call" variant="default" onClick={onStartVideoCall} aria-label="Start video call" />
         )}
 
         <IconButton
@@ -142,47 +150,81 @@ export default function ChatHeader({
           label="Open chat menu"
           variant={showMenu ? "primary" : "default"}
           onClick={() => setShowMenu((value) => !value)}
+          aria-expanded={showMenu}
+          aria-haspopup="menu"
         />
 
         {showMenu && (
-          <div className="absolute right-0 top-14 z-50 w-56 rounded-xl border border-white/10 bg-black/95 py-2 shadow-xl">
-            <button onClick={onOpenSearch} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10">
-              <Search size={16} />
+          <nav 
+            className="absolute right-0 top-14 z-50 w-56 rounded-xl border border-white/10 bg-black/95 py-2 shadow-xl" 
+            role="menu"
+            aria-label="Chat options"
+          >
+            <button 
+              onClick={onOpenSearch} 
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10"
+              role="menuitem"
+            >
+              <Search size={16} aria-hidden="true" />
               Search messages
             </button>
-            <button onClick={onOpenParticipants} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10">
-              <Users size={16} />
+            <button 
+              onClick={onOpenParticipants} 
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10"
+              role="menuitem"
+            >
+              <Users size={16} aria-hidden="true" />
               View participants
             </button>
-            <button onClick={onStartRename} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10">
-              <Edit2 size={16} />
+            <button 
+              onClick={onStartRename} 
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10"
+              role="menuitem"
+            >
+              <Edit2 size={16} aria-hidden="true" />
               Rename {selectedChat.isGroup ? "group" : "chat"}
             </button>
             {selectedChat.isGroup ? (
               <>
-                <button onClick={onRequestAddMember} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10">
-                  <UserPlus size={16} />
+                <button 
+                  onClick={onRequestAddMember} 
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10"
+                  role="menuitem"
+                >
+                  <UserPlus size={16} aria-hidden="true" />
                   Add member
                 </button>
-                <button onClick={onRequestRemoveMember} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10">
-                  <UserMinus size={16} />
+                <button 
+                  onClick={onRequestRemoveMember} 
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10"
+                  role="menuitem"
+                >
+                  <UserMinus size={16} aria-hidden="true" />
                   Remove member
                 </button>
               </>
             ) : !savedContact && otherUser ? (
-              <button onClick={onOpenAddContact} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10">
-                <UserPlus size={16} />
+              <button 
+                onClick={onOpenAddContact} 
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white hover:bg-white/10"
+                role="menuitem"
+              >
+                <UserPlus size={16} aria-hidden="true" />
                 Add to contacts
               </button>
             ) : null}
             <div className="my-1 h-px bg-white/10" />
-            <button onClick={onClearChat} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10">
-              <Trash2 size={16} />
+            <button 
+              onClick={onClearChat} 
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10"
+              role="menuitem"
+            >
+              <Trash2 size={16} aria-hidden="true" />
               Clear chat
             </button>
-          </div>
+          </nav>
         )}
       </div>
-    </div>
+    </header>
   );
 }

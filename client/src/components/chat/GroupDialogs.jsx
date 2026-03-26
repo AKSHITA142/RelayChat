@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { Check, CheckCheck, Info, Loader2, Phone, Plus, Shield, UserMinus, UserPlus, X } from "lucide-react";
 import {
   DialogShell,
@@ -319,19 +318,12 @@ export default function GroupDialogs({
         </DialogShellContent>
       </DialogShell>
 
-      <AnimatePresence>
-        {adminNotice ? (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="pointer-events-none absolute left-1/2 top-24 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-[22px] border border-destructive/20 bg-destructive/12 px-6 py-3 text-destructive shadow-panel backdrop-blur-xl"
-          >
-            <Shield size={18} />
-            <span className="text-sm font-bold">{adminNotice}</span>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      {adminNotice && (
+        <div className="pointer-events-none absolute left-1/2 top-24 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-[22px] border border-destructive/20 bg-destructive/12 px-6 py-3 text-destructive shadow-panel backdrop-blur-xl transition-all duration-300">
+          <Shield size={18} />
+          <span className="text-sm font-bold">{adminNotice}</span>
+        </div>
+      )}
     </>
   );
 }

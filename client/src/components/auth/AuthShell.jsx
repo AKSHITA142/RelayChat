@@ -40,10 +40,8 @@ export default function AuthShell({
 }) {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 text-foreground">
-      {/* Advanced 3D Background */}
       <Advanced3DBackground className="absolute inset-0 z-0" />
       
-      {/* Overlay Effects */}
       <div className="pointer-events-none absolute inset-0 bg-hero-fade opacity-60" />
       <div className="pointer-events-none absolute inset-0 app-noise opacity-30" />
 
@@ -62,9 +60,15 @@ export default function AuthShell({
               </div>
 
               <div className="space-y-5">
-                <div className="flex items-center gap-3">
-                  <div className="surface-panel flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-button hover:shadow-[0_20px_50px_-20px_hsl(var(--primary)/0.65)] transition-all duration-300">
-                    <Shield size={22} />
+                <div className="flex items-center gap-4">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/40 to-secondary/40 p-1 shadow-lg">
+                    <img 
+                      src="/relaychat-logo.svg" 
+                      alt="RelayChat" 
+                      className="h-full w-full object-contain"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                    <span className="text-2xl font-bold text-primary">R</span>
                   </div>
                   <div>
                     <p className="font-headline text-3xl font-bold tracking-tight text-gradient">RelayChat</p>
@@ -115,11 +119,22 @@ export default function AuthShell({
 
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: "easeOut" }}>
             <Card className="surface-panel overflow-hidden p-6 md:p-8 lg:p-10 backdrop-blur-2xl border-l border-white/10 shadow-panel">
-              <div className="mb-8 flex flex-col gap-6">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="section-badge shadow-lg">
-                    <Sparkles size={12} />
-                    {eyebrow}
+              <div className="mb-6 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/40 to-secondary/40 p-0.5 shadow-md">
+                      <img 
+                        src="/relaychat-logo.svg" 
+                        alt="RelayChat" 
+                        className="h-full w-full object-contain"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                      <span className="text-xl font-bold text-primary">R</span>
+                    </div>
+                    <div className="section-badge shadow-lg">
+                      <Sparkles size={12} />
+                      {eyebrow}
+                    </div>
                   </div>
                   <div className="feature-pill shadow-md hover:shadow-lg transition-all duration-300">
                     <span className="inline-flex size-2 rounded-full bg-secondary shadow-[0_0_12px_hsl(var(--secondary)/0.8)] animate-pulse" />
