@@ -102,7 +102,7 @@ function initSocket(server) {
         }
       });
 
-      socket.on("request-history-sync", ({ requesterDeviceId, requesterLabel }, callback) => {
+      socket.on("request-history-sync", ({ requesterDeviceId, requesterLabel, requesterPublicKey }, callback) => {
         try {
           if (!requesterDeviceId) {
             callback && callback({ ok: false, deliveredCount: 0, message: "Missing requester device ID" });
@@ -113,6 +113,7 @@ function initSocket(server) {
             requesterSocketId: socket.id,
             userId: socket.userId.toString(),
             requesterDeviceId,
+            requesterPublicKey: requesterPublicKey || null,
           });
 
           io.in(socket.userId.toString()).fetchSockets()
@@ -129,6 +130,7 @@ function initSocket(server) {
                     requestId,
                     requesterDeviceId,
                     requesterLabel,
+                    requesterPublicKey: requesterPublicKey || null,
                   });
                 });
 

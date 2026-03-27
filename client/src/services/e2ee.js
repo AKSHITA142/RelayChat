@@ -691,8 +691,7 @@ export const restorePrivateKeyFromCloud = async (apiClient, userId, pin) => {
     const currentDeviceId = getCurrentDeviceId();
     localStorage.removeItem(getHistorySyncNeededStorageKey(userId, currentDeviceId));
     
-    // Make sure we also have a device id if we need to fake one or keep the existing
-    return true;
+    return { publicKey: publicKeyJwk };
   } catch (err) {
     throw new Error("Invalid password or corrupted backup");
   }

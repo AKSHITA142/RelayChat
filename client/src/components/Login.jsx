@@ -2,10 +2,15 @@ import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle, Mail, Phone, ShieldCheck } from "lucide-react";
 import api from "../services/api";
 import { connectSocket } from "../services/socket";
-import { ensureE2EERegistration } from "../services/e2ee";
+import {
+  ensureE2EERegistration,
+  getCurrentDeviceId,
+  getCurrentDeviceLabel,
+  markHistorySyncComplete,
+  needsHistorySync,
+} from "../services/e2ee";
 import { isTokenValid } from "../utils/auth";
 import socket from "../services/socket";
-import { getCurrentDeviceId, getCurrentDeviceLabel } from "../services/e2ee";
 import AuthShell from "@/components/auth/AuthShell";
 import PhoneOtpForm from "@/components/auth/PhoneOtpForm";
 import EmailLoginForm from "@/components/auth/EmailLoginForm";
@@ -58,7 +63,19 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
     localStorage.setItem("user", JSON.stringify(res.data.user));
 
     try {
-      await ensureE2EERegistration(api, res.data.user);
+      const updatedUser = await ensureE2EERegistration(api, res.data.user);
+      const effectiveUser = updatedUser || res.data.user;
+
+      // New device registration + other trusted devices present => require verification now.
+      if (needsHistorySync(effectiveUser._id)) {
+        setRestoreAuthData({ ...res.data, user: effectiveUser });
+        setShowRestorePrompt(true);
+        setRestoreError("");
+        setIsWaitingForApproval(false);
+        setSyncStatus("");
+        return;
+      }
+
       localStorage.setItem("session-active", "true");
       connectSocket();
       setShowRestorePrompt(false);
@@ -67,6 +84,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       console.warn("E2EE restore required:", err);
       setRestoreAuthData(res.data);
       setShowRestorePrompt(true);
+      setRestoreError(err?.message || "");
     }
   };
 
@@ -76,13 +94,36 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
     setRestoreError("");
     try {
       const { restorePrivateKeyFromCloud } = await import("../services/e2ee");
-      await restorePrivateKeyFromCloud(api, restoreAuthData.user._id, restorePin);
+      const restoreUserId = restoreAuthData.user._id;
+      const restored = await restorePrivateKeyFromCloud(api, restoreUserId, restorePin);
+      let latestUser = restoreAuthData.user;
+
+      // Ensure the server's record for THIS deviceId matches the restored key.
+      // This avoids "missing original encryption key" when a device was previously registered
+      // with a different key and then local storage was cleared.
+      if (restored?.publicKey) {
+        const encryptionKeyRes = await api.post("/user/encryption-key", {
+          publicKey: restored.publicKey,
+          deviceId: getCurrentDeviceId(),
+          deviceLabel: getCurrentDeviceLabel(),
+        });
+
+        if (encryptionKeyRes?.data?.user) {
+          latestUser = { ...latestUser, ...encryptionKeyRes.data.user };
+          localStorage.setItem("user", JSON.stringify(latestUser));
+          setRestoreAuthData((prev) => (prev ? { ...prev, user: latestUser } : prev));
+        }
+      }
       
-      await ensureE2EERegistration(api, restoreAuthData.user);
+      const ensuredUser = await ensureE2EERegistration(api, latestUser);
+      if (ensuredUser) {
+        localStorage.setItem("user", JSON.stringify(ensuredUser));
+      }
       
-      const deviceId = localStorage.getItem("relaychat-e2ee-device-id");
-      if (deviceId) {
-        localStorage.removeItem(`relaychat-history-sync-needed-${restoreAuthData.user._id}-${deviceId}`);
+      try {
+        markHistorySyncComplete(restoreUserId);
+      } catch {
+        /* ignore */
       }
       
       setShowRestorePrompt(false);
@@ -91,7 +132,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       onLogin();
     } catch (err) {
       console.error(err);
-      setRestoreError(err.message || "Failed to restore backup or incorrect PIN");
+      setRestoreError(err.response?.data?.message || err.message || "Failed to restore backup or incorrect PIN");
     } finally {
       setLoading(false);
     }
@@ -129,49 +170,81 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
             setTimeout(sendHistorySyncRequest, 100);
             return;
           }
-          
+
+          let completed = false;
+          let completionTimer = null;
+
+          const cleanup = () => {
+            socket.off("history-sync-response", handleHistorySyncResponse);
+            socket.off("history-sync-complete", handleHistorySyncComplete);
+            if (completionTimer) {
+              clearTimeout(completionTimer);
+              completionTimer = null;
+            }
+          };
+
+          const finishLogin = () => {
+            if (completed) return;
+            completed = true;
+            cleanup();
+            try {
+              markHistorySyncComplete(userId);
+            } catch {
+              /* ignore */
+            }
+            setShowRestorePrompt(false);
+            localStorage.setItem("session-active", "true");
+            connectSocket();
+            onLogin();
+          };
+
+          const handleHistorySyncComplete = (data) => {
+            if (data?.requesterDeviceId !== deviceId) return;
+            if (data?.syncedCount === 0) {
+              setRestoreError("Approved, but no message keys were synced. Keep both devices online and try again, or use your backup PIN.");
+              cleanup();
+              setIsWaitingForApproval(false);
+              return;
+            }
+
+            setSyncStatus(`Synced ${data?.syncedCount || 0} keys. Entering chat...`);
+            finishLogin();
+          };
+
+          const handleHistorySyncResponse = (data) => {
+            if (data?.requesterDeviceId !== deviceId) return;
+
+            if (!data?.approved) {
+              setSyncStatus("Approval declined on your other device. You can try again or use your PIN.");
+              cleanup();
+              setIsWaitingForApproval(false);
+              return;
+            }
+
+            setSyncStatus("Approved! Syncing message keys...");
+
+            // Wait for "history-sync-complete" from the approving device.
+            completionTimer = setTimeout(() => {
+              setRestoreError("Still syncing... Keep this screen open on both devices, or use your backup PIN.");
+            }, 20000);
+          };
+
+          socket.off("history-sync-response", handleHistorySyncResponse);
+          socket.off("history-sync-complete", handleHistorySyncComplete);
+          socket.on("history-sync-response", handleHistorySyncResponse);
+          socket.on("history-sync-complete", handleHistorySyncComplete);
+
           socket.emit("request-history-sync", {
             requesterDeviceId: deviceId,
             requesterLabel: getCurrentDeviceLabel(),
+            requesterPublicKey: publicKey,
           }, (result) => {
             if (result?.ok) {
               setSyncStatus("Approval request sent! Please check your other trusted device.");
             } else {
-              setSyncStatus(result?.message || "No other devices online. Logging in without history sync...");
-              setTimeout(() => { 
-                setShowRestorePrompt(false); 
-                localStorage.setItem("session-active", "true");
-                connectSocket();
-                onLogin(); 
-              }, 3000);
-            }
-          });
-
-          socket.on("history-sync-response", (data) => {
-            if (data.requesterDeviceId === deviceId && data.approved) {
-              setSyncStatus("Approved! Completing setup...");
-              
-              socket.emit("history-sync-finished", {
-                requesterDeviceId: deviceId,
-                syncedCount: 0,
-              });
-              
-              setTimeout(() => { 
-                setShowRestorePrompt(false); 
-                localStorage.setItem("session-active", "true");
-                onLogin(); 
-              }, 1500);
-            }
-          });
-
-          socket.on("history-sync-complete", (data) => {
-            if (data.requesterDeviceId === deviceId) {
-              setSyncStatus("Synced! Entering chat...");
-              setTimeout(() => { 
-                setShowRestorePrompt(false); 
-                localStorage.setItem("session-active", "true");
-                onLogin(); 
-              }, 1000);
+              setRestoreError(result?.message || "No other trusted device is online right now.");
+              cleanup();
+              setIsWaitingForApproval(false);
             }
           });
         };
@@ -180,12 +253,8 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
         sendHistorySyncRequest();
       } else {
         connectSocket();
-        setSyncStatus("No trusted devices found. Logging in without history sync.");
-        setTimeout(() => { 
-          setShowRestorePrompt(false); 
-          localStorage.setItem("session-active", "true");
-          onLogin(); 
-        }, 2000);
+        setRestoreError("No trusted devices found for approval. Use your backup PIN or continue without history.");
+        setIsWaitingForApproval(false);
       }
     } catch (keyError) {
       console.error("Device verification error:", keyError);
@@ -351,6 +420,16 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
           onSkipRestore={handleSkipRestore}
           onContinueWithoutHistory={() => {
             setShowRestorePrompt(false);
+            localStorage.setItem("session-active", "true");
+            connectSocket();
+            try {
+              const restoreUserId = restoreAuthData?.user?._id;
+              if (restoreUserId) {
+                markHistorySyncComplete(restoreUserId);
+              }
+            } catch {
+              /* ignore */
+            }
             onLogin();
           }}
         />

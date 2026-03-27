@@ -7,7 +7,7 @@ import VideoCall from "../components/VideoCall";
 import Settings from "../components/Settings";
 import { Check, X as CloseIcon } from "lucide-react";
 import api from "../services/api";
-import { ensureE2EERegistration, hydrateDecryptedMessage } from "../services/e2ee";
+import { buildHistorySyncUpdate, ensureE2EERegistration, hydrateDecryptedMessage } from "../services/e2ee";
 import { getThemeClassName, useChatTheme } from "../hooks/useChatTheme";
 import { cn } from "../lib/utils";
 
@@ -21,6 +21,9 @@ export default function Chat() {
   const [contacts, setContacts] = useState(() => getLoggedInUser()?.contacts || []);
   const [e2eeUser, setE2eeUser] = useState(() => getLoggedInUser());
   const [pendingHistorySyncApproval, setPendingHistorySyncApproval] = useState(null);
+  const [historySyncStatus, setHistorySyncStatus] = useState("");
+  const [historySyncError, setHistorySyncError] = useState("");
+  const [isHistorySyncing, setIsHistorySyncing] = useState(false);
   
   const [isAddingContact, setIsAddingContact] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
@@ -44,7 +47,92 @@ export default function Chat() {
     window.location.href = "/login";
   };
 
+  const handleApproveHistorySync = async (approval) => {
+    const currentUserId = getLoggedInUser()?._id?.toString();
+    if (!currentUserId) return;
+
+    const requestId = approval?.requestId;
+    const requesterDeviceId = approval?.requesterDeviceId;
+    const requesterPublicKey = approval?.requesterPublicKey;
+
+    setHistorySyncError("");
+    setHistorySyncStatus("Starting history sync...");
+    setIsHistorySyncing(true);
+
+    try {
+      if (!requestId || !requesterDeviceId || !requesterPublicKey) {
+        throw new Error("Missing requester device details for history sync.");
+      }
+
+      const chatsRes = await api.get("/chat/my-chats");
+      const chatList = Array.isArray(chatsRes.data) ? chatsRes.data : [];
+
+      const updates = [];
+      let processedCount = 0;
+
+      const maxChats = 50;
+      const maxMessagesPerChat = 400;
+
+      for (const chat of chatList.slice(0, maxChats)) {
+        const chatId = chat?._id;
+        if (!chatId) continue;
+
+        setHistorySyncStatus("Scanning messages...");
+        const messagesRes = await api.get(`/message/${chatId}`);
+        const messages = Array.isArray(messagesRes.data) ? messagesRes.data : [];
+
+        for (const message of messages.slice(-maxMessagesPerChat)) {
+          const update = await buildHistorySyncUpdate({
+            message,
+            currentUserId,
+            targetUserId: currentUserId,
+            targetDeviceId: requesterDeviceId,
+            targetPublicKey: requesterPublicKey,
+          });
+          if (update) updates.push(update);
+        }
+      }
+
+      setHistorySyncStatus(`Syncing ${updates.length} key updates...`);
+
+      const batchSize = 50;
+      for (let index = 0; index < updates.length; index += batchSize) {
+        const batch = updates.slice(index, index + batchSize);
+        const resp = await api.post("/message/sync-device-history", { updates: batch });
+        processedCount += Array.isArray(resp.data?.processedMessageIds) ? resp.data.processedMessageIds.length : 0;
+      }
+
+      socket.emit("history-sync-finished", {
+        requestId,
+        requesterDeviceId,
+        syncedCount: processedCount,
+      });
+
+      setHistorySyncStatus(`Done. Synced ${processedCount} messages.`);
+      setPendingHistorySyncApproval(null);
+    } catch (err) {
+      console.error("History sync approval failed:", err);
+      const message = err?.response?.data?.message || err?.message || "History sync failed";
+      setHistorySyncError(message);
+
+      if (approval?.requestId) {
+        socket.emit("history-sync-finished", {
+          requestId: approval.requestId,
+          requesterDeviceId: approval.requesterDeviceId,
+          syncedCount: 0,
+        });
+      }
+    } finally {
+      setIsHistorySyncing(false);
+    }
+  };
+
   useEffect(() => {
+    const handleHistorySyncRequested = (data) => {
+      setPendingHistorySyncApproval(data);
+    };
+    socket.on("history-sync-requested", handleHistorySyncRequested);
+
     connectSocket();
     const currentUser = getLoggedInUser();
     if (currentUser?._id) {
@@ -58,7 +146,10 @@ export default function Chat() {
         .catch((error) => console.error("Failed to initialize E2EE keys:", error));
     }
     document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.src = ""; } catch {} });
-    return () => socket.disconnect();
+    return () => {
+      socket.off("history-sync-requested", handleHistorySyncRequested);
+      socket.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -153,14 +244,6 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
-    const handleHistorySyncRequested = (data) => {
-      setPendingHistorySyncApproval(data);
-    };
-    socket.on("history-sync-requested", handleHistorySyncRequested);
-    return () => socket.off("history-sync-requested", handleHistorySyncRequested);
-  }, []);
-
-  useEffect(() => {
     if (!chats.length) return;
     chats.forEach(chat => socket.emit("join-chat", chat._id));
   }, [chats]);
@@ -177,11 +260,14 @@ export default function Chat() {
               <p className="mt-1 text-xs text-white/60">
                 "{pendingHistorySyncApproval.requesterLabel}" wants to sync history
               </p>
+              {historySyncStatus ? <p className="mt-2 text-[11px] text-white/60">{historySyncStatus}</p> : null}
+              {historySyncError ? <p className="mt-2 text-[11px] text-red-300">{historySyncError}</p> : null}
             </div>
             <button 
-              onClick={() => setPendingHistorySyncApproval(null)} 
+              onClick={() => { if (!isHistorySyncing) setPendingHistorySyncApproval(null); }} 
               className="rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-white"
               aria-label="Dismiss"
+              disabled={isHistorySyncing}
             >
               <CloseIcon size={18} />
             </button>
@@ -191,9 +277,10 @@ export default function Chat() {
               onClick={() => {
                 const { requestId } = pendingHistorySyncApproval;
                 socket.emit("respond-history-sync", { requestId, approved: true });
-                setPendingHistorySyncApproval(null);
+                handleApproveHistorySync(pendingHistorySyncApproval);
               }} 
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-500"
+              disabled={isHistorySyncing}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-500 disabled:opacity-50"
             >
               <Check size={16} /> Approve
             </button>
@@ -203,7 +290,8 @@ export default function Chat() {
                 socket.emit("respond-history-sync", { requestId, approved: false });
                 setPendingHistorySyncApproval(null);
               }} 
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white/70 transition-colors hover:bg-white/20 hover:text-white"
+              disabled={isHistorySyncing}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white/70 transition-colors hover:bg-white/20 hover:text-white disabled:opacity-50"
             >
               <CloseIcon size={16} /> Decline
             </button>
