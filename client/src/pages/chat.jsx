@@ -3,6 +3,7 @@ import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
 import socket, { connectSocket } from "../services/socket";
 import { getLoggedInUser } from "../utils/auth";
+import { redirectToAppBase } from "../utils/navigation";
 import VideoCall from "../components/VideoCall";
 import Settings from "../components/Settings";
 import { Check, X as CloseIcon } from "lucide-react";
@@ -44,7 +45,7 @@ export default function Chat() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("session-active");
-    window.location.href = "/login";
+    redirectToAppBase();
   };
 
   const handleApproveHistorySync = async (approval) => {

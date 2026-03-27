@@ -15,6 +15,7 @@ import api from "../services/api";
 import { getLoggedInUser } from "../utils/auth";
 import { hydrateChatPreview } from "../services/e2ee";
 import { config } from "../config";
+import { redirectToAppBase } from "../utils/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { IconButton } from "@/components/ui/icon-button";
@@ -459,7 +460,7 @@ export default function Sidebar({
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("session-active");
-    window.location.href = "/login";
+    redirectToAppBase();
   };
 
   useEffect(() => {
