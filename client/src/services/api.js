@@ -1,5 +1,7 @@
 import axios from "axios";
 import { config } from "../config";
+import { redirectToSessionExpired } from "../utils/navigation";
+import { clearClientStorage } from "../utils/auth";
 
 const api = axios.create({
   baseURL: config.endpoints.base(),
@@ -25,10 +27,8 @@ api.interceptors.response.use(
     // Don't force session-expired redirect for auth endpoints:
     // those can legitimately return 401/400 (e.g. invalid credentials/OTP).
     if (status === 401 && !isAuthEndpoint) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("session-active");
-      window.location.href = "/login?session_expired=true";
+      clearClientStorage();
+      redirectToSessionExpired();
     }
     return Promise.reject(error);
   }
