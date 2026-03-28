@@ -115,6 +115,14 @@ exports.sendEmailOtp = async (req, res) => {
   try {
     console.log("🔍 sendEmailOtp called with body:", req.body);
     
+    // Test basic functionality first
+    if (!req.body || !req.body.email) {
+      console.log("❌ No email in request body");
+      return res.status(400).json({ message: "Email is required" });
+    }
+    
+    console.log("✅ Basic request validation passed");
+
     const { ttlSeconds, cooldownSeconds, otpSecret } = getOtpConfig();
     const email = normalizeEmail(req.body?.email);
 
@@ -148,7 +156,7 @@ exports.sendEmailOtp = async (req, res) => {
     const expiresAt = new Date(now.getTime() + ttlSeconds * 1000);
 
     console.log("🔍 Saving OTP to database...");
-    await EmailOtp.findOneAndUpdate(
+    const otpRecord = await EmailOtp.findOneAndUpdate(
       { email },
       { email, otpHash, expiresAt, attemptCount: 0, lastSentAt: now },
       { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -158,14 +166,40 @@ exports.sendEmailOtp = async (req, res) => {
     
     console.log("🔍 Sending email via SendGrid...");
     // Call Sendgrid
-    await sendEmailViaSendgrid(email, "Your RelayChat verification code", textMsg);
+    try {
+      await sendEmailViaSendgrid(email, "Your RelayChat verification code", textMsg);
+    } catch (sendError) {
+      // Avoid locking the user out with cooldown if email delivery fails.
+      try {
+        if (otpRecord?._id) {
+          await EmailOtp.deleteOne({ _id: otpRecord._id });
+        } else {
+          await EmailOtp.deleteOne({ email });
+        }
+      } catch {
+        /* ignore cleanup errors */
+      }
+      throw sendError;
+    }
 
     console.log("✅ Email OTP sent successfully");
     res.status(200).json({ message: "OTP sent successfully" });
+
   } catch (error) {
     console.error("❌ sendEmailOtp error:", error);
     console.error("❌ Error stack:", error.stack);
-    res.status(500).json({ message: "Failed to send OTP" });
+    const statusCode = error?.code || error?.response?.statusCode;
+    if (statusCode === 401) {
+      return res.status(500).json({
+        message: "Email provider unauthorized. Check SENDGRID_API_KEY on the deployed server.",
+      });
+    }
+    if (statusCode === 403) {
+      return res.status(500).json({
+        message: "Email provider forbidden. Verify SENDGRID_FROM sender identity/domain in SendGrid.",
+      });
+    }
+    res.status(500).json({ message: "Failed to send OTP", error: error.message });
   }
 };
 
