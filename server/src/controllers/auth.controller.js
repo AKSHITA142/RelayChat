@@ -84,10 +84,10 @@ const getOtpConfig = () => {
   const ttlSeconds = Number(process.env.OTP_TTL_SECONDS || 300);
   const cooldownSeconds = Number(process.env.OTP_COOLDOWN_SECONDS || 60);
   const maxAttempts = Number(process.env.OTP_MAX_ATTEMPTS || 5);
-  const otpSecret = process.env.OTP_SECRET || process.env.JWT_SECRET;
+  const otpSecret = process.env.OTP_SECRET || process.env.JWT_SECRET || "default-otp-secret-change-in-production";
 
-  if (!otpSecret) {
-    throw new Error("Missing OTP_SECRET (or JWT_SECRET) for OTP hashing");
+  if (!otpSecret || otpSecret === "default-otp-secret-change-in-production") {
+    console.warn("⚠️  Using default OTP secret. Please set OTP_SECRET or JWT_SECRET in production!");
   }
 
   return {
@@ -113,14 +113,21 @@ const timingSafeEqualHex = (aHex, bHex) => {
 // body: { email }
 exports.sendEmailOtp = async (req, res) => {
   try {
+    console.log("🔍 sendEmailOtp called with body:", req.body);
+    
     const { ttlSeconds, cooldownSeconds, otpSecret } = getOtpConfig();
     const email = normalizeEmail(req.body?.email);
 
+    console.log("🔍 Parsed email:", email);
+    console.log("🔍 OTP config:", { ttlSeconds, cooldownSeconds, hasOtpSecret: !!otpSecret });
+
     if (!email || !emailRegex.test(email)) {
+      console.log("❌ Invalid email format");
       return res.status(400).json({ message: "Valid email is required" });
     }
 
     const now = new Date();
+    console.log("🔍 Checking for existing OTP for email:", email);
     const existing = await EmailOtp.findOne({ email });
 
     if (existing?.lastSentAt) {
@@ -128,16 +135,19 @@ exports.sendEmailOtp = async (req, res) => {
       const msCooldown = cooldownSeconds * 1000;
       if (msSinceLastSend < msCooldown) {
         const waitSeconds = Math.ceil((msCooldown - msSinceLastSend) / 1000);
+        console.log("❌ Cooldown active, wait:", waitSeconds);
         return res.status(429).json({
           message: `Please wait ${waitSeconds}s before requesting another OTP`,
         });
       }
     }
 
+    console.log("🔍 Generating OTP...");
     const otp = crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
     const otpHash = hashOtp(otp, otpSecret);
     const expiresAt = new Date(now.getTime() + ttlSeconds * 1000);
 
+    console.log("🔍 Saving OTP to database...");
     await EmailOtp.findOneAndUpdate(
       { email },
       { email, otpHash, expiresAt, attemptCount: 0, lastSentAt: now },
@@ -146,12 +156,15 @@ exports.sendEmailOtp = async (req, res) => {
 
     const textMsg = `Your RelayChat verification code is: ${otp}\n\nThis code expires in ${Math.round(ttlSeconds / 60)} minutes.`;
     
+    console.log("🔍 Sending email via SendGrid...");
     // Call Sendgrid
     await sendEmailViaSendgrid(email, "Your RelayChat verification code", textMsg);
 
+    console.log("✅ Email OTP sent successfully");
     res.status(200).json({ message: "OTP sent successfully" });
   } catch (error) {
-    console.error("sendEmailOtp error:", error);
+    console.error("❌ sendEmailOtp error:", error);
+    console.error("❌ Error stack:", error.stack);
     res.status(500).json({ message: "Failed to send OTP" });
   }
 };
