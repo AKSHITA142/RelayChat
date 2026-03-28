@@ -18,8 +18,8 @@ api.interceptors.response.use(
     const requestUrl = error.config?.url || "";
     const isAuthEndpoint =
       requestUrl.startsWith("/auth/login") ||
-      requestUrl.startsWith("/auth/send-otp") ||
-      requestUrl.startsWith("/auth/verify-otp") ||
+      requestUrl.startsWith("/auth/send-email-otp") ||
+      requestUrl.startsWith("/auth/verify-email-otp") ||
       requestUrl.startsWith("/auth/complete-registration");
 
     // Don't force session-expired redirect for auth endpoints:

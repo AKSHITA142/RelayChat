@@ -1,32 +1,36 @@
 const User = require("../models/User");
+const EmailOtp = require("../models/EmailOtp");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const redisClient = require("../config/redis");
-const { sendSms } = require("../utils/sms");
+const crypto = require("crypto");
+const { getResendClient, getResendFrom } = require("../config/resend");
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
 
 // Helper function to set secure cookies
 const setAuthCookie = (res, token) => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  
-  res.cookie('token', token, {
+  const isProduction = process.env.NODE_ENV === "production";
+
+  res.cookie("token", token, {
     httpOnly: true,
     secure: isProduction, // Only send over HTTPS in production
-    sameSite: isProduction ? 'None' : 'Lax', // None for cross-site in production
+    sameSite: isProduction ? "None" : "Lax", // None for cross-site in production
     maxAge: 2 * 60 * 60 * 1000, // 2 hours
-    path: '/'
+    path: "/",
   });
 };
 
 // Helper function to clear cookies
 const clearAuthCookie = (res) => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  
-  res.cookie('token', '', {
+  const isProduction = process.env.NODE_ENV === "production";
+
+  res.cookie("token", "", {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'None' : 'Lax',
+    sameSite: isProduction ? "None" : "Lax",
     expires: new Date(0), // Immediately expire
-    path: '/'
+    path: "/",
   });
 };
 
@@ -36,17 +40,16 @@ exports.login = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({
-        message: "Invalid credentials"
-      });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({
-        message: "Invalid credentials"
-      });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
+
+    user.lastLoginAt = new Date();
+    await user.save();
 
     const token = jwt.sign(
       { id: user._id, role: user.role },
@@ -54,7 +57,6 @@ exports.login = async (req, res) => {
       { expiresIn: "5h" }
     );
 
-    // Set secure cookie
     setAuthCookie(res, token);
 
     res.json({
@@ -68,131 +70,172 @@ exports.login = async (req, res) => {
         role: user.role,
         contacts: user.contacts,
         encryptionPublicKey: user.encryptionPublicKey,
-        encryptionDevices: user.encryptionDevices || []
-      }
+        encryptionDevices: user.encryptionDevices || [],
+        lastLoginAt: user.lastLoginAt,
+      },
     });
-
   } catch (error) {
-    res.status(500).json({
-      message: "Server error"
-    });
+    console.error("login error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
+const getOtpConfig = () => {
+  const ttlSeconds = Number(process.env.OTP_TTL_SECONDS || 300);
+  const cooldownSeconds = Number(process.env.OTP_COOLDOWN_SECONDS || 60);
+  const maxAttempts = Number(process.env.OTP_MAX_ATTEMPTS || 5);
+  const otpSecret = process.env.OTP_SECRET || process.env.JWT_SECRET;
 
-exports.sendOtp = async (req, res) => {
+  if (!otpSecret) {
+    throw new Error("Missing OTP_SECRET (or JWT_SECRET) for OTP hashing");
+  }
+
+  return {
+    ttlSeconds,
+    cooldownSeconds,
+    maxAttempts,
+    otpSecret,
+  };
+};
+
+const hashOtp = (otp, otpSecret) => {
+  return crypto.createHmac("sha256", otpSecret).update(String(otp)).digest("hex");
+};
+
+const timingSafeEqualHex = (aHex, bHex) => {
+  const a = Buffer.from(String(aHex), "hex");
+  const b = Buffer.from(String(bHex), "hex");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+};
+
+// POST /auth/send-email-otp
+// body: { email }
+exports.sendEmailOtp = async (req, res) => {
   try {
-    const { phone } = req.body;
+    const { ttlSeconds, cooldownSeconds, otpSecret } = getOtpConfig();
+    const email = normalizeEmail(req.body?.email);
 
-    const phoneRegex = /^\+[1-9]\d{1,14}$/;
-    if (!phoneRegex.test(phone)) {
-      return res.status(400).json({ message: "Invalid phone number format. Use international format like +919876543210" });
+    if (!email || !emailRegex.test(email)) {
+      return res.status(400).json({ message: "Valid email is required" });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
-    
-    const otpData = {
-      phone_number: phone,
-      otp,
-      expires_at: expiresAt,
-      attempt_count: 0
-    };
+    const now = new Date();
+    const existing = await EmailOtp.findOne({ email });
 
-    await redisClient.set(phone, JSON.stringify(otpData), {
-      EX: 300
+    if (existing?.lastSentAt) {
+      const msSinceLastSend = now.getTime() - new Date(existing.lastSentAt).getTime();
+      const msCooldown = cooldownSeconds * 1000;
+      if (msSinceLastSend < msCooldown) {
+        const waitSeconds = Math.ceil((msCooldown - msSinceLastSend) / 1000);
+        return res.status(429).json({
+          message: `Please wait ${waitSeconds}s before requesting another OTP`,
+        });
+      }
+    }
+
+    const otp = crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+    const otpHash = hashOtp(otp, otpSecret);
+    const expiresAt = new Date(now.getTime() + ttlSeconds * 1000);
+
+    await EmailOtp.findOneAndUpdate(
+      { email },
+      { email, otpHash, expiresAt, attemptCount: 0, lastSentAt: now },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const resend = getResendClient();
+    const from = getResendFrom();
+
+    await resend.emails.send({
+      from,
+      to: email,
+      subject: "Your RelayChat verification code",
+      text: `Your RelayChat verification code is: ${otp}\n\nThis code expires in ${Math.round(ttlSeconds / 60)} minutes.`,
     });
 
-    try {
-      await sendSms(phone, `Your RelayChat verification code is: ${otp}. It expires in 5 minutes.`);
-    } catch (smsErr) {
-      console.error("SMS Sending failed, fallback to console log:", smsErr.message);
-      console.log(`\n===========================================`);
-      console.log(`📱 SMS TO: ${phone}`);
-      console.log(`🔑 OTP: ${otp}`);
-      console.log(`===========================================\n`);
-    }
-
     res.status(200).json({ message: "OTP sent successfully" });
-
   } catch (error) {
-    console.error("sendOtp error:", error);
+    console.error("sendEmailOtp error:", error);
     res.status(500).json({ message: "Failed to send OTP" });
   }
 };
 
-exports.verifyOtp = async (req, res) => {
+// POST /auth/verify-email-otp
+// body: { email, otp }
+exports.verifyEmailOtp = async (req, res) => {
   try {
-    const { phone, otp } = req.body;
+    const { maxAttempts, otpSecret } = getOtpConfig();
+    const email = normalizeEmail(req.body?.email);
+    const otp = String(req.body?.otp || "").trim();
 
-    if (!phone || !otp) {
-      return res.status(400).json({ message: "Phone number and OTP are required" });
+    if (!email || !emailRegex.test(email)) {
+      return res.status(400).json({ message: "Valid email is required" });
+    }
+    if (!/^\d{6}$/.test(otp)) {
+      return res.status(400).json({ message: "Valid 6-digit OTP is required" });
     }
 
-    const dataString = await redisClient.get(phone);
-    if (!dataString) {
-      return res.status(400).json({ message: "OTP expired or not found" });
+    const record = await EmailOtp.findOne({ email });
+    if (!record) {
+      return res.status(400).json({ message: "OTP expired or not requested" });
     }
 
-    const otpData = JSON.parse(dataString);
-
-
-    if (otpData.attempt_count >= 5) {
-      await redisClient.del(phone); 
-      return res.status(429).json({ message: "Too many failed attempts. Please request a new OTP." });
+    const now = new Date();
+    if (record.expiresAt && now > new Date(record.expiresAt)) {
+      await EmailOtp.deleteOne({ _id: record._id });
+      return res.status(400).json({ message: "OTP expired" });
     }
 
-    if (Date.now() > otpData.expires_at) {
-      await redisClient.del(phone);
-      return res.status(400).json({ message: "OTP has expired" });
+    if ((record.attemptCount || 0) >= maxAttempts) {
+      await EmailOtp.deleteOne({ _id: record._id });
+      return res.status(429).json({ message: "Too many attempts. Please request a new OTP." });
     }
 
-   
-    if (otpData.otp !== otp) {
-      
-      otpData.attempt_count += 1;
-      await redisClient.set(phone, JSON.stringify(otpData), { KEEPTTL: true });
+    const submittedHash = hashOtp(otp, otpSecret);
+    const isValid = timingSafeEqualHex(submittedHash, record.otpHash);
+
+    if (!isValid) {
+      await EmailOtp.updateOne({ _id: record._id }, { $inc: { attemptCount: 1 } });
       return res.status(400).json({ message: "Invalid OTP" });
     }
 
- 
-    await redisClient.del(phone);
+    await EmailOtp.deleteOne({ _id: record._id });
 
-    let user = await User.findOne({ phoneNumber: phone });
-    
+    let user = await User.findOne({ email });
     if (!user) {
-      return res.status(202).json({
-        message: "New user detected. Please complete registration.",
-        isNewUser: true,
-        phoneNumber: phone
-      });
+      const defaultName = email.split("@")[0] ? `User ${email.split("@")[0]}` : "User";
+      user = await User.create({ email, name: defaultName, lastLoginAt: now });
+    } else {
+      user.lastLoginAt = now;
+      await user.save();
     }
 
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "2h" }
+      { expiresIn: "5h" }
     );
 
-    // Set secure cookie
     setAuthCookie(res, token);
 
     res.status(200).json({
       message: "Login successful",
-      token, // Still send token for client-side storage
+      token,
       user: {
         _id: user._id,
         name: user.name,
+        email: user.email,
         phoneNumber: user.phoneNumber,
         role: user.role,
         contacts: user.contacts,
         encryptionPublicKey: user.encryptionPublicKey,
-        encryptionDevices: user.encryptionDevices || []
-      }
+        encryptionDevices: user.encryptionDevices || [],
+        lastLoginAt: user.lastLoginAt,
+      },
     });
-
   } catch (error) {
-    console.error("verifyOtp error:", error);
+    console.error("verifyEmailOtp error:", error);
     res.status(500).json({ message: "Failed to verify OTP" });
   }
 };
@@ -201,23 +244,11 @@ exports.completeRegistration = async (req, res) => {
   try {
     const { name, email, password, phoneNumber } = req.body;
 
-    if (!name || !phoneNumber) {
-      return res.status(400).json({ message: "Name and Phone Number are required" });
+    if (!name) {
+      return res.status(400).json({ message: "Name is required" });
     }
 
-    // Check only the primary database to avoid resurrecting legacy records in fresh environments
-    let user = await User.findOne({ phoneNumber });
-    if (user) {
-      return res.status(400).json({ message: "User already exists with this phone number" });
-    }
-
-    // Optional
-    if (email) {
-      const existingEmail = await User.findOne({ email });
-      if (existingEmail) {
-        return res.status(400).json({ message: "Email already in use" });
-      }
-    }
+    const normalizedEmail = email ? normalizeEmail(email) : undefined;
 
     let hashedPassword;
     if (password) {
@@ -225,37 +256,57 @@ exports.completeRegistration = async (req, res) => {
       hashedPassword = await bcrypt.hash(password, salt);
     }
 
-    user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      phoneNumber
-    });
+    let user = null;
+    if (phoneNumber) user = await User.findOne({ phoneNumber });
+    if (!user && normalizedEmail) user = await User.findOne({ email: normalizedEmail });
 
-  
+    if (normalizedEmail) {
+      const existingEmail = await User.findOne({ email: normalizedEmail });
+      if (existingEmail && (!user || String(existingEmail._id) !== String(user._id))) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+    }
+
+    if (!user) {
+      user = await User.create({
+        name,
+        email: normalizedEmail,
+        password: hashedPassword,
+        phoneNumber,
+        lastLoginAt: new Date(),
+      });
+    } else {
+      user.name = name;
+      if (normalizedEmail !== undefined) user.email = normalizedEmail;
+      if (hashedPassword) user.password = hashedPassword;
+      if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
+      user.lastLoginAt = new Date();
+      await user.save();
+    }
+
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
     );
 
-    // Set secure cookie
     setAuthCookie(res, token);
 
-    res.status(201).json({
+    res.status(200).json({
       message: "Registration complete",
-      token, // Still send token for client-side storage
+      token,
       user: {
         _id: user._id,
         name: user.name,
         phoneNumber: user.phoneNumber,
+        email: user.email,
         role: user.role,
         contacts: user.contacts,
         encryptionPublicKey: user.encryptionPublicKey,
-        encryptionDevices: user.encryptionDevices || []
-      }
+        encryptionDevices: user.encryptionDevices || [],
+        lastLoginAt: user.lastLoginAt,
+      },
     });
-
   } catch (error) {
     console.error("completeRegistration error:", error);
     res.status(500).json({ message: "Failed to complete registration" });
@@ -265,12 +316,8 @@ exports.completeRegistration = async (req, res) => {
 // Logout function to clear cookies
 exports.logout = async (req, res) => {
   try {
-    // Clear the auth cookie
     clearAuthCookie(res);
-    
-    res.status(200).json({
-      message: "Logout successful"
-    });
+    res.status(200).json({ message: "Logout successful" });
   } catch (error) {
     console.error("logout error:", error);
     res.status(500).json({ message: "Failed to logout" });

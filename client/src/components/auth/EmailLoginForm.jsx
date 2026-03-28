@@ -49,7 +49,7 @@ export default function EmailLoginForm({
         className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/4 px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft size={16} />
-        Back to phone verification
+        Back to OTP verification
       </button>
     </motion.div>
   );

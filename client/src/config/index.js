@@ -8,8 +8,15 @@ export const config = {
   
   // API endpoints
   endpoints: {
-    base: () => `${import.meta.env.VITE_API_URL || 'http://localhost:5002'}/api`,
-    files: (fileUrl) => `${import.meta.env.VITE_API_URL || 'http://localhost:5002'}${fileUrl}`,
+    base: () => {
+      const raw = import.meta.env.VITE_API_URL || 'http://localhost:5002';
+      const normalized = raw.replace(/\/+$/, "");
+      return normalized.endsWith("/api") ? normalized : `${normalized}/api`;
+    },
+    files: (fileUrl) => {
+      const raw = import.meta.env.VITE_API_URL || 'http://localhost:5002';
+      return `${raw.replace(/\/+$/, "")}${fileUrl}`;
+    },
   }
 };
 

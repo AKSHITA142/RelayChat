@@ -97,6 +97,8 @@ app.use("/api", rateLimiter);
 
 const authRoutes = require("./routes/auth.routes");
 app.use("/api/auth", authRoutes);
+// Back-compat: some clients call `/auth/*` without the `/api` prefix.
+app.use("/auth", rateLimiter, authRoutes);
 
 const userRoutes = require("./routes/user.routes");
 app.use("/api/user", userRoutes);

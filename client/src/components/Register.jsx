@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import { User, Mail, Lock, Phone, ArrowLeft, CheckCircle, AlertCircle, Loader2, ShieldCheck } from "lucide-react";
+import { User, Mail, Lock, ArrowLeft, CheckCircle, AlertCircle, Loader2, ShieldCheck } from "lucide-react";
 import api from "../services/api";
 import { ensureE2EERegistration } from "../services/e2ee";
 import AuthShell from "@/components/auth/AuthShell";
@@ -13,25 +13,24 @@ export default function Register({ onRegister, onBackToLogin }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleStartRegistration = async () => {
-    if (!name || !email || !password || !phone) {
+    if (!name || !email || !password) {
       return setError("All fields are required");
     }
     setLoading(true);
     setError("");
     try {
-      await api.post("/auth/send-otp", { phone });
+      await api.post("/auth/send-email-otp", { email });
       setStep(2);
-      setError("Success: OTP Sent! Check your mobile device.");
+      setError("Success: OTP Sent! Check your email inbox.");
     } catch (err) {
       console.error("OTP Error:", err);
-      setError(err.response?.data?.message || "Failed to send OTP. Check phone format.");
+      setError(err.response?.data?.message || "Failed to send OTP. Check email format.");
     } finally {
       setLoading(false);
     }
@@ -42,12 +41,11 @@ export default function Register({ onRegister, onBackToLogin }) {
     setLoading(true);
     setError("");
     try {
-      await api.post("/auth/verify-otp", { phone, otp });
+      await api.post("/auth/verify-email-otp", { email, otp });
       const res = await api.post("/auth/complete-registration", {
         name,
         email,
         password,
-        phoneNumber: phone
       });
       
       localStorage.setItem("token", res.data.token);
@@ -80,11 +78,11 @@ export default function Register({ onRegister, onBackToLogin }) {
   return (
     <AuthShell
       eyebrow="Create Account"
-      title={step === 1 ? "Start your journey" : "Verify your number"}
+      title={step === 1 ? "Start your journey" : "Verify your email"}
       description={
         step === 1
-          ? "Create a secure RelayChat identity with email, password, and phone verification."
-          : `We've sent a security code to ${phone}. Enter it below to finish onboarding.`
+          ? "Create a secure RelayChat identity with email and password, then verify access via email OTP."
+          : `We've sent a security code to ${email}. Enter it below to finish onboarding.`
       }
       footer={
         <motion.p className="text-sm text-muted-foreground">
@@ -159,7 +157,6 @@ export default function Register({ onRegister, onBackToLogin }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <Input icon={Phone} placeholder="Phone number (+91...)" value={phone} onChange={(e) => setPhone(e.target.value)} />
 
               <Button onClick={handleStartRegistration} disabled={loading} className="w-full">
                 {loading ? <Loader2 className="animate-spin" /> : "Verify and continue"}

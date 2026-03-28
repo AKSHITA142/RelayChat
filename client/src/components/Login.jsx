@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, CheckCircle, Mail, Phone, ShieldCheck } from "lucide-react";
+import { AlertCircle, CheckCircle, Mail, ShieldCheck } from "lucide-react";
 import api from "../services/api";
 import { connectSocket } from "../services/socket";
 import {
@@ -12,24 +12,22 @@ import {
 import { isTokenValid } from "../utils/auth";
 import socket from "../services/socket";
 import AuthShell from "@/components/auth/AuthShell";
-import PhoneOtpForm from "@/components/auth/PhoneOtpForm";
+import EmailOtpForm from "@/components/auth/EmailOtpForm";
 import EmailLoginForm from "@/components/auth/EmailLoginForm";
 import RestoreSessionUI from "@/components/auth/RestoreSessionUI";
 import { cn } from "@/lib/utils";
+import { reloadToAppBase, replaceUrlToAppBase } from "../utils/navigation";
+import { clearClientStorage } from "../utils/auth";
 
 export default function Login({ onLogin, onSignup, canResume = false, sessionExpired = false, onAction }) {
-  const [loginMethod, setLoginMethod] = useState("phone");
+  const [loginMethod, setLoginMethod] = useState("otp");
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   
-  const [phone, setPhone] = useState("+91");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [canResendAt, setCanResendAt] = useState(0);
-  
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [name, setName] = useState("");
   
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,7 +44,6 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       const storedUser = JSON.parse(localStorage.getItem("user") || "null");
       setIsWaitingForApproval(false);
       setOtpSent(false);
-      setIsRegistering(false);
       if (storedUser) {
         setRestoreAuthData({ user: storedUser });
         setShowRestorePrompt(true);
@@ -77,6 +74,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       }
 
       localStorage.setItem("session-active", "true");
+      replaceUrlToAppBase();
       connectSocket();
       setShowRestorePrompt(false);
       onLogin();
@@ -128,8 +126,9 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       
       setShowRestorePrompt(false);
       localStorage.setItem("session-active", "true");
-      connectSocket();
-      onLogin();
+      // Force a clean bootstrap into Chat. This avoids occasional "blank until refresh"
+      // when transitioning out of recovery mode (socket + E2EE state can be mid-flight).
+      reloadToAppBase();
     } catch (err) {
       console.error(err);
       setRestoreError(err.response?.data?.message || err.message || "Failed to restore backup or incorrect PIN");
@@ -194,8 +193,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
             }
             setShowRestorePrompt(false);
             localStorage.setItem("session-active", "true");
-            connectSocket();
-            onLogin();
+            reloadToAppBase();
           };
 
           const handleHistorySyncComplete = (data) => {
@@ -281,16 +279,15 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   };
 
   const handleSendOtp = async () => {
-    const digits = phone.replace(/^\+91/, "").replace(/\D/g, "");
-    if (digits.length !== 10) return setError("Please enter exactly 10 digits after +91");
+    if (!email) return setError("Please enter your email");
     onAction?.();
     setLoading(true);
     setError("");
     try {
-      await api.post("/auth/send-otp", { phone });
+      await api.post("/auth/send-email-otp", { email });
       setOtpSent(true);
       setError("Success: OTP Sent Successfully!");
-      setCanResendAt(Date.now() + 45 * 1000);
+      setCanResendAt(Date.now() + 60 * 1000);
     } catch (err) {
       console.error("OTP send error:", err);
       setError(err.response?.data?.message || "Failed to send OTP.");
@@ -306,42 +303,16 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   };
 
   const handleVerifyOtp = async () => {
-    if (!phone || !otp) return setError("Please enter phone and OTP");
+    if (!email || !otp) return setError("Please enter email and OTP");
     onAction?.();
     setLoading(true);
     setError("");
     try {
-      const res = await api.post("/auth/verify-otp", { phone, otp });
-      
-      if (res.status === 202) {
-        setIsRegistering(true);
-        setError("Success: Phone verified! Complete your profile.");
-      } else {
-        await handleLoginSuccess(res);
-      }
+      const res = await api.post("/auth/verify-email-otp", { email, otp });
+      await handleLoginSuccess(res);
     } catch (err) {
       console.error("OTP verify error:", err);
       setError(err.response?.data?.message || "Invalid OTP.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCompleteRegistration = async () => {
-    if (!name) return setError("Name is required");
-    setLoading(true);
-    setError("");
-    try {
-      const res = await api.post("/auth/complete-registration", {
-        name,
-        email,
-        password,
-        phoneNumber: phone
-      });
-      await handleLoginSuccess(res);
-    } catch (err) {
-      console.error("Registration failed:", err);
-      setError(err.response?.data?.message || "Registration failed.");
     } finally {
       setLoading(false);
     }
@@ -353,9 +324,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
     const nowValid = token && isTokenValid(token);
     if (!nowValid || !storedUser) {
       setError("Saved session expired. Please verify again.");
-      localStorage.removeItem("session-active");
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      clearClientStorage();
       return;
     }
     setLoading(true);
@@ -375,11 +344,9 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
 
   const authSteps = showRestorePrompt
     ? ["Authenticate", "Verify device", "Restore access"]
-    : isRegistering
-      ? ["Verify phone", "Create profile", "Enter workspace"]
-      : loginMethod === "phone"
-        ? [otpSent ? "Phone entered" : "Enter phone", otpSent ? "Verify code" : "Receive code", "Secure device check"]
-        : ["Enter credentials", "Secure device check", "Restore access"];
+    : loginMethod === "otp"
+      ? [otpSent ? "Email entered" : "Enter email", otpSent ? "Verify code" : "Receive code", "Secure device check"]
+      : ["Enter credentials", "Secure device check", "Restore access"];
 
   const authNotice = error ? (
     <div
@@ -421,7 +388,6 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
           onContinueWithoutHistory={() => {
             setShowRestorePrompt(false);
             localStorage.setItem("session-active", "true");
-            connectSocket();
             try {
               const restoreUserId = restoreAuthData?.user?._id;
               if (restoreUserId) {
@@ -430,7 +396,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
             } catch {
               /* ignore */
             }
-            onLogin();
+            reloadToAppBase();
           }}
         />
       </AuthShell>
@@ -439,30 +405,22 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
 
   return (
     <AuthShell
-      eyebrow={isRegistering ? "Phone Verified" : loginMethod === "phone" ? "OTP Access" : "Password Access"}
+      eyebrow={loginMethod === "otp" ? "OTP Access" : "Password Access"}
       title={
-        isRegistering
-          ? "Complete your profile"
-          : loginMethod === "phone"
-            ? "Continue with your phone"
-            : "Welcome back"
+        loginMethod === "otp" ? "Continue with your email" : "Welcome back"
       }
       description={
-        isRegistering
-          ? "Your number is confirmed. Add a few optional identity details before entering RelayChat."
-          : loginMethod === "phone"
-            ? "Use a security code to unlock RelayChat quickly on any device."
-            : "Use your email and password, then continue through secure device verification."
+        loginMethod === "otp"
+          ? "Use a security code delivered to your email to unlock RelayChat on any device."
+          : "Use your email and password, then continue through secure device verification."
       }
       footer={
-        !isRegistering ? (
-          <p className="text-sm text-muted-foreground">
-            Don't have an account?{" "}
-            <span onClick={onSignup} className="cursor-pointer font-bold text-secondary transition-colors hover:text-foreground">
-              Sign up for free
-            </span>
-          </p>
-        ) : null
+        <p className="text-sm text-muted-foreground">
+          Don't have an account?{" "}
+          <span onClick={onSignup} className="cursor-pointer font-bold text-secondary transition-colors hover:text-foreground">
+            Sign up for free
+          </span>
+        </p>
       }
     >
       <div className="mb-6 flex flex-col gap-4">
@@ -477,46 +435,48 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
           ))}
         </div>
 
-        {!isRegistering ? (
-          <div className="inline-flex w-full rounded-[22px] border border-white/10 bg-white/6 p-1.5 backdrop-blur-xl sm:w-fit">
-            {[
-              { id: "phone", label: "Phone", icon: Phone },
-              { id: "email", label: "Email", icon: Mail },
-            ].map(({ id, label, icon: Icon }) => {
-              const active = loginMethod === id;
+        <div className="inline-flex w-full rounded-[22px] border border-white/10 bg-white/6 p-1.5 backdrop-blur-xl sm:w-fit">
+          {[
+            { id: "otp", label: "Email OTP", icon: Mail },
+            { id: "password", label: "Password", icon: ShieldCheck },
+          ].map(({ id, label, icon: Icon }) => {
+            const active = loginMethod === id;
 
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => {
-                    setLoginMethod(id);
-                    setError("");
-                  }}
-                  className={cn(
-                    "interactive-btn inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition-all",
-                    active
-                      ? "bg-primary text-primary-foreground shadow-button"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon size={15} />
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setLoginMethod(id);
+                  setError("");
+                  if (id !== "otp") {
+                    setOtpSent(false);
+                    setOtp("");
+                  }
+                }}
+                className={cn(
+                  "interactive-btn inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition-all",
+                  active
+                    ? "bg-primary text-primary-foreground shadow-button"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Icon size={15} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {authNotice}
 
       <div className="w-full">
-        {loginMethod === "phone" ? (
-          <PhoneOtpForm
-            key="phone-flow"
-            phone={phone}
-            setPhone={setPhone}
+        {loginMethod === "otp" ? (
+          <EmailOtpForm
+            key="email-otp-flow"
+            email={email}
+            setEmail={setEmail}
             otp={otp}
             setOtp={setOtp}
             otpSent={otpSent}
@@ -527,22 +487,10 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
             onResumeSession={handleResumeSession}
             onResend={handleResendOtp}
             onSwitchMethod={() => {
-              setLoginMethod("email");
+              setLoginMethod("password");
               setError("");
-            }}
-            isRegistering={isRegistering}
-            name={name}
-            setName={setName}
-            email={email}
-            setEmail={setEmail}
-            password={password}
-            setPassword={setPassword}
-            onCompleteRegistration={handleCompleteRegistration}
-            onCancelRegistration={() => {
-              setIsRegistering(false);
               setOtpSent(false);
               setOtp("");
-              setError("");
             }}
           />
         ) : (
@@ -555,8 +503,10 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
             loading={loading}
             onSubmit={handleEmailLogin}
             onBack={() => {
-              setLoginMethod("phone");
+              setLoginMethod("otp");
               setError("");
+              setOtpSent(false);
+              setOtp("");
             }}
           />
         )}

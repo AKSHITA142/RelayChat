@@ -1,5 +1,11 @@
 export const getLoggedInUser = () => {
-  return JSON.parse(localStorage.getItem("user"));
+  const raw = localStorage.getItem("user");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 };
 
 export const isTokenValid = (token) => {
@@ -10,5 +16,13 @@ export const isTokenValid = (token) => {
     return payload.exp * 1000 > Date.now();
   } catch {
     return false;
+  }
+};
+
+export const clearClientStorage = () => {
+  try {
+    localStorage.clear();
+  } catch {
+    /* ignore */
   }
 };

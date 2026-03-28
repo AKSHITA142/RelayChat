@@ -12,7 +12,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import api from "../services/api";
-import { getLoggedInUser } from "../utils/auth";
+import { clearClientStorage, getLoggedInUser } from "../utils/auth";
 import { hydrateChatPreview } from "../services/e2ee";
 import { config } from "../config";
 import { redirectToAppBase } from "../utils/navigation";
@@ -457,9 +457,7 @@ export default function Sidebar({
       onLogout();
       return;
     }
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("session-active");
+    clearClientStorage();
     redirectToAppBase();
   };
 

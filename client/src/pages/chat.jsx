@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
 import socket, { connectSocket } from "../services/socket";
-import { getLoggedInUser } from "../utils/auth";
+import { clearClientStorage, getLoggedInUser } from "../utils/auth";
 import { redirectToAppBase } from "../utils/navigation";
 import VideoCall from "../components/VideoCall";
 import Settings from "../components/Settings";
@@ -42,9 +42,7 @@ export default function Chat() {
     try {
       socket.disconnect();
     } catch {}
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("session-active");
+    clearClientStorage();
     redirectToAppBase();
   };
 
