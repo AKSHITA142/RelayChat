@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Loader2, Mail, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,19 @@ export default function EmailOtpForm({
   onResend,
   onSwitchMethod,
 }) {
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.ceil((canResendAt - Date.now()) / 1000));
+      setTimeLeft(remaining);
+    };
+    
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [canResendAt]);
+
   return (
     <motion.div
       key="email-otp"
@@ -68,8 +82,8 @@ export default function EmailOtpForm({
         ) : null}
 
         {otpSent ? (
-          <Button variant="outline" onClick={onResend} disabled={loading || Date.now() < canResendAt} className="w-full">
-            {Date.now() < canResendAt ? `Resend in ${Math.ceil((canResendAt - Date.now()) / 1000)}s` : "Resend code"}
+          <Button variant="outline" onClick={onResend} disabled={loading || timeLeft > 0} className="w-full">
+            {timeLeft > 0 ? `Resend in ${timeLeft}s` : "Resend code"}
           </Button>
         ) : null}
       </div>

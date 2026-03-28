@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { User, Mail, Lock, ArrowLeft, CheckCircle, AlertCircle, Loader2, ShieldCheck } from "lucide-react";
@@ -14,6 +14,20 @@ export default function Register({ onRegister, onBackToLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [canResendAt, setCanResendAt] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.ceil((canResendAt - Date.now()) / 1000));
+      setTimeLeft(remaining);
+    };
+    if (canResendAt > 0) {
+      updateTimer();
+      const interval = setInterval(updateTimer, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [canResendAt]);
   
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -27,10 +41,28 @@ export default function Register({ onRegister, onBackToLogin }) {
     try {
       await api.post("/auth/send-email-otp", { email });
       setStep(2);
+      setCanResendAt(Date.now() + 60 * 1000);
       setError("Success: OTP Sent! Check your email inbox.");
     } catch (err) {
       console.error("OTP Error:", err);
       setError(err.response?.data?.message || "Failed to send OTP. Check email format.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (loading) return;
+    if (Date.now() < canResendAt) return;
+    setLoading(true);
+    setError("");
+    try {
+      await api.post("/auth/send-email-otp", { email });
+      setCanResendAt(Date.now() + 60 * 1000);
+      setError("Success: OTP Resent! Check your email inbox.");
+    } catch (err) {
+      console.error("OTP Error:", err);
+      setError(err.response?.data?.message || "Failed to resend OTP.");
     } finally {
       setLoading(false);
     }
@@ -184,11 +216,14 @@ export default function Register({ onRegister, onBackToLogin }) {
                 <Button onClick={handleCompleteRegistration} disabled={loading} className="w-full">
                   {loading ? <Loader2 className="animate-spin" /> : "Verify identity"}
                 </Button>
-                <Button variant="outline" onClick={() => setStep(1)} className="w-full">
-                  <ArrowLeft size={16} />
-                  Change details
+                <Button variant="outline" onClick={handleResendOtp} disabled={loading || timeLeft > 0} className="w-full">
+                  {timeLeft > 0 ? `Resend in ${timeLeft}s` : "Resend code"}
                 </Button>
               </div>
+              <Button variant="ghost" onClick={() => setStep(1)} className="w-full mt-2" disabled={loading}>
+                <ArrowLeft size={16} className="mr-2" />
+                Change details
+              </Button>
             </motion.div>
           )}
         </AnimatePresence>

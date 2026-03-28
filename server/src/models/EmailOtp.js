@@ -7,7 +7,7 @@ const emailOtpSchema = new mongoose.Schema(
       required: true,
       lowercase: true,
       trim: true,
-      index: true,
+      // index is declared below via emailOtpSchema.index() with unique: true
     },
     otpHash: {
       type: String,
@@ -33,5 +33,6 @@ const emailOtpSchema = new mongoose.Schema(
 emailOtpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 emailOtpSchema.index({ email: 1 }, { unique: true });
 
-module.exports = mongoose.model("EmailOtp", emailOtpSchema);
+// Use explicit collection name to avoid MongoDB naming conflicts
+module.exports = mongoose.model("EmailOtp", emailOtpSchema, "emailotps");
 

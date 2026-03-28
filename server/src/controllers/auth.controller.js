@@ -3,7 +3,7 @@ const EmailOtp = require("../models/EmailOtp");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const { getResendClient, getResendFrom } = require("../config/resend");
+const { sendEmailViaSendgrid } = require("../config/sendgrid");
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
@@ -144,15 +144,10 @@ exports.sendEmailOtp = async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    const resend = getResendClient();
-    const from = getResendFrom();
-
-    await resend.emails.send({
-      from,
-      to: email,
-      subject: "Your RelayChat verification code",
-      text: `Your RelayChat verification code is: ${otp}\n\nThis code expires in ${Math.round(ttlSeconds / 60)} minutes.`,
-    });
+    const textMsg = `Your RelayChat verification code is: ${otp}\n\nThis code expires in ${Math.round(ttlSeconds / 60)} minutes.`;
+    
+    // Call Sendgrid
+    await sendEmailViaSendgrid(email, "Your RelayChat verification code", textMsg);
 
     res.status(200).json({ message: "OTP sent successfully" });
   } catch (error) {

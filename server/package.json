@@ -4,13 +4,15 @@
   "description": "",
   "scripts": {
     "dev": "npx -y kill-port 5002 && nodemon",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "build": "echo 'No build step required for server'"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
@@ -22,7 +24,6 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.1.2",
     "multer": "^2.1.1",
-    "resend": "^4.8.0",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3"
   },
