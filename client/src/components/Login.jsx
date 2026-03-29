@@ -290,6 +290,14 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       setCanResendAt(Date.now() + 60 * 1000);
     } catch (err) {
       console.error("OTP send error:", err);
+      if (err?.response?.status === 429) {
+        // Server cooldown: keep OTP input visible and sync the resend timer with backend.
+        const message = err.response?.data?.message || "";
+        const match = message.match(/(\d+)s/);
+        const waitSeconds = match ? Number(match[1]) : 60;
+        setOtpSent(true);
+        setCanResendAt(Date.now() + waitSeconds * 1000);
+      }
       setError(err.response?.data?.message || "Failed to send OTP.");
     } finally {
       setLoading(false);
@@ -304,11 +312,13 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
 
   const handleVerifyOtp = async () => {
     if (!email || !otp) return setError("Please enter email and OTP");
+    const normalizedOtp = String(otp).replace(/\D/g, "").slice(0, 6);
+    if (normalizedOtp.length !== 6) return setError("Please enter a valid 6-digit OTP");
     onAction?.();
     setLoading(true);
     setError("");
     try {
-      const res = await api.post("/auth/verify-email-otp", { email, otp });
+      const res = await api.post("/auth/verify-email-otp", { email, otp: normalizedOtp });
       await handleLoginSuccess(res);
     } catch (err) {
       console.error("OTP verify error:", err);

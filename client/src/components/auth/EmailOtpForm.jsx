@@ -63,7 +63,10 @@ export default function EmailOtpForm({
             type="text"
             placeholder="6-digit security code"
             value={otp}
-            onChange={(event) => setOtp(event.target.value)}
+            onChange={(event) => {
+              const digits = event.target.value.replace(/\D/g, "").slice(0, 6);
+              setOtp(digits);
+            }}
             maxLength={6}
             className="text-center text-base tracking-[0.4em]"
           />
