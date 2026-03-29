@@ -8,20 +8,18 @@ const { sendEmailViaSendgrid } = require("../config/sendgrid");
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
 
-// Helper function to set secure cookies
 const setAuthCookie = (res, token) => {
   const isProduction = process.env.NODE_ENV === "production";
 
   res.cookie("token", token, {
     httpOnly: true,
-    secure: isProduction, // Only send over HTTPS in production
-    sameSite: isProduction ? "None" : "Lax", // None for cross-site in production
-    maxAge: 2 * 60 * 60 * 1000, // 2 hours
+    secure: isProduction,
+    sameSite: isProduction ? "None" : "Lax",
+    maxAge: 2 * 60 * 60 * 1000,
     path: "/",
   });
 };
 
-// Helper function to clear cookies
 const clearAuthCookie = (res) => {
   const isProduction = process.env.NODE_ENV === "production";
 
@@ -29,7 +27,7 @@ const clearAuthCookie = (res) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "None" : "Lax",
-    expires: new Date(0), // Immediately expire
+    expires: new Date(0),
     path: "/",
   });
 };
@@ -51,17 +49,15 @@ exports.login = async (req, res) => {
     user.lastLoginAt = new Date();
     await user.save();
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "5h" }
-    );
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: "5h",
+    });
 
     setAuthCookie(res, token);
 
     res.json({
       message: "Login successful",
-      token, // Still send token for client-side storage
+      token,
       user: {
         _id: user._id,
         name: user.name,
@@ -84,10 +80,15 @@ const getOtpConfig = () => {
   const ttlSeconds = Number(process.env.OTP_TTL_SECONDS || 300);
   const cooldownSeconds = Number(process.env.OTP_COOLDOWN_SECONDS || 60);
   const maxAttempts = Number(process.env.OTP_MAX_ATTEMPTS || 5);
-  const otpSecret = process.env.OTP_SECRET || process.env.JWT_SECRET || "default-otp-secret-change-in-production";
+  const otpSecret =
+    process.env.OTP_SECRET ||
+    process.env.JWT_SECRET ||
+    "default-otp-secret-change-in-production";
 
   if (!otpSecret || otpSecret === "default-otp-secret-change-in-production") {
-    console.warn("⚠️  Using default OTP secret. Please set OTP_SECRET or JWT_SECRET in production!");
+    console.warn(
+      "Using default OTP secret. Set OTP_SECRET (or JWT_SECRET) in production."
+    );
   }
 
   return {
@@ -113,29 +114,18 @@ const timingSafeEqualHex = (aHex, bHex) => {
 // body: { email }
 exports.sendEmailOtp = async (req, res) => {
   try {
-    console.log("🔍 sendEmailOtp called with body:", req.body);
-    
-    // Test basic functionality first
     if (!req.body || !req.body.email) {
-      console.log("❌ No email in request body");
       return res.status(400).json({ message: "Email is required" });
     }
-    
-    console.log("✅ Basic request validation passed");
 
     const { ttlSeconds, cooldownSeconds, otpSecret } = getOtpConfig();
     const email = normalizeEmail(req.body?.email);
 
-    console.log("🔍 Parsed email:", email);
-    console.log("🔍 OTP config:", { ttlSeconds, cooldownSeconds, hasOtpSecret: !!otpSecret });
-
     if (!email || !emailRegex.test(email)) {
-      console.log("❌ Invalid email format");
       return res.status(400).json({ message: "Valid email is required" });
     }
 
     const now = new Date();
-    console.log("🔍 Checking for existing OTP for email:", email);
     const existing = await EmailOtp.findOne({ email });
 
     if (existing?.lastSentAt) {
@@ -143,29 +133,29 @@ exports.sendEmailOtp = async (req, res) => {
       const msCooldown = cooldownSeconds * 1000;
       if (msSinceLastSend < msCooldown) {
         const waitSeconds = Math.ceil((msCooldown - msSinceLastSend) / 1000);
-        console.log("❌ Cooldown active, wait:", waitSeconds);
         return res.status(429).json({
           message: `Please wait ${waitSeconds}s before requesting another OTP`,
+          email,
+          retryAfterSeconds: waitSeconds,
+          cooldownSeconds,
         });
       }
     }
 
-    console.log("🔍 Generating OTP...");
     const otp = crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
     const otpHash = hashOtp(otp, otpSecret);
     const expiresAt = new Date(now.getTime() + ttlSeconds * 1000);
 
-    console.log("🔍 Saving OTP to database...");
     const otpRecord = await EmailOtp.findOneAndUpdate(
       { email },
       { email, otpHash, expiresAt, attemptCount: 0, lastSentAt: now },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    const textMsg = `Your RelayChat verification code is: ${otp}\n\nThis code expires in ${Math.round(ttlSeconds / 60)} minutes.`;
-    
-    console.log("🔍 Sending email via SendGrid...");
-    // Call Sendgrid
+    const textMsg = `Your RelayChat verification code is: ${otp}\n\nThis code expires in ${Math.round(
+      ttlSeconds / 60
+    )} minutes.`;
+
     try {
       await sendEmailViaSendgrid(email, "Your RelayChat verification code", textMsg);
     } catch (sendError) {
@@ -182,21 +172,24 @@ exports.sendEmailOtp = async (req, res) => {
       throw sendError;
     }
 
-    console.log("✅ Email OTP sent successfully");
-    res.status(200).json({ message: "OTP sent successfully" });
-
+    res.status(200).json({
+      message: "OTP sent successfully",
+      email,
+      ttlSeconds,
+      cooldownSeconds,
+    });
   } catch (error) {
-    console.error("❌ sendEmailOtp error:", error);
-    console.error("❌ Error stack:", error.stack);
     const statusCode = error?.code || error?.response?.statusCode;
     if (statusCode === 401) {
       return res.status(500).json({
-        message: "Email provider unauthorized. Check SENDGRID_API_KEY on the deployed server.",
+        message:
+          "Email provider unauthorized. Check SENDGRID_API_KEY on the deployed server.",
       });
     }
     if (statusCode === 403) {
       return res.status(500).json({
-        message: "Email provider forbidden. Verify SENDGRID_FROM sender identity/domain in SendGrid.",
+        message:
+          "Email provider forbidden. Verify SENDGRID_FROM sender identity/domain in SendGrid.",
       });
     }
     res.status(500).json({ message: "Failed to send OTP", error: error.message });
@@ -231,7 +224,9 @@ exports.verifyEmailOtp = async (req, res) => {
 
     if ((record.attemptCount || 0) >= maxAttempts) {
       await EmailOtp.deleteOne({ _id: record._id });
-      return res.status(429).json({ message: "Too many attempts. Please request a new OTP." });
+      return res
+        .status(429)
+        .json({ message: "Too many attempts. Please request a new OTP." });
     }
 
     const submittedHash = hashOtp(otp, otpSecret);
@@ -253,11 +248,9 @@ exports.verifyEmailOtp = async (req, res) => {
       await user.save();
     }
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "5h" }
-    );
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: "5h",
+    });
 
     setAuthCookie(res, token);
 
@@ -326,11 +319,9 @@ exports.completeRegistration = async (req, res) => {
       await user.save();
     }
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "2h" }
-    );
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: "2h",
+    });
 
     setAuthCookie(res, token);
 
@@ -355,7 +346,6 @@ exports.completeRegistration = async (req, res) => {
   }
 };
 
-// Logout function to clear cookies
 exports.logout = async (req, res) => {
   try {
     clearAuthCookie(res);
@@ -365,3 +355,4 @@ exports.logout = async (req, res) => {
     res.status(500).json({ message: "Failed to logout" });
   }
 };
+

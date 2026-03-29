@@ -278,28 +278,33 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
     }
   };
 
-  const handleSendOtp = async () => {
-    if (!email) return setError("Please enter your email");
-    onAction?.();
-    setLoading(true);
-    setError("");
-    try {
-      await api.post("/auth/send-email-otp", { email });
-      setOtpSent(true);
-      setError("Success: OTP Sent Successfully!");
-      setCanResendAt(Date.now() + 60 * 1000);
-    } catch (err) {
-      console.error("OTP send error:", err);
-      if (err?.response?.status === 429) {
-        // Server cooldown: keep OTP input visible and sync the resend timer with backend.
-        const message = err.response?.data?.message || "";
-        const match = message.match(/(\d+)s/);
-        const waitSeconds = match ? Number(match[1]) : 60;
-        setOtpSent(true);
-        setCanResendAt(Date.now() + waitSeconds * 1000);
-      }
-      setError(err.response?.data?.message || "Failed to send OTP.");
-    } finally {
+	  const handleSendOtp = async () => {
+	    if (!email) return setError("Please enter your email");
+	    onAction?.();
+	    setLoading(true);
+	    setError("");
+	    try {
+	      const res = await api.post("/auth/send-email-otp", { email });
+	      setOtpSent(true);
+	      setError("Success: OTP Sent Successfully!");
+	      const cooldownSeconds = Number(res?.data?.cooldownSeconds || 60);
+	      setCanResendAt(Date.now() + cooldownSeconds * 1000);
+	    } catch (err) {
+	      console.error("OTP send error:", err);
+	      if (err?.response?.status === 429) {
+	        // Server cooldown: keep OTP input visible and sync the resend timer with backend.
+	        const waitSeconds =
+	          Number(err.response?.data?.retryAfterSeconds) ||
+	          (() => {
+	            const message = err.response?.data?.message || "";
+	            const match = message.match(/(\d+)s/);
+	            return match ? Number(match[1]) : 60;
+	          })();
+	        setOtpSent(true);
+	        setCanResendAt(Date.now() + waitSeconds * 1000);
+	      }
+	      setError(err.response?.data?.message || "Failed to send OTP.");
+	    } finally {
       setLoading(false);
     }
   };

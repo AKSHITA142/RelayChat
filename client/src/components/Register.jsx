@@ -32,52 +32,69 @@ export default function Register({ onRegister, onBackToLogin }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleStartRegistration = async () => {
-    if (!name || !email || !password) {
-      return setError("All fields are required");
-    }
-    setLoading(true);
-    setError("");
-    try {
-      await api.post("/auth/send-email-otp", { email });
-      setStep(2);
-      setCanResendAt(Date.now() + 60 * 1000);
-      setError("Success: OTP Sent! Check your email inbox.");
-    } catch (err) {
-      console.error("OTP Error:", err);
-      setError(err.response?.data?.message || "Failed to send OTP. Check email format.");
+	  const handleStartRegistration = async () => {
+	    if (!name || !email || !password) {
+	      return setError("All fields are required");
+	    }
+	    setLoading(true);
+	    setError("");
+	    try {
+	      const res = await api.post("/auth/send-email-otp", { email });
+	      setStep(2);
+	      const cooldownSeconds = Number(res?.data?.cooldownSeconds || 60);
+	      setCanResendAt(Date.now() + cooldownSeconds * 1000);
+	      setError("Success: OTP Sent! Check your email inbox.");
+	    } catch (err) {
+	      console.error("OTP Error:", err);
+	      setError(err.response?.data?.message || "Failed to send OTP. Check email format.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResendOtp = async () => {
-    if (loading) return;
-    if (Date.now() < canResendAt) return;
-    setLoading(true);
-    setError("");
-    try {
-      await api.post("/auth/send-email-otp", { email });
-      setCanResendAt(Date.now() + 60 * 1000);
-      setError("Success: OTP Resent! Check your email inbox.");
-    } catch (err) {
-      console.error("OTP Error:", err);
-      setError(err.response?.data?.message || "Failed to resend OTP.");
-    } finally {
-      setLoading(false);
-    }
-  };
+	  const handleResendOtp = async () => {
+	    if (loading) return;
+	    if (Date.now() < canResendAt) return;
+	    setLoading(true);
+	    setError("");
+	    try {
+	      const res = await api.post("/auth/send-email-otp", { email });
+	      const cooldownSeconds = Number(res?.data?.cooldownSeconds || 60);
+	      setCanResendAt(Date.now() + cooldownSeconds * 1000);
+	      setError("Success: OTP Resent! Check your email inbox.");
+	    } catch (err) {
+	      console.error("OTP Error:", err);
+	      if (err?.response?.status === 429) {
+	        const waitSeconds =
+	          Number(err.response?.data?.retryAfterSeconds) ||
+	          (() => {
+	            const message = err.response?.data?.message || "";
+	            const match = message.match(/(\d+)s/);
+	            return match ? Number(match[1]) : 60;
+	          })();
+	        setCanResendAt(Date.now() + waitSeconds * 1000);
+	      }
+	      setError(err.response?.data?.message || "Failed to resend OTP.");
+	    } finally {
+	      setLoading(false);
+	    }
+	  };
 
-  const handleCompleteRegistration = async () => {
-    if (!otp) return setError("Please enter the OTP");
-    setLoading(true);
-    setError("");
-    try {
-      await api.post("/auth/verify-email-otp", { email, otp });
-      const res = await api.post("/auth/complete-registration", {
-        name,
-        email,
-        password,
+	  const handleCompleteRegistration = async () => {
+	    if (!otp) return setError("Please enter the OTP");
+	    setLoading(true);
+	    setError("");
+	    try {
+	      const normalizedOtp = String(otp).replace(/\D/g, "").slice(0, 6);
+	      if (normalizedOtp.length !== 6) {
+	        setLoading(false);
+	        return setError("Please enter a valid 6-digit OTP");
+	      }
+	      await api.post("/auth/verify-email-otp", { email, otp: normalizedOtp });
+	      const res = await api.post("/auth/complete-registration", {
+	        name,
+	        email,
+	        password,
       });
       
       localStorage.setItem("token", res.data.token);
