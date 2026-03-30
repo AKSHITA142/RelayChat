@@ -18,6 +18,7 @@ import RestoreSessionUI from "@/components/auth/RestoreSessionUI";
 import { cn } from "@/lib/utils";
 import { reloadToAppBase, replaceUrlToAppBase } from "../utils/navigation";
 import { clearClientStorage } from "../utils/auth";
+import { GoogleLogin } from "@react-oauth/google";
 
 export default function Login({ onLogin, onSignup, canResume = false, sessionExpired = false, onAction }) {
   const [loginMethod, setLoginMethod] = useState("otp");
@@ -278,7 +279,22 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
     }
   };
 
-	  const handleSendOtp = async () => {
+  const handleGoogleLogin = async (credentialResponse) => {
+    onAction?.();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.post("/auth/google", { credential: credentialResponse.credential });
+      await handleLoginSuccess(res);
+    } catch (err) {
+      console.error("Google login error:", err);
+      setError(err.response?.data?.message || "Failed to authenticate with Google.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
 	    if (!email) return setError("Please enter your email");
 	    onAction?.();
 	    setLoading(true);
@@ -485,6 +501,18 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       </div>
 
       {authNotice}
+
+      <div className="mb-6 flex flex-col items-center justify-center gap-4 border-b border-white/10 pb-6">
+        <GoogleLogin
+          onSuccess={handleGoogleLogin}
+          onError={() => setError("Google Sign-In was unsuccessful. Try again later.")}
+          useOneTap
+          shape="pill"
+          theme="filled_black"
+          text="continue_with"
+        />
+        <span className="text-xs uppercase tracking-widest text-muted-foreground">or continue with email</span>
+      </div>
 
       <div className="w-full">
         {loginMethod === "otp" ? (

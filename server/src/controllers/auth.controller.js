@@ -4,6 +4,9 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const { sendEmailViaSendgrid } = require("../config/sendgrid");
+const { OAuth2Client } = require("google-auth-library");
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
@@ -356,3 +359,58 @@ exports.logout = async (req, res) => {
   }
 };
 
+exports.googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: "Missing Google credential" });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    
+    const payload = ticket.getPayload();
+    const email = normalizeEmail(payload.email);
+    const name = payload.name;
+    const avatar = payload.picture;
+
+    let user = await User.findOne({ email });
+    const now = new Date();
+    
+    if (!user) {
+      user = await User.create({ email, name, avatar, lastLoginAt: now });
+    } else {
+      user.lastLoginAt = now;
+      if (avatar && !user.avatar) user.avatar = avatar;
+      await user.save();
+    }
+
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: "5h",
+    });
+
+    setAuthCookie(res, token);
+    
+    res.status(200).json({
+      message: "Google login successful",
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        phoneNumber: user.phoneNumber,
+        role: user.role,
+        contacts: user.contacts,
+        encryptionPublicKey: user.encryptionPublicKey,
+        encryptionDevices: user.encryptionDevices || [],
+        lastLoginAt: user.lastLoginAt,
+      },
+    });
+  } catch (error) {
+    console.error("googleLogin error:", error);
+    res.status(500).json({ message: "Failed to authenticate with Google" });
+  }
+};
