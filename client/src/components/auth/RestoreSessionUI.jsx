@@ -137,13 +137,28 @@ export default function RestoreSessionUI({
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-5 text-left backdrop-blur-md">
+            <h4 className="flex items-center gap-2 text-base font-semibold text-white">
+              <CheckCircle size={18} className="text-white" />
+              New to RelayChat?
+            </h4>
+            <p className="mb-4 mt-2 text-sm text-white/60">
+              If this is your first time, you don't need a backup PIN or device verification. You can jump right in.
+            </p>
+            <Button
+              onClick={onContinueWithoutHistory}
+              className="w-full rounded-xl bg-white text-black hover:bg-white/90 font-semibold"
+            >
+              Join Chat Directly
+            </Button>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row mt-4">
             <button
               type="button"
               onClick={onContinueWithoutHistory}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white/70 transition-all hover:bg-white/10 hover:text-white"
             >
-              <CheckCircle size={18} />
               Continue without history
             </button>
             <button
