@@ -205,12 +205,18 @@ function SidebarContent({
                   <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Start private chat</p>
                   <p className="text-sm text-muted-foreground">Enter phone number to chat</p>
                 </div>
-                <SearchField
-                  value={contactPhone}
-                  onChange={(event) => setContactPhone(event.target.value)}
-                  placeholder="Phone (+91...)"
-                  className="w-full"
-                />
+                <div className="relative flex items-center h-11 w-full rounded-2xl border border-white/10 bg-black/20 focus-within:border-primary/40 focus-within:bg-white/5 focus-within:ring-1 focus-within:ring-primary/40 transition-all">
+                  <div className="flex items-center pl-4 pr-3 text-sm font-bold text-muted-foreground border-r border-white/10">
+                    +91
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="98765 43210"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    className="flex-1 h-full w-full bg-transparent px-3 text-sm font-medium text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                  />
+                </div>
                 <Button onClick={handleStartChat} disabled={contactLoading} className="w-full">
                   {contactLoading ? <Loader2 className="animate-spin" /> : "Start Chat"}
                 </Button>
@@ -472,10 +478,10 @@ export default function Sidebar({
   }, [setChats, myUserId]);
 
   const handleStartChat = async () => {
-    if (!contactPhone.trim()) return setContactError("Please enter a phone number");
+    if (!contactPhone.trim() || contactPhone.length !== 10) return setContactError("Please enter a valid 10-digit number");
     setContactLoading(true);
     try {
-      const res = await api.post("/chat/start", { phone: contactPhone });
+      const res = await api.post("/chat/start", { phone: "+91" + contactPhone });
       const newChat = res.data.chat;
       setChats((prev) => {
         if (prev.some((chat) => (chat._id || chat.id)?.toString() === (newChat._id || newChat.id)?.toString())) {

@@ -84,15 +84,6 @@ export default function PhoneOtpForm({
           </div>
 
           <div className="grid gap-4">
-            <Input
-              icon={Phone}
-              type="text"
-              placeholder="Phone (+91987...)"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              disabled={otpSent}
-            />
-
             {otpSent && (
               <div className="overflow-hidden">
                 <Input

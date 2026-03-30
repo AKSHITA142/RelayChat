@@ -305,11 +305,14 @@ export default function ChatWindow({
   };
 
   const handleAddMemberByPhone = async () => {
-    if (!phoneToAdd.trim()) return;
+    if (!phoneToAdd.trim() || phoneToAdd.length !== 10) {
+      showTimedAdminNotice("Please enter a valid 10-digit number");
+      return;
+    }
 
     setIsAddingByPhone(true);
     try {
-      const response = await api.post("/chat/start", { phone: phoneToAdd.trim() });
+      const response = await api.post("/chat/start", { phone: "+91" + phoneToAdd.trim() });
       const targetUserId =
         response.data.chat?.participants?.find((participant) => (participant._id || participant).toString() !== myUserId?.toString())?._id ||
         response.data.receiver_id;

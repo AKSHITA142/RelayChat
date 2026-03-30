@@ -100,13 +100,18 @@ export default function GroupDialogs({
             <div className="space-y-3">
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Quick add by phone</p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <SearchField
-                  value={phoneToAdd}
-                  onChange={(event) => setPhoneToAdd(event.target.value)}
-                  placeholder="Phone (+91...)"
-                  icon={Phone}
-                  className="flex-1"
-                />
+                <div className="relative flex-1 flex items-center h-10 w-full rounded-xl border border-white/10 bg-black/20 focus-within:border-primary/40 focus-within:bg-white/5 focus-within:ring-1 focus-within:ring-primary/40 transition-all">
+                  <div className="flex items-center pl-3 pr-2 text-sm font-bold text-muted-foreground border-r border-white/10">
+                    +91
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="98765 43210"
+                    value={phoneToAdd}
+                    onChange={(e) => setPhoneToAdd(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    className="flex-1 h-full w-full bg-transparent px-3 text-sm font-medium text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                  />
+                </div>
                 <Button onClick={onAddMemberByPhone} disabled={isAddingByPhone || !phoneToAdd.trim()}>
                   {isAddingByPhone ? <Loader2 className="animate-spin" /> : "Add"}
                 </Button>

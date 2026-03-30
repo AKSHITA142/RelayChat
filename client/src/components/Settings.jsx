@@ -169,7 +169,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout, initialTab
     }
     setIsBackingUp(true);
     try {
-      await api.post("/user/verify-reset", { phoneNumber: verifyPhone });
+      await api.post("/user/verify-reset", { phoneNumber: "+91" + verifyPhone });
       setIsResetMode(true);
       setIsVerifyingOldPin(false);
       setBackupStatus("Verified! Enter new PIN");
@@ -480,13 +480,18 @@ export default function Settings({ user, onUpdate, onClose, onLogout, initialTab
                             {showOldPin ? <EyeOff size={18} /> : <Eye size={18} />}
                           </button>
                         </div>
-                        <input
-                          type="text"
-                          placeholder="Your phone number"
-                          value={verifyPhone}
-                          onChange={(e) => setVerifyPhone(e.target.value)}
-                          className="flex h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-white placeholder:text-white/30 focus:border-primary/50 focus:outline-none"
-                        />
+                        <div className="relative flex items-center h-12 w-full rounded-xl border border-white/10 bg-white/5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 transition-all">
+                          <div className="flex items-center pl-4 pr-2 text-sm font-bold text-white/50 border-r border-white/10">
+                            +91
+                          </div>
+                          <input
+                            type="tel"
+                            placeholder="Your phone number"
+                            value={verifyPhone}
+                            onChange={(e) => setVerifyPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                            className="flex-1 h-full bg-transparent px-3 text-white placeholder:text-white/30 focus:outline-none"
+                          />
+                        </div>
                         <button
                           onClick={handleVerifyReset}
                           disabled={isBackingUp}

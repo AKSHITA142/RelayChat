@@ -17,8 +17,8 @@ export default function PhoneOnboardingUI({ user, onComplete }) {
 
   const handlePhoneSubmit = async (e) => {
     e.preventDefault();
-    if (!phone || phone.length < 5) {
-      setError("Please enter a valid phone number");
+    if (!phone || phone.length !== 10) {
+      setError("Please enter a valid 10-digit phone number");
       return;
     }
     
@@ -26,7 +26,7 @@ export default function PhoneOnboardingUI({ user, onComplete }) {
     setError("");
 
     try {
-      const formattedPhone = phone.trim();
+      const formattedPhone = "+91" + phone;
       const res = await api.put("/user/profile", { phoneNumber: formattedPhone });
       setUpdatedUserData(res.data.user);
 
@@ -118,13 +118,16 @@ export default function PhoneOnboardingUI({ user, onComplete }) {
             </div>
             <h3 className="mb-4 text-lg font-bold text-white">Your Phone Number</h3>
 
-            <div className="relative">
+            <div className="relative flex items-center h-12 w-full rounded-xl border border-white/10 bg-white/5 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/30 transition-all">
+              <div className="flex items-center pl-4 pr-3 text-lg font-bold tracking-widest text-white/50 border-r border-white/10">
+                +91
+              </div>
               <input
                 type="tel"
-                placeholder="+1 234 567 8900"
+                placeholder="  98765 43210"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="flex h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-center text-lg tracking-widest text-white placeholder:text-white/30 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                className="flex-1 h-full bg-transparent px-3 text-lg tracking-widest text-white placeholder:text-white/30 focus:outline-none"
               />
             </div>
             {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
