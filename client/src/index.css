@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 @layer base {
+
   :root,
   .dark {
     color-scheme: dark;
@@ -303,8 +304,8 @@
     opacity: 0.8;
   }
 
-  .surface-panel > *,
-  .surface-muted > * {
+  .surface-panel>*,
+  .surface-muted>* {
     position: relative;
     z-index: 1;
   }
@@ -429,13 +430,27 @@
 }
 
 @keyframes slideUp {
-  from { transform: translateY(10px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 @keyframes floatSlow {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .animate-slide-up {

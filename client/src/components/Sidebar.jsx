@@ -106,13 +106,19 @@ function SidebarContent({
       <div className="border-b border-white/10 px-4 pb-4 pt-5">
         <div className="mb-5 flex items-start justify-between gap-3">
           <div className="space-y-3">
-            <div className="section-badge shadow-lg">Conversations</div>
-            <div>
-              <h2 className="font-headline text-3xl font-bold tracking-[-0.04em] text-gradient">Messages</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Search and manage your conversations
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-gradient-to-br from-primary/40 to-secondary/40 p-1.5 shadow-lg">
+                <img
+                  src="/logo.png"
+                  alt="RelayChat"
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <h2 className="font-headline text-3xl font-bold tracking-[-0.04em] text-gradient">RelayChat</h2>
             </div>
+            <p className="text-sm font-medium text-muted-foreground">
+              Speak freely. Connect privately.
+            </p>
           </div>
 
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
