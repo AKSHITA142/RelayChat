@@ -632,17 +632,38 @@ export default function ChatWindow({
 
     const deleteForMeHandler = ({ messageId }) => {
       if (!showDeleted) {
-        setMessages((previous) => previous.filter((message) => message._id !== messageId));
+        setMessages((previous) => {
+          const nextMessages = previous.filter((message) => message._id !== messageId);
+          setChats((prevChats) =>
+            prevChats.map((chat) => {
+              if (chat._id === selectedChat._id && chat.lastMessage?._id?.toString() === messageId.toString()) {
+                const newLastMsg = nextMessages.length > 0 ? nextMessages[nextMessages.length - 1] : null;
+                return { ...chat, lastMessage: newLastMsg };
+              }
+              return chat;
+            })
+          );
+          return nextMessages;
+        });
         return;
       }
 
-      setMessages((previous) =>
-        previous.map((message) =>
+      setMessages((previous) => {
+        const nextMessages = previous.map((message) =>
           message._id === messageId
             ? { ...message, deletedFor: [...(message.deletedFor || []), myUserId] }
             : message
-        )
-      );
+        );
+        setChats((prevChats) =>
+          prevChats.map((chat) => {
+            if (chat._id === selectedChat._id && chat.lastMessage?._id?.toString() === messageId.toString()) {
+              return { ...chat, lastMessage: { ...chat.lastMessage, deletedFor: [...(chat.lastMessage.deletedFor || []), myUserId] } };
+            }
+            return chat;
+          })
+        );
+        return nextMessages;
+      });
     };
 
     const restoreForMeHandler = ({ messageId }) => {
@@ -656,11 +677,19 @@ export default function ChatWindow({
     };
 
     const deleteForEveryoneHandler = ({ messageId }) => {
-      setMessages((previous) =>
-        previous.map((message) =>
+      setMessages((previous) => {
+        const nextMessages = previous.map((message) =>
           message?._id === messageId ? { ...message, content: "This message was deleted", isDeleted: true } : message
-        )
-      );
+        );
+        setChats((prevChats) =>
+          prevChats.map((chat) =>
+            chat.lastMessage?._id?.toString() === messageId.toString()
+              ? { ...chat, lastMessage: { ...chat.lastMessage, content: "This message was deleted", isDeleted: true } }
+              : chat
+          )
+        );
+        return nextMessages;
+      });
     };
 
     const reactionHandler = (updatedMessage) => {

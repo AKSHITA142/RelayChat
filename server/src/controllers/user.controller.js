@@ -45,7 +45,7 @@ const getProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { name, status, signalVisibility, vaultProtocol, globalTheme } = req.body;
+    const { name, status, signalVisibility, vaultProtocol, globalTheme, phoneNumber } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -56,6 +56,7 @@ const updateProfile = async (req, res) => {
     if (signalVisibility !== undefined) user.signalVisibility = signalVisibility;
     if (vaultProtocol !== undefined) user.vaultProtocol = vaultProtocol;
     if (globalTheme !== undefined) user.globalTheme = globalTheme;
+    if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
 
     await user.save();
 

@@ -30,14 +30,15 @@ export default function Settings({ user, onUpdate, onClose, onLogout, initialTab
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [backupPin, setBackupPin] = useState("");
-  const [oldPin, setOldPin] = useState("");
-  const [isVerifyingOldPin, setIsVerifyingOldPin] = useState(false);
+  const autoPin = (user?._id || user?.id) ? localStorage.getItem(`auto-pin-${user?._id || user?.id}`) : null;
+  const [oldPin, setOldPin] = useState(autoPin || "");
+  const [isVerifyingOldPin, setIsVerifyingOldPin] = useState(!!autoPin);
   const [isResetMode, setIsResetMode] = useState(false);
   const [verifyPhone, setVerifyPhone] = useState("");
-  const [backupStatus, setBackupStatus] = useState("");
+  const [backupStatus, setBackupStatus] = useState(autoPin ? "Auto-generated PIN loaded. Enter a new PIN below to update it." : "");
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [showPin, setShowPin] = useState(false);
-  const [showOldPin, setShowOldPin] = useState(false);
+  const [showOldPin, setShowOldPin] = useState(!autoPin);
 
   useEffect(() => {
     setName(user?.name || "");
@@ -132,7 +133,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout, initialTab
     setBackupStatus("");
     try {
       const { backupPrivateKeyToCloud, restorePrivateKeyFromCloud } = await import("../services/e2ee");
-      if (isVerifyingOldPin) {
+      if (isVerifyingOldPin || oldPin) {
         try {
           await restorePrivateKeyFromCloud(api, user?._id || user?.id, oldPin);
         } catch {
@@ -145,6 +146,7 @@ export default function Settings({ user, onUpdate, onClose, onLogout, initialTab
       setBackupStatus("Backup saved successfully!");
       setBackupPin("");
       setOldPin("");
+      localStorage.removeItem(`auto-pin-${user?._id || user?.id}`);
       setIsVerifyingOldPin(false);
       setIsResetMode(false);
       const refreshed = await api.get("/user/profile");
@@ -443,7 +445,19 @@ export default function Settings({ user, onUpdate, onClose, onLogout, initialTab
                     </div>
                   </div>
 
-                  {user?.encryptedBackupKey && !isResetMode && (
+                  {autoPin && (
+                    <div className="mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
+                      <p className="text-sm text-yellow-200">
+                        <strong className="text-yellow-400">Current Auto-Generated PIN: </strong> 
+                        <span className="font-mono text-lg font-bold tracking-widest text-white">{autoPin}</span>
+                      </p>
+                      <p className="mt-1 text-xs text-yellow-400/80">
+                        This PIN was automatically applied. Enter a new PIN below to change it to something memorable.
+                      </p>
+                    </div>
+                  )}
+
+                  {user?.encryptedBackupKey && !isResetMode && !autoPin && (
                     <div className="mb-4 space-y-3 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
                       <p className="flex items-center gap-2 text-sm font-medium text-red-400">
                         <ShieldCheck size={16} />

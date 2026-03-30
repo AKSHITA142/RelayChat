@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { reloadToAppBase, replaceUrlToAppBase } from "../utils/navigation";
 import { clearClientStorage } from "../utils/auth";
 import { GoogleLogin } from "@react-oauth/google";
+import PhoneOnboardingUI from "@/components/auth/PhoneOnboardingUI";
+
 
 export default function Login({ onLogin, onSignup, canResume = false, sessionExpired = false, onAction }) {
   const [loginMethod, setLoginMethod] = useState("otp");
@@ -39,6 +41,7 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
   const [restoreError, setRestoreError] = useState("");
   const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
   const [syncStatus, setSyncStatus] = useState("Initializing device...");
+  const [showPhoneOnboarding, setShowPhoneOnboarding] = useState(false);
 
   useEffect(() => {
     if (sessionExpired) {
@@ -64,6 +67,12 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       const updatedUser = await ensureE2EERegistration(api, res.data.user);
       const effectiveUser = updatedUser || res.data.user;
 
+      if (!effectiveUser.phoneNumber) {
+        setRestoreAuthData({ ...res.data, user: effectiveUser });
+        setShowPhoneOnboarding(true);
+        return;
+      }
+
       // New device registration + other trusted devices present => require verification now.
       if (needsHistorySync(effectiveUser._id)) {
         setRestoreAuthData({ ...res.data, user: effectiveUser });
@@ -85,6 +94,16 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       setShowRestorePrompt(true);
       setRestoreError(err?.message || "");
     }
+  };
+
+  const handlePhoneOnboardingComplete = async (updatedUser) => {
+    // update local storage with the new phone number
+    const finalUser = { ...restoreAuthData.user, phoneNumber: updatedUser.phoneNumber };
+    localStorage.setItem("user", JSON.stringify(finalUser));
+    
+    // new users skip history approval
+    localStorage.setItem("session-active", "true");
+    reloadToAppBase();
   };
 
   const handleRestoreBackup = async () => {
@@ -392,6 +411,10 @@ export default function Login({ onLogin, onSignup, canResume = false, sessionExp
       {error.replace("Success: ", "")}
     </div>
   ) : null;
+
+  if (showPhoneOnboarding) {
+    return <PhoneOnboardingUI user={restoreAuthData?.user} onComplete={handlePhoneOnboardingComplete} />;
+  }
 
   if (showRestorePrompt) {
     return (

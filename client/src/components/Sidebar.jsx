@@ -117,7 +117,7 @@ function SidebarContent({
 
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
             <DropdownMenu className="surface-panel">
-              <DropdownItem 
+              <DropdownItem
                 icon={UserPlus}
                 onClick={() => {
                   setIsAddingContact(!isAddingContact);
@@ -127,8 +127,8 @@ function SidebarContent({
               >
                 {isAddingContact ? "Cancel" : "Add Contact"}
               </DropdownItem>
-              
-              <DropdownItem 
+
+              <DropdownItem
                 icon={Users}
                 onClick={() => {
                   setIsCreatingGroup(!isCreatingGroup);
@@ -140,10 +140,10 @@ function SidebarContent({
               >
                 {isCreatingGroup ? "Cancel" : "Create Group"}
               </DropdownItem>
-              
+
               <DropdownSeparator />
-              
-              <DropdownItem 
+
+              <DropdownItem
                 icon={Settings}
                 onClick={() => {
                   setSettingsInitialTab?.("profile");
@@ -156,8 +156,8 @@ function SidebarContent({
               >
                 Settings
               </DropdownItem>
-              
-              <DropdownItem 
+
+              <DropdownItem
                 icon={ShieldCheck}
                 variant="success"
                 onClick={() => {
@@ -351,7 +351,7 @@ function SidebarContent({
                 onlineUsers.some((userId) => userId?.toString() === otherUser._id.toString());
 
               return (
-                <div 
+                <div
                   key={chat._id}
                   role="button"
                   tabIndex={0}
@@ -569,17 +569,16 @@ export default function Sidebar({
 
       {/* Mobile drawer */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 flex w-[92vw] max-w-sm flex-col bg-card/95 backdrop-blur-xl border-r border-border/70 transition-transform duration-300 ease-out md:hidden ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-[92vw] max-w-sm flex-col bg-card/95 backdrop-blur-xl border-r border-border/70 transition-transform duration-300 ease-out md:hidden ${mobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
         role="dialog"
         aria-label="Chat list"
         aria-modal="true"
       >
         <div className="flex items-center justify-between border-b border-border/70 px-4 py-4">
           <span className="text-sm font-bold text-foreground">Chats</span>
-          <button 
-            onClick={() => setMobileOpen(false)} 
+          <button
+            onClick={() => setMobileOpen(false)}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             aria-label="Close chat list"
           >

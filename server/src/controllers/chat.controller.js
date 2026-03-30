@@ -5,18 +5,18 @@ const { getIO } = require("../socket");
 
 exports.createChat = async (req, res) => {
   try {
-    const { userId } = req.body; 
+    const { userId } = req.body;
 
     if (!userId) {
       return res.status(400).json({
         message: "User ID is required"
-      });0
+      }); 0
     }
 
-   
+
     let chat = await Chat.findOne({
       isGroup: false,
-     
+
       participants: { $all: [req.user.id, userId] }
     });
 
@@ -28,7 +28,7 @@ exports.createChat = async (req, res) => {
       return res.status(200).json(populatedChat);
     }
 
-    
+
     chat = await Chat.create({
       participants: [req.user.id, userId],
       isGroup: false
@@ -50,11 +50,11 @@ exports.createChat = async (req, res) => {
 exports.getMyChats = async (req, res) => {
   const userId = req.user.id;
 
-  console.log("getMyChats called by User:", req.user.id); 
-  const _c = await Chat.find({ participants: req.user.id }); 
+  console.log("getMyChats called by User:", req.user.id);
+  const _c = await Chat.find({ participants: req.user.id });
   console.log("Found chats in DB:", _c.length);
 
-  
+
   const chats = await Chat.find({ participants: userId })
     .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")
     .populate("lastMessage")
@@ -88,7 +88,7 @@ exports.createGroup = async (req, res) => {
   const fullGroupChat = await Chat.findOne({ _id: chat._id })
     .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol");
 
-  
+
   const io = getIO();
   if (io) {
     fullGroupChat.participants.forEach(p => {
@@ -126,11 +126,11 @@ exports.addToGroup = async (req, res) => {
       .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")
       .populate("lastMessage");
 
-    
+
     const io = getIO();
     if (io) {
       io.to(userId).emit("new-chat", fullGroupChat);
-      
+
 
       chat.participants.forEach(p => {
         if (p.toString() !== userId) {
@@ -176,7 +176,7 @@ exports.removeFromGroup = async (req, res) => {
 
     const io = getIO();
     if (io) {
-      
+
       io.to(userId).emit("removed-from-chat", { chatId });
 
       chat.participants.forEach(p => {
@@ -209,7 +209,7 @@ exports.startChatByPhone = async (req, res) => {
       return res.status(400).json({ message: "You cannot start a chat with yourself" });
     }
 
-  
+
     let chat = await Chat.findOne({
       isGroup: false,
       participants: { $all: [req.user.id, targetUser._id] }
