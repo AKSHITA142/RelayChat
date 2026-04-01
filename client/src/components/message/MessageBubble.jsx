@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 export default function MessageBubble({
   id,
   isOwn,
+  myUserId,
   isHighlighted = false,
   isDimmed = false,
   isDeleted = false,
@@ -14,7 +15,19 @@ export default function MessageBubble({
   footer,
   reactions,
   actions,
+  replyTo,
+  contacts = [],
 }) {
+  const replySenderId = (replyTo?.sender?._id || replyTo?.sender)?.toString();
+  const isReplyToMe = replySenderId && myUserId && replySenderId === myUserId.toString();
+
+  const getReplyToName = () => {
+    if (isReplyToMe) return "You";
+    const contact = contacts.find((c) => c.userId?.toString() === replySenderId);
+    if (contact?.savedName) return contact.savedName;
+    return replyTo?.sender?.name || replyTo?.sender?.phoneNumber || "User";
+  };
+
   return (
     <div
       id={id}
@@ -42,6 +55,18 @@ export default function MessageBubble({
         onMouseLeave={onPressEnd}
       >
         {actions}
+        
+        {replyTo && (
+          <div className="mb-2 overflow-hidden rounded-lg border-l-4 border-primary bg-black/30 p-2 text-[11px] backdrop-blur-md ring-1 ring-white/5">
+            <p className="font-bold text-white drop-shadow-sm">
+              {getReplyToName()}
+            </p>
+            <p className="mt-0.5 truncate text-white/80 font-medium leading-tight">
+              {replyTo.content || (replyTo.fileName ? "📎 Attachment" : "Message start")}
+            </p>
+          </div>
+        )}
+        
         <div className="relative z-10">{children}</div>
         {footer ? (
           <div className={cn("mt-2 flex items-center justify-end gap-1.5", isOwn ? "opacity-80" : "opacity-65")}>

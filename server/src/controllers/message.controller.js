@@ -6,6 +6,7 @@ exports.getMessagesByChat = async (req, res) => {
 
   const messages = await Message.find(query)
     .populate("sender", "_id name phoneNumber")
+    .populate({ path: "replyTo", populate: { path: "sender", select: "_id name" } })
     .populate("encryptedContent.encryptedKeys.userId", "_id")
     .populate("encryptedFile.encryptedKeys.userId", "_id")
     .sort({ createdAt: 1 });

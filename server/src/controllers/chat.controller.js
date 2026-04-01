@@ -20,6 +20,10 @@ exports.createChat = async (req, res) => {
     });
 
     if (chat) {
+      if (chat.deletedBy?.some(id => id.toString() === req.user.id)) {
+        chat.deletedBy.pull(req.user.id);
+        await chat.save();
+      }
       if (!chat.visibleTo?.some(id => id.toString() === req.user.id)) {
         chat.visibleTo = chat.visibleTo || [];
         chat.visibleTo.push(req.user.id);
@@ -62,6 +66,7 @@ exports.getMyChats = async (req, res) => {
 
   const chats = await Chat.find({ 
     participants: userId,
+    deletedBy: { $ne: userId },
     $or: [
       { lastMessage: { $ne: null } },
       { visibleTo: { $in: [userId] } },
@@ -228,6 +233,10 @@ exports.startChatByPhone = async (req, res) => {
     });
 
     if (chat) {
+      if (chat.deletedBy?.some(id => id.toString() === req.user.id)) {
+        chat.deletedBy.pull(req.user.id);
+        await chat.save();
+      }
       if (!chat.visibleTo?.some(id => id.toString() === req.user.id)) {
         chat.visibleTo = chat.visibleTo || [];
         chat.visibleTo.push(req.user.id);
@@ -260,6 +269,54 @@ exports.startChatByPhone = async (req, res) => {
 
   } catch (error) {
     console.error("startChatByPhone error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.deleteChat = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const chat = await Chat.findById(chatId);
+    if (!chat) return res.status(404).json({ message: "Chat not found" });
+
+    if (!chat.participants.some(p => p.toString() === req.user.id)) {
+      return res.status(403).json({ message: "Not a participant" });
+    }
+
+    if (!chat.deletedBy.some(id => id.toString() === req.user.id)) {
+      chat.deletedBy.push(req.user.id);
+      await chat.save();
+    }
+
+    res.json({ message: "Chat deleted for you" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.pinMessage = async (req, res) => {
+  try {
+    const { chatId, messageId } = req.body;
+    const chat = await Chat.findById(chatId);
+    if (!chat) return res.status(404).json({ message: "Chat not found" });
+
+    if (chat.pinnedMessages.some(m => m.toString() === messageId)) {
+       chat.pinnedMessages.pull(messageId);
+    } else {
+       chat.pinnedMessages.push(messageId);
+    }
+    
+    await chat.save();
+    
+    const io = getIO();
+    if (io) {
+      io.to(chatId).emit("pinned-updated", { chatId, pinnedMessages: chat.pinnedMessages });
+    }
+    
+    res.json(chat.pinnedMessages);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };

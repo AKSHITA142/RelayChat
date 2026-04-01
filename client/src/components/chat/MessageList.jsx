@@ -11,6 +11,10 @@ const MessageList = memo(function MessageList({
   onDeleteMe,
   onDeleteEveryone,
   onShowMessageInfo,
+  onReply,
+  onEdit,
+  onPin,
+  contacts,
   messagesEndRef,
 }) {
   if (!messages?.length) {
@@ -48,6 +52,10 @@ const MessageList = memo(function MessageList({
             onDeleteMe={onDeleteMe}
             onDeleteEveryone={onDeleteEveryone}
             onShowMessageInfo={onShowMessageInfo}
+            onReply={onReply}
+            onEdit={onEdit}
+            onPin={onPin}
+            contacts={contacts}
             searchQuery={searchQuery}
             isHighlighted={searchResults[currentSearchIndex] === index}
           />

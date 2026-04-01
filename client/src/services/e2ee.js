@@ -354,21 +354,34 @@ export const decryptDirectMessage = async (message, currentUserId) => {
 };
 
 export const hydrateDecryptedMessage = async (message, currentUserId) => {
-  if (!message?.encryptedContent?.ciphertext) {
-    return message;
+  if (!message) return message;
+
+  let hydrated = { ...message };
+
+  // Handle replyTo decryption recursively
+  if (message.replyTo?.encryptedContent?.ciphertext) {
+    try {
+      hydrated.replyTo = await hydrateDecryptedMessage(message.replyTo, currentUserId);
+    } catch (err) {
+      console.warn("Failed to decrypt replyTo content", err);
+    }
+  }
+
+  if (!message.encryptedContent?.ciphertext) {
+    return hydrated;
   }
 
   try {
     const content = await decryptDirectMessage(message, currentUserId);
     return {
-      ...message,
+      ...hydrated,
       content,
       isEncrypted: true,
     };
   } catch (error) {
     console.error("Failed to decrypt message:", error);
     return {
-      ...message,
+      ...hydrated,
       content: "[Unable to decrypt message]",
       isEncrypted: true,
       encryptionError: true,

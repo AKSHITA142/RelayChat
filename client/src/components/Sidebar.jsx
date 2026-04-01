@@ -10,6 +10,7 @@ import {
   Settings,
   UserPlus,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import api from "../services/api";
 import { clearClientStorage, getLoggedInUser } from "../utils/auth";
@@ -64,6 +65,7 @@ function SidebarContent({
   handleLogout,
   myUserId,
   closeMobile,
+  onDeleteChat,
 }) {
   const [search, setSearch] = useState("");
 
@@ -401,11 +403,20 @@ function SidebarContent({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <h4 className="font-semibold text-foreground truncate">{displayName}</h4>
-                        {chat.isGroup && (
-                          <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-primary">
-                            Group
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {chat.isGroup && (
+                            <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-primary shrink-0">
+                              Group
+                            </span>
+                          )}
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onDeleteChat?.(chat._id); }}
+                            className="p-1 px-1.5 opacity-0 group-hover:opacity-100 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all duration-200"
+                            title="Delete conversation"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                       <p className="text-sm text-muted-foreground truncate mt-1">{getChatPreview(chat)}</p>
                     </div>
@@ -455,6 +466,7 @@ export default function Sidebar({
   setIsShowingSettings,
   setSettingsInitialTab,
   onLogout,
+  onDeleteChat,
 }) {
   const myUserId = getLoggedInUser()?._id;
   const [contactPhone, setContactPhone] = useState("");
@@ -561,6 +573,7 @@ export default function Sidebar({
     handleCreateGroup,
     handleLogout,
     myUserId,
+    onDeleteChat,
   };
 
   return (

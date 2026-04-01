@@ -32,6 +32,18 @@ export default function Chat() {
   const [isShowingSettings, setIsShowingSettings] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState("profile");
   
+  const handleDeleteChat = async (chatId) => {
+    if (window.confirm("Are you sure you want to delete this chat for yourself?")) {
+      try {
+        await api.delete(`/chat/${chatId}`);
+        setChats(prev => prev.filter(c => c._id !== chatId));
+        if (selectedChat?._id === chatId) setSelectedChat(null);
+      } catch (err) {
+        console.error("Delete chat error:", err);
+      }
+    }
+  };
+
   const performLogout = async () => {
     try {
       await api.post("/auth/logout");
@@ -312,6 +324,7 @@ export default function Chat() {
             setIsShowingSettings={setIsShowingSettings}
             setSettingsInitialTab={setSettingsInitialTab}
             onLogout={performLogout}
+            onDeleteChat={handleDeleteChat}
           />
         </div>
 

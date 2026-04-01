@@ -223,7 +223,7 @@ function initSocket(server) {
       }
 
       // SEND MESSAGE
-      socket.on("send-message", async ({ chatId, content, encryptedPayload, clientTempId }) => {
+      socket.on("send-message", async ({ chatId, content, encryptedPayload, clientTempId, replyToId }) => {
         try {
           const roomId = chatId.toString();
           if (!mongoose.Types.ObjectId.isValid(roomId)) return;
@@ -235,6 +235,7 @@ function initSocket(server) {
             sender: socket.userId,
             chat: roomId,
             content: encryptedPayload ? undefined : content,
+            replyTo: replyToId ? replyToId : undefined,
             encryptedContent: encryptedPayload ? {
               ciphertext: encryptedPayload.ciphertext,
               iv: encryptedPayload.iv,
@@ -269,8 +270,14 @@ function initSocket(server) {
           socket.emit("message-delivered", { messageId: message._id });
           let populatedMessage = await Message.findById(message._id)
             .populate("sender", "_id name")
+            .populate("replyTo")
             .populate("encryptedContent.encryptedKeys.userId", "_id")
             .populate("seenBy.userId", "_id name phoneNumber");
+
+          if (populatedMessage.replyTo) {
+             await populatedMessage.populate("replyTo.sender", "_id name");
+          }
+
           populatedMessage = populatedMessage.toObject();
           if (clientTempId) {
             populatedMessage.clientTempId = clientTempId;
@@ -302,8 +309,14 @@ function initSocket(server) {
 
             populatedMessage = await Message.findById(message._id)
               .populate("sender", "_id name")
+              .populate("replyTo")
               .populate("encryptedContent.encryptedKeys.userId", "_id")
               .populate("seenBy.userId", "_id name phoneNumber");
+            
+            if (populatedMessage.replyTo) {
+               await populatedMessage.populate("replyTo.sender", "_id name");
+            }
+
             populatedMessage = populatedMessage.toObject();
             if (clientTempId) {
               populatedMessage.clientTempId = clientTempId;
@@ -333,6 +346,48 @@ function initSocket(server) {
         }
       });
 
+      // EDIT MESSAGE
+      socket.on("edit-message", async ({ chatId, messageId, newContent, newEncryptedPayload }) => {
+        try {
+          const roomId = chatId.toString();
+          const msg = await Message.findById(messageId);
+          if (!msg || msg.sender.toString() !== socket.userId) return;
+
+          msg.content = newEncryptedPayload ? undefined : newContent;
+          if (newEncryptedPayload) {
+            msg.encryptedContent = {
+              ciphertext: newEncryptedPayload.ciphertext,
+              iv: newEncryptedPayload.iv,
+              algorithm: newEncryptedPayload.algorithm,
+              version: newEncryptedPayload.version,
+              encryptedKeys: Array.isArray(newEncryptedPayload.encryptedKeys)
+                ? newEncryptedPayload.encryptedKeys.map((entry) => ({
+                    userId: entry.userId,
+                    deviceId: entry.deviceId,
+                    key: entry.key,
+                  }))
+                : []
+            };
+          }
+          msg.isEdited = true;
+          await msg.save();
+
+          const populatedMessage = await Message.findById(messageId)
+            .populate("sender", "_id name")
+            .populate("replyTo")
+            .populate("encryptedContent.encryptedKeys.userId", "_id")
+            .populate("seenBy.userId", "_id name phoneNumber");
+          
+          if (populatedMessage.replyTo) {
+             await populatedMessage.populate("replyTo.sender", "_id name");
+          }
+
+          io.to(roomId).emit("message-edited", populatedMessage);
+        } catch (err) {
+          console.error("Edit message error:", err);
+        }
+      });
+
       // MARK SEEN
       socket.on("mark-seen", async ({ chatId }) => {
         try {
@@ -356,6 +411,7 @@ function initSocket(server) {
           const messagesWithSeen = await Message.find(
             { chat: roomId, sender: { $ne: socket.userId } }
           ).populate("sender", "_id name")
+           .populate("replyTo")
            .populate("seenBy.userId", "_id name phoneNumber");
           
           // Broadcast updated messages to all users(participants) in the room

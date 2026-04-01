@@ -20,7 +20,19 @@ export default function MessageInput({
   onVoiceSend,
   onCancelVoice,
   onStartVoice,
+  replyingTo,
+  editingMessage,
+  contacts = [],
+  onCancelReply,
+  onCancelEdit,
 }) {
+  const getReplyingToName = () => {
+    if (!replyingTo) return "User";
+    const senderId = (replyingTo.sender?._id || replyingTo.sender)?.toString();
+    const contact = contacts.find((c) => c.userId?.toString() === senderId);
+    if (contact?.savedName) return contact.savedName;
+    return replyingTo.sender?.name || replyingTo.sender?.phoneNumber || "User";
+  };
   const textareaRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const inputContainerRef = useRef(null);
@@ -73,6 +85,32 @@ export default function MessageInput({
         <VoiceRecorder onSend={onVoiceSend} onCancel={onCancelVoice} />
       ) : (
         <div className="space-y-3">
+          {replyingTo && (
+            <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/10 px-4 py-2 animate-in fade-in slide-in-from-bottom-2">
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-bold text-primary uppercase inline-flex items-center gap-1.5">
+                  Replying to <span className="text-foreground">{getReplyingToName()}</span>
+                </span>
+                <p className="text-sm text-foreground truncate opacity-80">{replyingTo.content || "📎 Attachment"}</p>
+              </div>
+              <button onClick={onCancelReply} className="ml-2 rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white">
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          {editingMessage && (
+            <div className="flex items-center justify-between rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2 animate-in fade-in slide-in-from-bottom-2">
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-bold text-amber-500 uppercase">Editing Message</span>
+                <p className="text-sm text-foreground truncate opacity-80">{editingMessage.content}</p>
+              </div>
+              <button onClick={onCancelEdit} className="ml-2 rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white">
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
           {selectedFile && (
             <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2">
               <div className="flex items-center gap-3">

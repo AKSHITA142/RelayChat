@@ -31,6 +31,10 @@ const Message = memo(function Message({
   isHighlighted = false,
   participantIds = [],
   isGroupChat = false,
+  onReply,
+  onEdit,
+  onPin,
+  contacts = [],
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuIsUpwards, setMenuIsUpwards] = useState(false);
@@ -198,56 +202,72 @@ const Message = memo(function Message({
   }
 
   return (
-    <MessageBubble
-      id={id}
-      isOwn={isMe}
-      isHighlighted={isHighlighted}
-      isDimmed={isDeletedForMe}
-      hasReactions={hasReactions}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        setShowMenu(true);
-      }}
-      onPressStart={startPress}
-      onPressEnd={endPress}
-      footer={
-        <>
-          <span className="text-[10px] font-bold uppercase tracking-tighter">{formatTime(msg.createdAt)}</span>
-          {renderStatus()}
-        </>
-      }
-      reactions={
-        <MessageReactions
-          reactions={msg.reactions}
-          pickerVisible={showReactions}
-          isOwn={isMe}
-          onSelect={handleReact}
-        />
-      }
-      actions={
-        <MessageActions
-          isOwn={isMe}
-          isOpen={showMenu}
-          menuIsUpwards={menuIsUpwards}
-          isDeletedForMe={isDeletedForMe}
-          isDeleted={Boolean(msg.isDeleted)}
-          onToggle={(event) => {
-            event.stopPropagation();
-            const rect = event.currentTarget.getBoundingClientRect();
-            setMenuIsUpwards(rect.bottom + 200 > window.innerHeight);
-            setShowMenu(true);
-          }}
-          onClose={() => setShowMenu(false)}
-          onRestore={handleRestoreForMe}
-          onDeleteMe={handleDeleteForMe}
-          onDeleteEveryone={handleDeleteForEveryone}
-          onViewInfo={() => {
-            onShowMessageInfo(msg);
-            setShowMenu(false);
-          }}
-        />
-      }
-    >
+      <MessageBubble
+        id={id}
+        isOwn={isMe}
+        myUserId={myId}
+        isHighlighted={isHighlighted}
+        isDimmed={isDeletedForMe}
+        hasReactions={hasReactions}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setShowMenu(true);
+        }}
+        onPressStart={startPress}
+        onPressEnd={endPress}
+        footer={
+          <>
+            {msg.isEdited && <span className="text-[9px] font-medium opacity-50 uppercase mr-1">Edited</span>}
+            <span className="text-[10px] font-bold uppercase tracking-tighter">{formatTime(msg.createdAt)}</span>
+            {renderStatus()}
+          </>
+        }
+        reactions={
+          <MessageReactions
+            reactions={msg.reactions}
+            pickerVisible={showReactions}
+            isOwn={isMe}
+            onSelect={handleReact}
+          />
+        }
+        replyTo={msg.replyTo}
+        contacts={contacts}
+        actions={
+          <MessageActions
+            isOwn={isMe}
+            isOpen={showMenu}
+            menuIsUpwards={menuIsUpwards}
+            isDeletedForMe={isDeletedForMe}
+            isDeleted={Boolean(msg.isDeleted)}
+            onToggle={(event) => {
+              event.stopPropagation();
+              const rect = event.currentTarget.getBoundingClientRect();
+              setMenuIsUpwards(rect.bottom + 200 > window.innerHeight);
+              setShowMenu(true);
+            }}
+            onClose={() => setShowMenu(false)}
+            onRestore={handleRestoreForMe}
+            onDeleteMe={handleDeleteForMe}
+            onDeleteEveryone={handleDeleteForEveryone}
+            onViewInfo={() => {
+              onShowMessageInfo(msg);
+              setShowMenu(false);
+            }}
+            onReply={() => {
+              onReply?.(msg);
+              setShowMenu(false);
+            }}
+            onEdit={() => {
+              onEdit?.(msg);
+              setShowMenu(false);
+            }}
+            onPin={() => {
+              onPin?.(msg);
+              setShowMenu(false);
+            }}
+          />
+        }
+      >
       {msg?.fileUrl ? (
         <MessageAttachment
           message={msg}

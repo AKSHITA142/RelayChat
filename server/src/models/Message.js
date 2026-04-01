@@ -131,7 +131,15 @@ const messageSchema = new mongoose.Schema(
         emoji: { type: String, required: true },
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }
       }
-    ]
+    ],
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message"
+    },
+    isEdited: {
+      type: Boolean,
+      default: false
+    }
   },
   { timestamps: true }
 );

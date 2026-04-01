@@ -85,6 +85,9 @@ export default function ChatWindow({
   const [showMessageInfo, setShowMessageInfo] = useState(false);
   const [selectedMessageInfoId, setSelectedMessageInfoId] = useState(null);
 
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
+
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -221,6 +224,31 @@ export default function ChatWindow({
       setIsVoiceRecording(false);
     }
   };
+
+  const handleReply = useCallback((message) => {
+    setReplyingTo(message);
+    setEditingMessage(null);
+    setText("");
+  }, []);
+
+  const handleEdit = useCallback((message) => {
+    setEditingMessage(message);
+    setReplyingTo(null);
+    setText(message.content || "");
+  }, []);
+
+  const handlePin = useCallback(async (message) => {
+    try {
+      const response = await api.post("/chat/pin", { 
+        chatId: selectedChat._id, 
+        messageId: message._id 
+      });
+      setChats(prev => prev.map(c => c._id === selectedChat._id ? { ...c, pinnedMessages: response.data } : c));
+      setSelectedChat(prev => ({ ...prev, pinnedMessages: response.data }));
+    } catch (err) {
+      console.error("Pin error:", err);
+    }
+  }, [selectedChat?._id, setChats, setSelectedChat]);
 
   const handleRenameChat = async () => {
     if (!tempGroupName.trim() || tempGroupName === displayName) {
@@ -703,6 +731,19 @@ export default function ChatWindow({
       );
     };
 
+    const editedHandler = (updatedMessage) => {
+      if (!updatedMessage?._id) return;
+      setMessages((previous) =>
+        previous.map((message) => (message?._id === updatedMessage._id ? updatedMessage : message))
+      );
+    };
+
+    const pinnedHandler = ({ chatId, pinnedMessages }) => {
+       if (chatId !== selectedChat._id) return;
+       setChats(prev => prev.map(c => c._id === chatId ? { ...c, pinnedMessages } : c));
+       setSelectedChat(prev => prev?._id === chatId ? { ...prev, pinnedMessages } : prev);
+    };
+
     socket.on("new-message", handler);
     socket.on("message-delivered", statusHandler);
     socket.on("message-seen", seenHandler);
@@ -710,6 +751,8 @@ export default function ChatWindow({
     socket.on("message-restored-for-me", restoreForMeHandler);
     socket.on("message-deleted-for-everyone", deleteForEveryoneHandler);
     socket.on("message-reacted", reactionHandler);
+    socket.on("message-edited", editedHandler);
+    socket.on("pinned-updated", pinnedHandler);
 
     return () => {
       socket.off("new-message", handler);
@@ -719,6 +762,8 @@ export default function ChatWindow({
       socket.off("message-restored-for-me", restoreForMeHandler);
       socket.off("message-deleted-for-everyone", deleteForEveryoneHandler);
       socket.off("message-reacted", reactionHandler);
+      socket.off("message-edited", editedHandler);
+      socket.off("pinned-updated", pinnedHandler);
     };
   }, [selectedChat, myUserId, showDeleted]);
 
@@ -808,8 +853,45 @@ export default function ChatWindow({
     }
   };
 
+
+  if (!selectedChat) {
+    return (
+      <div className="flex h-full flex-1 items-center justify-center px-4 py-6">
+        <div className="grid max-w-5xl grid-cols-1 gap-6 px-2 md:grid-cols-3">
+          {[
+            { icon: <FilePlus className="text-secondary" />, title: "Collaborate", desc: "Share documents, images, voice notes, and encrypted attachments without leaving the thread." },
+            { icon: <UserPlus className="text-primary" />, title: "Expand Network", desc: "Start a private chat or build a group space the moment you need one." },
+            { icon: <Cpu className="text-foreground" />, title: "Premium Focus", desc: "A glass-driven workspace keeps search, motion, and message context easy to track." },
+          ].map((card) => (
+            <div
+              key={card.title}
+              className="glass-card group flex cursor-pointer flex-col items-center p-6 text-center transition-transform hover:-translate-y-1"
+            >
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/6 transition-colors group-hover:bg-white/10">
+                {card.icon}
+              </div>
+              <h3 className="mb-2 font-headline text-xl font-bold tracking-tight text-foreground">{card.title}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">{card.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const handleSend = async () => {
     if (!text.trim() && !selectedFile) return;
+
+    if (editingMessage) {
+      socket.emit("edit-message", {
+        messageId: editingMessage._id,
+        chatId: selectedChat._id,
+        newContent: text
+      });
+      setEditingMessage(null);
+      setText("");
+      return;
+    }
 
     if (selectedFile) {
       await sendFileAndText();
@@ -847,6 +929,7 @@ export default function ChatWindow({
             status: "sent",
             seenBy: [],
             reactions: [],
+            replyTo: replyingTo
           },
         ]);
 
@@ -859,6 +942,7 @@ export default function ChatWindow({
           chatId: selectedChat._id,
           encryptedPayload,
           clientTempId,
+          replyToId: replyingTo?._id || null
         });
       } else if (selectedChat?.isGroup) {
         const participantUsers = (selectedChat?.participants || []).map((participant) => {
@@ -874,7 +958,9 @@ export default function ChatWindow({
           socket.emit("send-message", {
             chatId: selectedChat._id,
             content: messageText,
+            replyToId: replyingTo?._id || null
           });
+          setReplyingTo(null);
           return;
         }
 
@@ -890,6 +976,7 @@ export default function ChatWindow({
             status: "sent",
             seenBy: [],
             reactions: [],
+            replyTo: replyingTo
           },
         ]);
 
@@ -902,13 +989,16 @@ export default function ChatWindow({
           chatId: selectedChat._id,
           encryptedPayload,
           clientTempId,
+          replyToId: replyingTo?._id || null
         });
       } else {
         socket.emit("send-message", {
           chatId: selectedChat._id,
           content: messageText,
+          replyToId: replyingTo?._id || null
         });
       }
+      setReplyingTo(null);
     } catch (error) {
       console.error("Failed to send encrypted message:", error);
       if (clientTempId) {
@@ -919,124 +1009,71 @@ export default function ChatWindow({
     }
   };
 
-  if (!selectedChat) {
-    return (
-      <div className="flex h-full flex-1 items-center justify-center px-4 py-6">
-        <div className="grid max-w-5xl grid-cols-1 gap-6 px-2 md:grid-cols-3">
-          {[
-            { icon: <FilePlus className="text-secondary" />, title: "Collaborate", desc: "Share documents, images, voice notes, and encrypted attachments without leaving the thread." },
-            { icon: <UserPlus className="text-primary" />, title: "Expand Network", desc: "Start a private chat or build a group space the moment you need one." },
-            { icon: <Cpu className="text-foreground" />, title: "Premium Focus", desc: "A glass-driven workspace keeps search, motion, and message context easy to track." },
-          ].map((card) => (
-            <div
-              key={card.title}
-              className="glass-card group flex cursor-pointer flex-col items-center p-6 text-center transition-transform hover:-translate-y-1"
-            >
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/6 transition-colors group-hover:bg-white/10">
-                {card.icon}
-              </div>
-              <h3 className="mb-2 font-headline text-xl font-bold tracking-tight text-foreground">{card.title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">{card.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={cn("relative flex h-full flex-1 flex-col overflow-hidden text-foreground chat-canvas", chatThemeClassName)}>
+      <ChatHeader
+        selectedChat={selectedChat}
+        displayName={displayName}
+        otherUser={otherUser}
+        isOnline={isOnline}
+        isTyping={isTyping}
+        lastSeenText={lastSeenText}
+        savedContact={savedContact}
+        isRenaming={isRenaming}
+        tempGroupName={tempGroupName}
+        setTempGroupName={setTempGroupName}
+        onRenameSubmit={handleRenameChat}
+        onCancelRename={() => setIsRenaming(false)}
+        onStartRename={() => {
+          setIsRenaming(true);
+          setTempGroupName(displayName);
+          setShowMenu(false);
+        }}
+        onToggleContactInfo={() => setShowContactInfo((value) => !value)}
+        showThemePicker={showThemePicker}
+        setShowThemePicker={setShowThemePicker}
+        activeThemeName={activeThemeName}
+        onThemeSelect={handleThemeSelect}
+        showMenu={showMenu}
+        setShowMenu={setShowMenu}
+        onOpenSearch={() => {
+          setShowSearch(true);
+          setShowMenu(false);
+        }}
+        onOpenParticipants={() => {
+          setShowParticipants(true);
+          setShowMenu(false);
+        }}
+        onRequestAddMember={requestAddMember}
+        onRequestRemoveMember={requestRemoveMember}
+        onOpenAddContact={() => {
+          setShowAddContact(true);
+          setShowMenu(false);
+        }}
+        onToggleShowDeleted={() => {
+          setShowDeleted((value) => !value);
+          setShowMenu(false);
+        }}
+        showDeleted={showDeleted}
+        onClearChat={handleClearChat}
+        onStartVideoCall={startVideoCall}
+        menuRef={menuRef}
+      />
 
-      {/* Enhanced Content Container */}
       <div className="relative z-10 flex min-h-0 flex-1 flex-col backdrop-blur-sm">
-        {/* Contact Info Panel */}
-        {showContactInfo && !selectedChat?.isGroup && (
-          <div className="absolute inset-0 z-20 transition-opacity duration-200">
-            <div className="surface-panel h-full backdrop-blur-2xl border-l border-white/10">
-              <ContactInfoPanel
-                user={otherUser}
-                displayName={displayName}
-                onClose={() => setShowContactInfo(false)}
-                onVideoCall={() => {
-                  setShowContactInfo(false);
-                  startVideoCall();
-                }}
-                onVoiceCall={() => {
-                  setShowContactInfo(false);
-                  // Not fully implemented voice call, keeping format for consistency if needed.
-                  setActiveVideoCall?.({ chatId: selectedChat._id, recipientId: otherUser?._id, isVideo: false });
-                }}
-                onSearch={() => {
-                  setShowContactInfo(false);
-                  setShowSearch(true);
-                }}
-                onClearChat={() => {
-                  setShowContactInfo(false);
-                }}
-              />
-            </div>
-          </div>
+        {showSearch && (
+          <ChatSearchOverlay
+            visible={true}
+            searchQuery={searchQuery}
+            onSearchChange={handleSearch}
+            resultCount={searchResults.length}
+            currentIndex={currentSearchIndex}
+            onNext={navigateSearch}
+            onPrev={navigateSearch}
+            onClose={closeSearch}
+            onPaste={handlePaste}
+          />
         )}
-        <ChatHeader
-          selectedChat={selectedChat}
-          displayName={displayName}
-          otherUser={otherUser}
-          isOnline={isOnline}
-          isTyping={isTyping}
-          lastSeenText={lastSeenText}
-          savedContact={savedContact}
-          isRenaming={isRenaming}
-          tempGroupName={tempGroupName}
-          setTempGroupName={setTempGroupName}
-          onRenameSubmit={handleRenameChat}
-          onCancelRename={() => setIsRenaming(false)}
-          onStartRename={() => {
-            setIsRenaming(true);
-            setTempGroupName(displayName);
-            setShowMenu(false);
-          }}
-          onToggleContactInfo={() => setShowContactInfo((value) => !value)}
-          showThemePicker={showThemePicker}
-          setShowThemePicker={setShowThemePicker}
-          activeThemeName={activeThemeName}
-          onThemeSelect={handleThemeSelect}
-          showMenu={showMenu}
-          setShowMenu={setShowMenu}
-          onOpenSearch={() => {
-            setShowSearch(true);
-            setShowMenu(false);
-          }}
-          onOpenParticipants={() => {
-            setShowParticipants(true);
-            setShowMenu(false);
-          }}
-          onRequestAddMember={requestAddMember}
-          onRequestRemoveMember={requestRemoveMember}
-          onOpenAddContact={() => {
-            setShowAddContact(true);
-            setShowMenu(false);
-          }}
-          onToggleShowDeleted={() => {
-            setShowDeleted((value) => !value);
-            setShowMenu(false);
-          }}
-          showDeleted={showDeleted}
-          onClearChat={handleClearChat}
-          onStartVideoCall={startVideoCall}
-          menuRef={menuRef}
-        />
-
-        <ChatSearchOverlay
-          visible={showSearch}
-          searchQuery={searchQuery}
-          onSearchChange={handleSearch}
-          resultCount={searchResults.length}
-          currentIndex={currentSearchIndex}
-          onNext={navigateSearch}
-          onPrev={navigateSearch}
-          onClose={closeSearch}
-          onPaste={handlePaste}
-        />
 
         <MessageList
           messages={messages}
@@ -1046,10 +1083,14 @@ export default function ChatWindow({
           searchResults={searchResults}
           currentSearchIndex={currentSearchIndex}
           onDeleteMe={(messageId) => socket.emit("delete-for-me", { messageId })}
-          onDeleteEveryone={(messageId) =>
+          onDeleteEveryone={(messageId) => 
             socket.emit("delete-for-everyone", { messageId, chatId: selectedChat?._id })
           }
           onShowMessageInfo={handleShowMessageInfo}
+          onReply={handleReply}
+          onEdit={handleEdit}
+          onPin={handlePin}
+          contacts={contacts}
           messagesEndRef={messagesEndRef}
         />
 
@@ -1068,8 +1109,27 @@ export default function ChatWindow({
           onVoiceSend={handleVoiceSend}
           onCancelVoice={() => setIsVoiceRecording(false)}
           onStartVoice={() => setIsVoiceRecording(true)}
+          replyingTo={replyingTo}
+          editingMessage={editingMessage}
+          contacts={contacts}
+          onCancelReply={() => setReplyingTo(null)}
+          onCancelEdit={() => { setEditingMessage(null); setText(""); }}
         />
       </div>
+
+      {showContactInfo && (
+        <ContactInfoPanel
+          user={otherUser}
+          displayName={displayName}
+          onClose={() => setShowContactInfo(false)}
+          onVideoCall={startVideoCall}
+          onSearch={() => {
+            setShowContactInfo(false);
+            setShowSearch(true);
+          }}
+          onClearChat={handleClearChat}
+        />
+      )}
 
       <GroupDialogs
         showAddContact={showAddContact}

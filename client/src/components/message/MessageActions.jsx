@@ -1,4 +1,4 @@
-import { Clock, Info, MoreVertical, Trash2 } from "lucide-react";
+import { Clock, Info, MoreVertical, Trash2, Pin, Reply, Edit } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function MessageActions({
@@ -13,6 +13,9 @@ export default function MessageActions({
   onDeleteMe,
   onDeleteEveryone,
   onViewInfo,
+  onPin,
+  onReply,
+  onEdit,
 }) {
   return (
     <>
@@ -44,6 +47,44 @@ export default function MessageActions({
               menuIsUpwards ? "bottom-[calc(100%-10px)]" : "top-[calc(100%-10px)]"
             )}
           >
+            {!isDeleted && (
+              <>
+                <button
+                  type="button"
+                  onClick={onReply}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8"
+                >
+                  <Reply size={16} />
+                  Reply
+                </button>
+                <div className="h-px bg-white/10" />
+                
+                <button
+                  type="button"
+                  onClick={onPin}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8"
+                >
+                  <Pin size={16} className="text-amber-400" />
+                  Pin Message
+                </button>
+                <div className="h-px bg-white/10" />
+              </>
+            )}
+
+            {isOwn && !isDeleted ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-white/8"
+                >
+                  <Edit size={16} />
+                  Edit Message
+                </button>
+                <div className="h-px bg-white/10" />
+              </>
+            ) : null}
+
             {isOwn ? (
               <>
                 <button
