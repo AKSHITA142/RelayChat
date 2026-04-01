@@ -140,7 +140,7 @@ const saveContact = async (req, res) => {
     }
 
     const user = await User.findById(req.user.id);
-
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     const existingContactIndex = user.contacts.findIndex(
       c => c.userId.toString() === targetUserId
@@ -161,6 +161,37 @@ const saveContact = async (req, res) => {
 
   } catch (error) {
     console.error("Error saving contact:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const deleteContact = async (req, res) => {
+  try {
+    const { targetUserId } = req.params;
+
+    if (!targetUserId) {
+      return res.status(400).json({ message: "Target user ID is required" });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const originalLength = user.contacts.length;
+    user.contacts = user.contacts.filter(c => c.userId.toString() !== targetUserId);
+
+    if (user.contacts.length === originalLength) {
+      return res.status(404).json({ message: "Contact not found in list" });
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      message: "Contact deleted successfully",
+      contacts: user.contacts
+    });
+
+  } catch (error) {
+    console.error("Error deleting contact:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -349,5 +380,6 @@ module.exports = {
   upsertEncryptionKey, 
   saveBackupKey, 
   getBackupKey,
-  verifyMobileForKeyReset
+  verifyMobileForKeyReset,
+  deleteContact
 };

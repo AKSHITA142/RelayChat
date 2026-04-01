@@ -1,4 +1,4 @@
-import { X, Lock, Video, Phone, Search, AlertTriangle, Trash2, Shield } from "lucide-react";
+import { X, Lock, Video, Phone, Search, AlertTriangle, Trash2, Shield, UserMinus } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { config } from "../config";
@@ -17,6 +17,7 @@ export default function ContactInfoPanel({
   onVoiceCall,
   onSearch,
   onClearChat,
+  onDeleteContact,
 }) {
   if (!user) return null;
 
@@ -100,6 +101,19 @@ export default function ContactInfoPanel({
           <Trash2 size={18} />
           Clear Chat
         </button>
+
+        {onDeleteContact && (
+          <button
+            onClick={() => {
+              onDeleteContact(user._id);
+              onClose();
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-500 transition-all hover:bg-red-500/10"
+          >
+            <UserMinus size={18} />
+            Remove from Contacts
+          </button>
+        )}
 
         <button className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-400 transition-all hover:bg-red-500/10">
           <Shield size={18} />

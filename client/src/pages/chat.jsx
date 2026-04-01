@@ -44,6 +44,24 @@ export default function Chat() {
     }
   };
 
+  const handleDeleteContact = async (userId) => {
+    if (window.confirm("Are you sure you want to remove this user from your contacts?")) {
+      try {
+        const response = await api.delete(`/user/delete-contact/${userId}`);
+        const updatedContacts = response.data.contacts || [];
+        setContacts(updatedContacts);
+        
+        const currentUser = getLoggedInUser();
+        if (currentUser) {
+           const updatedUser = { ...currentUser, contacts: updatedContacts };
+           localStorage.setItem("user", JSON.stringify(updatedUser));
+        }
+      } catch (err) {
+        console.error("Delete contact error:", err);
+      }
+    }
+  };
+
   const performLogout = async () => {
     try {
       await api.post("/auth/logout");
@@ -344,6 +362,7 @@ export default function Chat() {
             setContacts={setContacts} setChats={setChats}
             setIsAddingContact={setIsAddingContact} setIsCreatingGroup={setIsCreatingGroup}
             setActiveVideoCall={setActiveVideoCall}
+            onDeleteContact={handleDeleteContact}
           />
         </div>
       </div>

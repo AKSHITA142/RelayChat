@@ -43,6 +43,7 @@ export default function ChatWindow({
   setIsAddingContact,
   setIsCreatingGroup,
   setActiveVideoCall,
+  onDeleteContact,
 }) {
   void setIsAddingContact;
   void setIsCreatingGroup;
@@ -1128,6 +1129,7 @@ export default function ChatWindow({
             setShowSearch(true);
           }}
           onClearChat={handleClearChat}
+          onDeleteContact={onDeleteContact}
         />
       )}
 
