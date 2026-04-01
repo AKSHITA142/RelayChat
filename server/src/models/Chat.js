@@ -26,7 +26,13 @@ const chatSchema = new mongoose.Schema(
       of: Number,
       default: {}
       //key: userId, value: count
-    }
+    },
+    visibleTo: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+      }
+    ]
   },  
   { timestamps: true }
 );

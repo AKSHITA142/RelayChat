@@ -56,7 +56,7 @@ function broadcastStop() {}
 window.__stopRinger = stopRinger;
 stopRinger();
 
-export default function VideoCall({ to, fromName, isIncoming, initialOffer, onClose }) {
+export default function VideoCall({ to, displayPeerName, myProfileName, isIncoming, initialOffer, onClose }) {
   const log = (...args) => console.log("[VC]", ...args);
 
   const [status, setStatus] = useState(isIncoming ? "incoming" : "calling");
@@ -225,13 +225,11 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      socket.emit("call-user", { to, offer, fromName });
-      log("Offer sent");
+      socket.emit("call-user", { to, offer, fromName: myProfileName || "User" });
     } catch (err) {
-      log("startCall Error", err);
-      setStatus("Error: " + (err.message || "Call failed"));
+      log("startCall error", err);
     }
-  }, [to, fromName, getMedia, buildPC]);
+  }, [to, myProfileName, getMedia, buildPC]);
 
   const acceptCall = useCallback(async () => {
     log("acceptCall initiated");
@@ -459,7 +457,7 @@ export default function VideoCall({ to, fromName, isIncoming, initialOffer, onCl
                   <User size={48} className="text-[#12f1ff]" />
                 </motion.div>
                 <div className="text-center">
-                  <h3 className="text-xl font-bold text-white">{fromName || "User"}</h3>
+                  <h3 className="text-xl font-bold text-white">{displayPeerName || "User"}</h3>
                   <p className="text-slate-400 text-sm mt-1 flex items-center gap-2 justify-center">
                     {status === "calling" && "Calling..."}
                     {status === "incoming" && "Incoming Video Call"}

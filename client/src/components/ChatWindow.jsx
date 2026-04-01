@@ -369,14 +369,15 @@ export default function ChatWindow({
   };
 
   const startVideoCall = useCallback(() => {
-    const myName = getLoggedInUser()?.name || "Someone";
+    const myName = getLoggedInUser()?.name || "User";
     setActiveVideoCall?.({
       to: otherUser?._id || otherUser,
-      fromName: myName,
+      displayPeerName: displayName,
+      myProfileName: myName,
       isIncoming: false,
       callId: Date.now(),
     });
-  }, [otherUser, setActiveVideoCall]);
+  }, [otherUser, displayName, setActiveVideoCall]);
 
   const handleTextChange = (value) => {
     setText(value);
@@ -958,10 +959,11 @@ export default function ChatWindow({
                 onClose={() => setShowContactInfo(false)}
                 onVideoCall={() => {
                   setShowContactInfo(false);
-                  setActiveVideoCall?.({ chatId: selectedChat._id, recipientId: otherUser?._id, isVideo: true });
+                  startVideoCall();
                 }}
                 onVoiceCall={() => {
                   setShowContactInfo(false);
+                  // Not fully implemented voice call, keeping format for consistency if needed.
                   setActiveVideoCall?.({ chatId: selectedChat._id, recipientId: otherUser?._id, isVideo: false });
                 }}
                 onSearch={() => {

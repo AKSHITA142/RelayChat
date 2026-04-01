@@ -236,11 +236,14 @@ export default function Chat() {
 
   useEffect(() => {
     const handleIncomingCall = ({ from, fromName, offer }) => {
-      setActiveVideoCall({ to: from, fromName, initialOffer: offer, isIncoming: true, callId: Date.now() });
+      const savedContact = contacts.find((c) => c.userId?.toString() === from?.toString());
+      const displayPeerName = savedContact ? savedContact.savedName : fromName || "Unknown";
+
+      setActiveVideoCall({ to: from, displayPeerName, initialOffer: offer, isIncoming: true, callId: Date.now() });
     };
     socket.on("incoming-call", handleIncomingCall);
     return () => socket.off("incoming-call", handleIncomingCall);
-  }, []);
+  }, [contacts]);
 
   useEffect(() => {
     if (!chats.length) return;

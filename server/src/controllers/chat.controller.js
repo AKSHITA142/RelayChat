@@ -10,17 +10,21 @@ exports.createChat = async (req, res) => {
     if (!userId) {
       return res.status(400).json({
         message: "User ID is required"
-      }); 0
+      });
     }
 
 
     let chat = await Chat.findOne({
       isGroup: false,
-
       participants: { $all: [req.user.id, userId] }
     });
 
     if (chat) {
+      if (!chat.visibleTo?.some(id => id.toString() === req.user.id)) {
+        chat.visibleTo = chat.visibleTo || [];
+        chat.visibleTo.push(req.user.id);
+        await chat.save();
+      }
       const populatedChat = await Chat.findById(chat._id)
         .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")
         .populate("lastMessage");
@@ -31,7 +35,8 @@ exports.createChat = async (req, res) => {
 
     chat = await Chat.create({
       participants: [req.user.id, userId],
-      isGroup: false
+      isGroup: false,
+      visibleTo: [req.user.id]
     });
 
     const populatedChat = await Chat.findById(chat._id)
@@ -55,7 +60,14 @@ exports.getMyChats = async (req, res) => {
   console.log("Found chats in DB:", _c.length);
 
 
-  const chats = await Chat.find({ participants: userId })
+  const chats = await Chat.find({ 
+    participants: userId,
+    $or: [
+      { lastMessage: { $ne: null } },
+      { visibleTo: { $in: [userId] } },
+      { isGroup: true }
+    ]
+  })
     .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")
     .populate("lastMessage")
     .sort({ updatedAt: -1 })
@@ -216,6 +228,11 @@ exports.startChatByPhone = async (req, res) => {
     });
 
     if (chat) {
+      if (!chat.visibleTo?.some(id => id.toString() === req.user.id)) {
+        chat.visibleTo = chat.visibleTo || [];
+        chat.visibleTo.push(req.user.id);
+        await chat.save();
+      }
       return res.status(200).json({
         chat_id: chat._id,
         receiver_id: targetUser._id,
@@ -227,7 +244,8 @@ exports.startChatByPhone = async (req, res) => {
 
     chat = await Chat.create({
       participants: [req.user.id, targetUser._id],
-      isGroup: false
+      isGroup: false,
+      visibleTo: [req.user.id]
     });
 
     const populatedChat = await Chat.findById(chat._id)

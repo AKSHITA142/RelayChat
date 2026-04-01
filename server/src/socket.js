@@ -250,8 +250,18 @@ function initSocket(server) {
             } : undefined,
           });
 
+          const isFirstMessage = !chat.lastMessage;
           chat.lastMessage = message._id;
           await chat.save();
+
+          if (isFirstMessage) {
+            const populatedChat = await Chat.findById(roomId)
+              .populate("participants", "name email phoneNumber avatar signalVisibility encryptionPublicKey encryptionDevices vaultProtocol")
+              .populate("lastMessage");
+            chat.participants.forEach(p => {
+              io.to(p.toString()).emit("new-chat", populatedChat);
+            });
+          }
 
           message.status = "delivered";
           await message.save();
@@ -454,4 +464,3 @@ module.exports = {
   initSocket,
   getIO: () => io
 };
-
