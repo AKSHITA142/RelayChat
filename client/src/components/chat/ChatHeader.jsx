@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Check,
   Circle,
@@ -19,6 +20,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { IconButton } from "@/components/ui/icon-button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
+import { getLoggedInUser } from "../../utils/auth";
 
 export default function ChatHeader({
   selectedChat,
@@ -49,8 +51,42 @@ export default function ChatHeader({
   onClearChat,
   onStartVideoCall,
   menuRef,
+  pinnedMessageObjects = [],
+  onScrollToMessage,
+  onUnpinMessage,
+  contacts = [],
 }) {
+  const [currentPinnedIndex, setCurrentPinnedIndex] = useState(0);
+
   const pinnedMessages = selectedChat?.pinnedMessages || [];
+  
+  const activeIndex = pinnedMessageObjects.length ? currentPinnedIndex % pinnedMessageObjects.length : 0;
+  const currentPinnedMsg = pinnedMessageObjects[activeIndex];
+
+  const getPinnedMessageName = () => {
+    if (!currentPinnedMsg) return "";
+    const myId = getLoggedInUser()?._id;
+    const senderId = (currentPinnedMsg.sender?._id || currentPinnedMsg.sender)?.toString();
+    
+    if (senderId === myId?.toString()) {
+      return "You";
+    }
+
+    const contact = contacts.find((c) => c.userId?.toString() === senderId);
+    if (contact?.savedName) {
+      return contact.savedName;
+    }
+
+    return currentPinnedMsg.sender?.name || currentPinnedMsg.sender?.phoneNumber || "User";
+  };
+
+  const handlePinnedClick = () => {
+    if (!currentPinnedMsg) return;
+    if (onScrollToMessage) {
+      onScrollToMessage(currentPinnedMsg._id);
+    }
+    setCurrentPinnedIndex(prev => prev + 1);
+  };
 
   return (
     <div className="z-20 mx-3 mt-3 flex flex-col md:mx-4">
@@ -232,17 +268,37 @@ export default function ChatHeader({
         </div>
       </header>
 
-      {pinnedMessages.length > 0 && (
-        <div className="mt-2 flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 py-2 pl-4 pr-3 backdrop-blur-sm animate-in slide-in-from-top-1 duration-300">
-          <Pin size={14} className="text-primary" />
-          <div className="flex-1 min-w-0">
-            <p className="truncate text-xs font-medium text-white/90">
-              {pinnedMessages.length} Pinned {pinnedMessages.length === 1 ? "Message" : "Messages"}
+      {pinnedMessages.length > 0 && currentPinnedMsg && (
+        <div 
+          onClick={handlePinnedClick}
+          className="mt-2 flex cursor-pointer items-center gap-3 rounded-xl border border-primary/20 bg-primary/10 py-2 pl-4 pr-3 backdrop-blur-md transition-all hover:bg-primary/20 animate-in slide-in-from-top-1 duration-300 shadow-sm"
+        >
+          <Pin size={14} className="text-primary shrink-0" />
+          <div className="flex-1 min-w-0 border-l-2 border-primary/50 pl-2">
+            <p className="truncate text-[11px] font-bold text-white drop-shadow-sm">
+              {getPinnedMessageName()}
+              {pinnedMessages.length > 1 && (
+                <span className="ml-2 font-normal text-white/50">
+                  ({activeIndex + 1} of {pinnedMessages.length})
+                </span>
+              )}
+            </p>
+            <p className="truncate text-xs font-medium text-white/80 leading-tight">
+              {currentPinnedMsg.content || "📎 Attachment"}
             </p>
           </div>
-          <button className="text-[10px] font-bold uppercase tracking-widest text-primary/70 hover:text-primary transition-colors">
-            View All
-          </button>
+          {onUnpinMessage && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onUnpinMessage(currentPinnedMsg);
+              }}
+              className="text-[10px] font-bold uppercase tracking-widest text-primary/70 hover:text-white transition-colors p-1"
+              title="Unpin"
+            >
+               Unpin
+            </button>
+          )}
         </div>
       )}
     </div>

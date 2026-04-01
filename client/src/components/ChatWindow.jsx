@@ -1059,6 +1059,10 @@ export default function ChatWindow({
         onClearChat={handleClearChat}
         onStartVideoCall={startVideoCall}
         menuRef={menuRef}
+        pinnedMessageObjects={messages.filter((msg) => selectedChat?.pinnedMessages?.includes(msg._id))}
+        onScrollToMessage={scrollToMessage}
+        onUnpinMessage={handlePin}
+        contacts={contacts}
       />
 
       <div className="relative z-10 flex min-h-0 flex-1 flex-col backdrop-blur-sm">
