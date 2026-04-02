@@ -18,6 +18,8 @@ export default function ContactInfoPanel({
   onSearch,
   onClearChat,
   onDeleteContact,
+  isOnline,
+  lastSeenText,
 }) {
   if (!user) return null;
 
@@ -54,8 +56,14 @@ export default function ContactInfoPanel({
           className="h-24 w-24 rounded-full border-4 border-white/20 shadow-xl"
         />
         <h2 className="text-2xl font-bold text-white">{displayName}</h2>
-        {phone && <p className="text-sm font-medium text-primary">{phone}</p>}
-        <p className="px-4 text-sm text-white/50">"{status}"</p>
+        {phone && <p className="text-sm font-medium text-white/70">{phone}</p>}
+        {lastSeenText && (
+          <div className={cn("mt-1 flex items-center justify-center gap-1.5 text-xs", isOnline ? "text-green-400" : "text-white/40")}>
+            {isOnline && <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />}
+            {lastSeenText}
+          </div>
+        )}
+        <p className="mt-2 px-4 text-sm italic text-white/50">"{status}"</p>
       </div>
 
       <div className="grid grid-cols-3 gap-3 px-5 pb-6">

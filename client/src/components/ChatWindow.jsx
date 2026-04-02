@@ -125,13 +125,33 @@ export default function ChatWindow({
     otherUser?._id &&
     onlineUsers.some((id) => id?.toString() === otherUser._id.toString());
 
-  const lastSeen = lastSeenMap[otherUser?._id];
+  const lastSeen = lastSeenMap[otherUser?._id] || otherUser?.lastSeen;
   const lastSeenText = (() => {
     try {
+      if (isOnline) return "Online";
       if (!lastSeen) return "Offline";
       const date = new Date(lastSeen);
       if (Number.isNaN(date.getTime())) return "Offline";
-      return `Available ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      
+      const now = new Date();
+      const isToday = now.toDateString() === date.toDateString();
+      
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      const isYesterday = yesterday.toDateString() === date.toDateString();
+      
+      const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      
+      if (isToday) {
+        return `Last seen today at ${timeStr}`;
+      } else if (isYesterday) {
+        return `Last seen yesterday at ${timeStr}`;
+      } else if (now - date < 7 * 24 * 60 * 60 * 1000) {
+        const weekday = date.toLocaleDateString([], { weekday: 'long' });
+        return `Last seen ${weekday} at ${timeStr}`;
+      } else {
+        return `Last seen on ${date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })} at ${timeStr}`;
+      }
     } catch {
       return "Offline";
     }
@@ -1134,6 +1154,8 @@ export default function ChatWindow({
           }}
           onClearChat={handleClearChat}
           onDeleteContact={onDeleteContact}
+          isOnline={isOnline}
+          lastSeenText={lastSeenText}
         />
       )}
 
