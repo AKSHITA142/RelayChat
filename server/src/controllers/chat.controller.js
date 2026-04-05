@@ -175,6 +175,7 @@ exports.removeFromGroup = async (req, res) => {
       return res.status(400).json({ message: "Not a group chat" });
     }
 
+    
     if (chat.groupAdmin.toString() !== req.user.id && userId !== req.user.id) {
       return res.status(403).json({ message: "Action not authorized" });
     }
