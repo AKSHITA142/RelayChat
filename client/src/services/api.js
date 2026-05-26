@@ -22,7 +22,8 @@ api.interceptors.response.use(
       requestUrl.startsWith("/auth/login") ||
       requestUrl.startsWith("/auth/send-email-otp") ||
       requestUrl.startsWith("/auth/verify-email-otp") ||
-      requestUrl.startsWith("/auth/complete-registration");
+      requestUrl.startsWith("/auth/complete-registration") ||
+      requestUrl.includes("/auth/google");
 
     // Don't force session-expired redirect for auth endpoints:
     // those can legitimately return 401/400 (e.g. invalid credentials/OTP).
